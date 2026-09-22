@@ -220,6 +220,8 @@ export default function V4AnalyticsSuite({scan,walletEquity=0}){
               <div><span>Volume Accel.</span><b>{analytics.indicators?.volumeAcceleration??'—'}×</b></div>
               <div><span>Max Drawdown</span><b className="bad">{pct(analytics.indicators?.maxDrawdown)}</b></div>
               <div><span>Data Quality</span><b>{analytics.dataQuality}%</b><small>{analytics.sampleSize} candles</small></div>
+              <div><span>Structure</span><b>{analytics.regime?.structure||'—'}</b><small>{analytics.regime?.volatility||'—'} volatility</small></div>
+              <div><span>Structure R:R</span><b>{analytics.levels?.structureRiskReward?analytics.levels.structureRiskReward.toFixed(2)+'×':'—'}</b><small>nearest support → resistance</small></div>
             </div>
             {tape?.summary?(
               <div className="tradeTape">
@@ -247,8 +249,16 @@ export default function V4AnalyticsSuite({scan,walletEquity=0}){
               <ForecastCard label="NEXT 6H RANGE" forecast={analytics.forecast?.h6}/>
             </div>
             <div className="levelsGrid">
-              <div><span>SUPPORT ZONES</span>{(analytics.levels?.support||[]).map(value=><b key={value}>{tiny(value)}</b>)}</div>
-              <div><span>RESISTANCE ZONES</span>{(analytics.levels?.resistance||[]).map(value=><b key={value}>{tiny(value)}</b>)}</div>
+              <div>
+                <span>SUPPORT ZONES</span>
+                {(analytics.levels?.support||[]).map(value=><b key={value}>{tiny(value)}</b>)}
+                <small>Nearest: {tiny(analytics.levels?.nearestSupport)} · {analytics.levels?.downsideToSupportPercent==null?'—':analytics.levels.downsideToSupportPercent.toFixed(1)+'% below'}</small>
+              </div>
+              <div>
+                <span>RESISTANCE ZONES</span>
+                {(analytics.levels?.resistance||[]).map(value=><b key={value}>{tiny(value)}</b>)}
+                <small>Nearest: {tiny(analytics.levels?.nearestResistance)} · {analytics.levels?.upsideToResistancePercent==null?'—':analytics.levels.upsideToResistancePercent.toFixed(1)+'% above'}</small>
+              </div>
               <div><span>WHY</span>{(analytics.reasons||[]).map(value=><small key={value}>+ {value}</small>)}</div>
               <div><span>RISKS</span>{(analytics.risks||[]).map(value=><small key={value}>− {value}</small>)}</div>
             </div>
