@@ -1,5 +1,5 @@
 import { generateText } from 'ai'
-import { logTokenScan } from '../lib/supabase-log.js'
+import { logAiAnalysis } from '../lib/supabase-log.js'
 import { rateLimit, applyRateHeaders } from '../lib/rate-limit.js'
 
 function fallbackAnalysis(scan,social){
@@ -62,12 +62,19 @@ Never claim probability of profit, guaranteed returns, insider information, or c
         prompt:JSON.stringify(compact),
         maxOutputTokens:650
       })
-      await logTokenScan(scan,text)
+      await logAiAnalysis(
+        {scan,model,analysis:text,social},
+        req.headers?.['x-vercel-oidc-token']
+      )
       return res.status(200).json({success:true,model,analysis:text,gatewayAvailable:true})
     }catch{}
   }
 
   const analysis=fallbackAnalysis(scan,social)
+  await logAiAnalysis(
+    {scan,model:'deterministic-fallback-v4',analysis,social},
+    req.headers?.['x-vercel-oidc-token']
+  )
   return res.status(200).json({
     success:true,
     model:'deterministic-fallback-v4',
