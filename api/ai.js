@@ -2,13 +2,28 @@ import { generateText } from 'ai'
 import { logAiAnalysis } from '../lib/supabase-log.js'
 import { rateLimit, applyRateHeaders } from '../lib/rate-limit.js'
 
-function fallbackAnalysis(scan,social){
+function fallbackAnalysis(scan,social,mode='pro'){
   const intel=scan?.intelligence
   const positives=intel?.positives?.slice(0,3).join('; ')||'No strong positive signals.'
   const negatives=intel?.negatives?.slice(0,3).join('; ')||'No major negative signals.'
   const socialLine = social?.available
     ? `Social momentum ${social.momentumScore}/100 with quality ${social.qualityScore}/100 across ${social.sourceDiversity} source(s). Treat this as supporting evidence, not primary evidence.`
     : 'Social data is unavailable or not configured; do not infer social confirmation.'
+  if(mode==='beginner'){
+    const score=Number(intel?.score||0)
+    const plain=score>=75
+      ? 'Several parts of the setup look constructive, but it still needs risk checks.'
+      : score>=55
+        ? 'The setup is mixed. There are positives, but enough weaknesses that patience matters.'
+        : 'The setup currently has more weakness or uncertainty than confirmation.'
+    return [
+      `BOTTOM LINE\n${intel?.signal||'WATCH'} · RCXT ${score}/100. ${plain}`,
+      `WHY\n${positives}`,
+      `WHAT COULD GO WRONG\n${negatives}`,
+      `BEGINNER NOTE\nA score is not a win chance. Liquidity tells you how easy it may be to exit, seller pressure can change fast, and a good-looking chart cannot make contract risk disappear. ${socialLine}`
+    ].join('\n\n')
+  }
+
   return [
     `SIGNAL\n${intel?.signal||'WATCH'} — risk-adjusted score ${intel?.score??0}/100. Setup ${intel?.setupScore??'—'}, execution ${intel?.executionScore??'—'}, safety ${intel?.safetyScore??'—'}, data quality ${intel?.dataQualityScore??'—'}.`,
     `WHY\n${positives}\n${socialLine}`,
@@ -32,6 +47,7 @@ export default async function handler(req,res){
 
   const scan=body?.scan
   const social=body?.social || null
+  const mode=body?.mode==='beginner'?'beginner':'pro'
   if(!scan?.address||!scan?.intelligence) return res.status(400).json({success:false,error:'Scan data is required.'})
 
   const compact={
@@ -44,7 +60,16 @@ export default async function handler(req,res){
     pair:scan.pair
   }
 
-  const system=`You are RCXT Radar's market analyst. Analyze only the supplied Solana token snapshot.
+  const system=mode==='beginner'
+    ? `You are RCXT Radar's beginner-friendly Solana market explainer.
+Analyze only the supplied token snapshot. Use plain language a brand-new trader can understand.
+Avoid unexplained jargon. If you use a term like liquidity, RSI, slippage, or market cap, explain it in a few words.
+Never claim certainty, guaranteed profit, a win probability, insider information, or exact future prices.
+The deterministic RCXT v4 signal is the source of truth.
+Use exactly four short sections: BOTTOM LINE, WHY, WHAT COULD GO WRONG, BEGINNER NOTE.
+Explicitly say that score/confidence are not a probability of profit.
+Social evidence is lower trust and must never override contract, liquidity, or execution risk.`
+    : `You are RCXT Radar's market analyst. Analyze only the supplied Solana token snapshot.
 Be concise, skeptical, and practical. Never claim certainty, guaranteed profit, insider knowledge, or future prices.
 The deterministic RCXT v4 signal is the source of truth. It separates setup, execution, safety, and data quality.
 Social data is lower-trust supporting evidence because it can be manipulated. Never let social momentum override contract, liquidity, execution, or market-structure risk.
@@ -70,7 +95,7 @@ Never claim probability of profit, guaranteed returns, insider information, or c
     }catch{}
   }
 
-  const analysis=fallbackAnalysis(scan,social)
+  const analysis=fallbackAnalysis(scan,social,mode)
   await logAiAnalysis(
     {scan,model:'deterministic-fallback-v4',analysis,social},
     req.headers?.['x-vercel-oidc-token']
