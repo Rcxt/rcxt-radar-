@@ -58,7 +58,10 @@ export default async function handler(req,res){
     ai:{mode:'multi-model-gateway-with-deterministic-fallback'},
     oidc:{available:Boolean(req.headers?.['x-vercel-oidc-token'])},
     socialProviders:{
-      reddit:Boolean(process.env.REDDIT_BEARER_TOKEN),
+      reddit:Boolean(
+        process.env.REDDIT_BEARER_TOKEN ||
+        (process.env.REDDIT_CLIENT_ID && process.env.REDDIT_CLIENT_SECRET)
+      ),
       x:Boolean(process.env.X_BEARER_TOKEN),
       instagram:Boolean(process.env.INSTAGRAM_ACCESS_TOKEN && process.env.INSTAGRAM_USER_ID)
     }
