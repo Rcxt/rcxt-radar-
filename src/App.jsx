@@ -842,7 +842,7 @@ export default function Home() {
                   </div>
                   <div className="cardFooter">
                     <span>{item.dex || 'DEX'}</span>
-                    <span>Open full scan →</span>
+                    <span>{item.intelligence.preliminary ? 'Preliminary · full scan →' : 'Open full scan →'}</span>
                   </div>
                 </div>
               ))}
@@ -975,6 +975,38 @@ export default function Home() {
                           : scan.security?.freezeAuthority
                             ? 'Active'
                             : 'Disabled'
+                      }
+                    />
+                    <SecurityRow
+                      label="Contract verification"
+                      good={Boolean(scan.intelligence.contractVerified)}
+                      unknown={!scan.security?.available}
+                      value={
+                        scan.intelligence.contractVerified
+                          ? 'Verified'
+                          : scan.security?.available
+                            ? 'Needs review'
+                            : 'Partial'
+                      }
+                    />
+                    <SecurityRow
+                      label="Largest account"
+                      good={scan.security?.concentrationAvailable && Number(scan.security?.top1Percent || 100) < 45}
+                      unknown={!scan.security?.concentrationAvailable}
+                      value={
+                        scan.security?.concentrationAvailable
+                          ? `${Number(scan.security.top1Percent).toFixed(1)}%`
+                          : 'Unavailable'
+                      }
+                    />
+                    <SecurityRow
+                      label="Top 10 accounts"
+                      good={scan.security?.concentrationAvailable && Number(scan.security?.top10Percent || 100) < 85}
+                      unknown={!scan.security?.concentrationAvailable}
+                      value={
+                        scan.security?.concentrationAvailable
+                          ? `${Number(scan.security.top10Percent).toFixed(1)}%`
+                          : 'Unavailable'
                       }
                     />
                     <SecurityRow
@@ -1262,8 +1294,8 @@ export default function Home() {
 
       <footer className="footer">
         <div>
-          <b>RCXT RADAR · v2.0.0 PRODUCTION</b>
-          <span>Official production build · Solana · DexScreener · Supabase · Vercel</span>
+          <b>RCXT RADAR · PRODUCTION</b>
+          <span>Score engine v3.0.0 · Solana · DexScreener · Supabase · Vercel</span>
         </div>
         <p>
           Signals are software-generated market intelligence, not guarantees or personalized financial advice.
