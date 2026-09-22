@@ -951,7 +951,7 @@ export default function Home() {
                   <small>Not a probability of profit</small>
                 </div>
                 <ScoreAxes intelligence={scan.intelligence} />
-                <ScoreTrend rows={scoreHistory} currentScore={scan.intelligence.score} />
+                <ScoreTrend rows={scoreHistory} currentScore={scan.intelligence.score} modelVersion={scan.intelligence.modelVersion} />
               </article>
 
               <div className="metricGrid six">
@@ -1363,8 +1363,10 @@ function ScoreRing({ score, large = false }) {
   )
 }
 
-function ScoreTrend({ rows, currentScore }) {
-  const ordered = [...(rows || [])].reverse()
+function ScoreTrend({ rows, currentScore, modelVersion }) {
+  const compatible = (rows || []).filter((row) => row.scoreVersion === modelVersion)
+  const legacyCount = Math.max(0, (rows?.length || 0) - compatible.length)
+  const ordered = [...compatible].reverse()
   const previous = ordered.length > 1 ? ordered[ordered.length - 2] : null
   const delta = previous ? Number(currentScore || 0) - Number(previous.score || 0) : null
 
@@ -1372,12 +1374,12 @@ function ScoreTrend({ rows, currentScore }) {
     <div className="scoreTrend">
       <div className="scoreTrendHead">
         <div>
-          <span>RECENT SCORE TREND</span>
+          <span>RECENT {modelVersion} SCORE TREND</span>
           <strong>
-            {delta === null ? 'Building history' : `${delta >= 0 ? '+' : ''}${delta} pts vs prior saved scan`}
+            {delta === null ? 'Building comparable history' : `${delta >= 0 ? '+' : ''}${delta} pts vs prior v4 scan`}
           </strong>
         </div>
-        <small>{rows?.length || 0} saved scans</small>
+        <small>{compatible.length} comparable{legacyCount ? ` · ${legacyCount} legacy hidden` : ''}</small>
       </div>
       <div className="trendBars">
         {ordered.length
@@ -1387,7 +1389,7 @@ function ScoreTrend({ rows, currentScore }) {
                 <span>{row.score}</span>
               </div>
             ))
-          : <p>No saved history yet. Manual scans create history; 5-second refreshes do not.</p>}
+          : <p>No comparable v4 history yet. Manual scans create history; 5-second refreshes do not.</p>}
       </div>
     </div>
   )
