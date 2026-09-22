@@ -45,6 +45,7 @@ export default function Home() {
   const [minLiquidity, setMinLiquidity] = useState(0)
   const [positionSize, setPositionSize] = useState('50')
   const [targetMarketCap, setTargetMarketCap] = useState('')
+  const [health, setHealth] = useState(null)
 
   const loadRadar = useCallback(async () => {
     setRadarLoading(true)
@@ -85,6 +86,27 @@ export default function Home() {
       // Ignore malformed local history.
     }
   }, [loadRadar])
+
+  useEffect(() => {
+    let active = true
+
+    async function loadHealth() {
+      try {
+        const response = await fetch('/api/health', { cache: 'no-store' })
+        const data = await response.json()
+        if (active && data?.success) setHealth(data)
+      } catch {
+        if (active) setHealth({ healthy: false, services: {} })
+      }
+    }
+
+    loadHealth()
+    const timer = setInterval(loadHealth, 30000)
+    return () => {
+      active = false
+      clearInterval(timer)
+    }
+  }, [])
 
   useEffect(() => {
     if (view !== 'radar') return
@@ -401,6 +423,23 @@ export default function Home() {
     return [...filtered].sort(sorters[radarSort] || sorters.score)
   }, [radar, hiddenAddresses, radarSearch, signalFilter, minScore, minLiquidity, radarSort])
 
+  const radarPulse = useMemo(() => {
+    const items = visibleRadar
+    if (!items.length) return { buys:0, highRisk:0, medianScore:0, volume24h:0, avg1h:0 }
+
+    const scores = items.map((item) => Number(item.intelligence?.score || 0)).sort((a,b) => a-b)
+    const middle = Math.floor(scores.length / 2)
+    const medianScore = scores.length % 2 ? scores[middle] : Math.round((scores[middle - 1] + scores[middle]) / 2)
+
+    return {
+      buys: items.filter((item) => ['BUY SETUP','LEAN BUY'].includes(item.intelligence?.signal)).length,
+      highRisk: items.filter((item) => ['HIGH','EXTREME'].includes(item.intelligence?.risk)).length,
+      medianScore,
+      volume24h: items.reduce((sum,item) => sum + Number(item.volume24h || 0), 0),
+      avg1h: items.reduce((sum,item) => sum + Number(item.change1h || 0), 0) / items.length,
+    }
+  }, [visibleRadar])
+
   const portfolioStats = useMemo(() => {
     const holdings = walletData?.holdings || []
     const total = Number(walletData?.portfolioTokenValueUsd || 0)
@@ -459,10 +498,16 @@ export default function Home() {
           >
             {notificationsEnabled ? 'Alerts On' : 'Enable Alerts'}
           </button>
-          <div className="systemStatus">
+          <div className={health?.healthy === false ? 'systemStatus degraded' : 'systemStatus'}>
             <span className="pulse" />
-            <span>LIVE</span>
-            <small>Solana + DexScreener</small>
+            <span>{health?.healthy === false ? 'DEGRADED' : 'LIVE'}</span>
+            <small>
+              {health?.healthy === false
+                ? 'Service issue detected'
+                : health
+                  ? `Solana ${health.services?.solana?.latencyMs ?? '—'}ms · Dex ${health.services?.dexscreener?.latencyMs ?? '—'}ms`
+                  : 'Checking systems…'}
+            </small>
           </div>
         </div>
       </header>
@@ -526,6 +571,14 @@ export default function Home() {
           </div>
 
           {radarError ? <ErrorBox text={radarError} /> : null}
+
+          <div className="marketPulse">
+            <MetricCard label="Buy Setups" value={radarPulse.buys} tone={radarPulse.buys ? 'positive' : ''} />
+            <MetricCard label="Median Score" value={radarPulse.medianScore} />
+            <MetricCard label="High-Risk Names" value={radarPulse.highRisk} tone={radarPulse.highRisk ? 'negative' : ''} />
+            <MetricCard label="Visible 24H Volume" value={compactUsd(radarPulse.volume24h)} />
+            <MetricCard label="Avg 1H Momentum" value={percent(radarPulse.avg1h)} tone={radarPulse.avg1h >= 0 ? 'positive' : 'negative'} />
+          </div>
 
           <div className="proToolbar">
             <input
