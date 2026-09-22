@@ -19,7 +19,7 @@ export default async function handler(req,res){
     const social=await getSocialIntel({address,symbol,name})
     const persistence=shouldPersist && social?.available
       ? await Promise.race([
-          logSocialSnapshot({address,symbol,social}),
+          logSocialSnapshot({address,symbol,social}, req.headers?.['x-vercel-oidc-token']),
           new Promise(resolve=>setTimeout(()=>resolve({ok:false,status:0,error:'Persistence timeout'}),1800))
         ])
       : {ok:true,skipped:true,status:0,error:null}
