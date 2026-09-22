@@ -2065,3 +2065,34 @@ input,select,textarea{font-size:16px}
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
+
+
+/* Social intelligence */
+.socialIntelPanel{margin-top:10px}
+.socialSummary{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:10px}
+.socialProviderGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:10px}
+.socialProvider{border:1px solid #1d2a35;background:#090f15;border-radius:12px;padding:11px;min-width:0}
+.socialProvider.active{border-color:#284436;background:linear-gradient(145deg,#0a1612,#091017)}
+.socialProvider.unavailable{opacity:.78}
+.socialProviderHead{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.socialProviderHead strong{font-size:11px}.socialProviderHead span{font-size:7px;letter-spacing:.09em;color:#657587}
+.socialProvider.active .socialProviderHead span{color:var(--green)}
+.socialProviderStats{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.socialProviderStats span{border:1px solid #1c2934;border-radius:999px;padding:4px 6px;font-size:7px;color:#8593a3}
+.socialProvider>small{display:block;margin-top:8px;color:#617082;font-size:8px;line-height:1.45}
+.socialPostList{display:grid;gap:5px;margin-top:9px}
+.socialPostList a{display:block;border-top:1px solid #17222c;padding-top:7px;text-decoration:none;color:#b8c3cf}
+.socialPostList a span{display:block;font-size:8px;line-height:1.45}
+.socialPostList a small{display:block;color:#536273;font-size:7px;margin-top:3px}
+.socialFooter{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px}
+.socialFooter>span{font-size:8px;color:#5c6b7c;line-height:1.4}
+@media(max-width:820px){
+  .socialSummary{grid-template-columns:repeat(3,1fr)}
+  .socialProviderGrid{grid-template-columns:1fr}
+}
+@media(max-width:480px){
+  .socialSummary{grid-template-columns:1fr 1fr}
+  .socialProvider{padding:12px}
+  .socialFooter{align-items:stretch;flex-direction:column}
+  .socialFooter .toolButton{width:100%}
+}
