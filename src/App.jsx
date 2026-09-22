@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 const TEST_WALLET = '976CYJJEVhntZhKS5wdUb3mz2w8FxViDbfCWK8xg2eQ7'
 const HISTORY_KEY = 'rcxt-scan-history-v1'
+const HIDDEN_KEY = 'rcxt-hidden-coins-v1'
 
 export default function Home() {
   const [view, setView] = useState('radar')
@@ -28,6 +29,8 @@ export default function Home() {
   const [walletError, setWalletError] = useState('')
 
   const [history, setHistory] = useState([])
+  const [hiddenCoins, setHiddenCoins] = useState([])
+  const [showHidden, setShowHidden] = useState(false)
 
   const loadRadar = useCallback(async () => {
     setRadarLoading(true)
@@ -51,6 +54,9 @@ export default function Home() {
     try {
       const saved = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]')
       if (Array.isArray(saved)) setHistory(saved.slice(0, 12))
+
+      const hidden = JSON.parse(localStorage.getItem(HIDDEN_KEY) || '[]')
+      if (Array.isArray(hidden)) setHiddenCoins(hidden.filter((item) => item?.address))
     } catch {
       // Ignore malformed local history.
     }
@@ -168,6 +174,40 @@ export default function Home() {
     runScan({ address: item.address })
   }
 
+  function hideCoin(item) {
+    setHiddenCoins((current) => {
+      const next = [
+        { address: item.address, symbol: item.symbol, name: item.name },
+        ...current.filter((coin) => coin.address !== item.address),
+      ]
+      localStorage.setItem(HIDDEN_KEY, JSON.stringify(next))
+      return next
+    })
+  }
+
+  function restoreCoin(address) {
+    setHiddenCoins((current) => {
+      const next = current.filter((coin) => coin.address !== address)
+      localStorage.setItem(HIDDEN_KEY, JSON.stringify(next))
+      return next
+    })
+  }
+
+  function restoreAllCoins() {
+    setHiddenCoins([])
+    localStorage.removeItem(HIDDEN_KEY)
+  }
+
+  const hiddenAddresses = useMemo(
+    () => new Set(hiddenCoins.map((coin) => coin.address)),
+    [hiddenCoins],
+  )
+
+  const visibleRadar = useMemo(
+    () => radar.filter((item) => !hiddenAddresses.has(item.address)),
+    [radar, hiddenAddresses],
+  )
+
   const walletSignals = useMemo(() => {
     if (!walletData?.holdings) return { buy: 0, watch: 0, reduce: 0 }
 
@@ -247,21 +287,71 @@ export default function Home() {
                 <p>Boosted Solana markets ranked by RCXT signal quality—not by hype.</p>
               </div>
             </div>
-            <button className="ghostButton" onClick={loadRadar} disabled={radarLoading}>
-              {radarLoading ? 'Refreshing…' : 'Refresh feed'}
-            </button>
+            <div className="radarActions">
+              {hiddenCoins.length ? (
+                <button className="ghostButton" onClick={() => setShowHidden((value) => !value)}>
+                  {showHidden ? 'Hide hidden list' : `Hidden (${hiddenCoins.length})`}
+                </button>
+              ) : null}
+              <button className="ghostButton" onClick={loadRadar} disabled={radarLoading}>
+                {radarLoading ? 'Refreshing…' : 'Refresh feed'}
+              </button>
+            </div>
           </div>
 
           {radarError ? <ErrorBox text={radarError} /> : null}
 
+          {showHidden && hiddenCoins.length ? (
+            <div className="hiddenTray">
+              <div className="hiddenTrayHead">
+                <div>
+                  <span>HIDDEN COINS</span>
+                  <small>These stay hidden on this device until you restore them.</small>
+                </div>
+                <button onClick={restoreAllCoins}>Restore all</button>
+              </div>
+              <div className="hiddenCoins">
+                {hiddenCoins.map((coin) => (
+                  <button key={coin.address} onClick={() => restoreCoin(coin.address)}>
+                    <strong>{coin.symbol || 'TOKEN'}</strong>
+                    <span>{coin.name || shortAddress(coin.address, 4)}</span>
+                    <em>Restore</em>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           <div className="radarGrid">
             {radarLoading && radar.length === 0
               ? Array.from({ length: 6 }).map((_, index) => <RadarSkeleton key={index} />)
-              : radar.map((item, index) => (
-                <button className="radarCard" key={item.address} onClick={() => openRadarToken(item)}>
+              : visibleRadar.map((item, index) => (
+                <div
+                  className="radarCard"
+                  key={item.address}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openRadarToken(item)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') openRadarToken(item)
+                  }}
+                >
                   <div className="radarTop">
                     <span className="rank">#{String(index + 1).padStart(2, '0')}</span>
-                    <SignalBadge signal={item.intelligence.signal} />
+                    <div className="radarTopActions">
+                      <button
+                        className="hideCoinButton"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          hideCoin(item)
+                        }}
+                        aria-label={`Hide ${item.symbol}`}
+                        title="Hide coin"
+                      >
+                        Hide
+                      </button>
+                      <SignalBadge signal={item.intelligence.signal} />
+                    </div>
                   </div>
                   <div className="tokenName">
                     <strong>{item.symbol}</strong>
@@ -288,7 +378,7 @@ export default function Home() {
                     <span>{item.dex || 'DEX'}</span>
                     <span>Open full scan →</span>
                   </div>
-                </button>
+                </div>
               ))}
           </div>
 
