@@ -2119,3 +2119,49 @@ input,select,textarea{font-size:16px}
   .calibrationStrip.collecting{flex-direction:column}
   .calibrationRows{grid-template-columns:1fr}
 }
+
+
+/* RCXT all-in-one command center */
+.commandMenuWrap{position:relative}
+.menuButton{height:38px;display:inline-flex;align-items:center;gap:8px;border:1px solid #24323d;background:#0a1117;color:#b7c2ce;border-radius:9px;padding:0 12px;font-size:8px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
+.menuButton:hover,.menuButton.active{border-color:#3a5162;background:#0d1821;color:#fff}
+.menuIcon{display:grid;gap:3px;width:14px}.menuIcon i{display:block;height:1px;background:currentColor;border-radius:2px}.menuIcon i:nth-child(2){width:10px}
+.commandMenu{position:absolute;z-index:100;top:46px;right:0;width:min(480px,calc(100vw - 20px));max-height:min(720px,calc(100dvh - 84px));overflow:auto;background:rgba(7,12,17,.98);border:1px solid #263642;border-radius:16px;box-shadow:0 26px 80px rgba(0,0,0,.55);padding:14px;-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px)}
+.commandMenuHead{display:flex;justify-content:space-between;gap:12px;padding:4px 3px 13px;border-bottom:1px solid #18232c}.commandMenuHead span{font-size:7px;color:var(--cyan);letter-spacing:.13em}.commandMenuHead strong{display:block;font-size:15px;margin-top:4px}.commandMenuHead>button{width:34px;height:34px;border-radius:9px;border:1px solid #24313b;background:#0c141b;color:#8fa0b0;font-size:20px}
+.commandSection{padding:13px 0 0}.commandSection>span{display:block;font-size:7px;color:#536476;letter-spacing:.12em;margin-bottom:7px}
+.commandGrid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.commandGrid.three{grid-template-columns:repeat(3,1fr)}
+.commandGrid button{min-height:58px;text-align:left;border:1px solid #1c2933;background:#091016;color:#d7dee5;border-radius:10px;padding:10px;cursor:pointer}.commandGrid button:hover{border-color:#345063;background:#0d1820}.commandGrid b{display:block;font-size:10px}.commandGrid small{display:block;font-size:7px;color:#647586;margin-top:4px;line-height:1.35}
+.presetRow{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.presetRow button{min-height:38px;border:1px solid #21303b;background:#091117;color:#78899a;border-radius:9px;font-size:8px;font-weight:900;text-transform:uppercase}.presetRow button.active{border-color:#2f6e55;color:var(--green);background:#0c1a14}
+.commandComingSoon{margin-top:13px;border:1px solid #313245;background:linear-gradient(135deg,#11111c,#0a1016);border-radius:11px;padding:11px;display:flex;align-items:center;justify-content:space-between;gap:12px}.commandComingSoon span{font-size:7px;color:#8f77d8;letter-spacing:.12em}.commandComingSoon strong{display:block;font-size:11px;margin-top:3px}.commandComingSoon small{display:block;font-size:7px;color:#657386;margin-top:3px}.commandComingSoon>b{font-size:8px;color:#a78cff;border:1px solid #433a61;border-radius:999px;padding:5px 7px}
+.commandFooter{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;padding-top:11px;border-top:1px solid #18232c}.commandFooter button{border:0;background:transparent;color:#718294;font-size:8px;text-decoration:underline;cursor:pointer}.commandFooter span{font-size:7px;color:#455362}
+
+.drawerBackdrop{position:fixed;inset:0;z-index:110;background:rgba(0,0,0,.64);display:flex;justify-content:flex-end;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.workspaceDrawer{width:min(430px,100%);height:100dvh;background:#070c11;border-left:1px solid #22313c;padding:max(18px,env(safe-area-inset-top)) 16px calc(18px + env(safe-area-inset-bottom));display:flex;flex-direction:column;box-shadow:-24px 0 70px rgba(0,0,0,.45);overflow:auto}
+.drawerHead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding-bottom:14px;border-bottom:1px solid #18232c}.drawerHead span{font-size:7px;color:var(--cyan);letter-spacing:.12em}.drawerHead h3{font-size:21px;margin:4px 0 0}.drawerHead button{width:38px;height:38px;border-radius:10px;border:1px solid #24333f;background:#0b131a;color:#92a1b0;font-size:22px}
+.drawerToolbar{display:flex;align-items:center;justify-content:space-between;padding:13px 0 5px}.drawerToolbar span{font-size:8px;color:#667789}.drawerToolbar button{border:0;background:transparent;color:var(--green);font-size:8px}
+.drawerList{display:grid;gap:7px;padding-top:12px}.drawerList>button,.drawerRow{width:100%;display:flex;justify-content:space-between;align-items:center;gap:12px;text-align:left;border:1px solid #1b2832;background:#091016;color:#d5dde5;border-radius:11px;padding:11px}.drawerList>button{cursor:pointer}.drawerList>button:hover{border-color:#345063}.drawerList strong,.drawerRow strong{display:block;font-size:11px}.drawerList span,.drawerRow span{display:block;font-size:8px;color:#647587;margin-top:3px}.drawerList small{font-size:8px;color:#718294}.drawerRow>button{border:1px solid #2b3d49;background:#0d171e;color:#8ea0b0;border-radius:8px;padding:7px 9px;font-size:8px}
+.emptyDrawer{border:1px dashed #26343e;border-radius:12px;padding:22px;text-align:center}.emptyDrawer span{font-size:7px;color:#526273;letter-spacing:.1em}.emptyDrawer p{font-size:9px;color:#718193;line-height:1.5;margin:7px 0 0}
+.systemDrawerGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:14px}.serviceTile,.systemMeta{border:1px solid #1d2a34;background:#091016;border-radius:11px;padding:12px}.serviceTile>div{display:flex;align-items:center;gap:7px}.serviceDot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green)}.serviceTile.degraded .serviceDot{background:var(--red);box-shadow:none}.serviceTile strong{font-size:9px}.serviceTile>b{display:block;font-size:10px;margin-top:10px;color:var(--green)}.serviceTile.degraded>b{color:var(--red)}.serviceTile small{display:block;font-size:7px;color:#59697a;margin-top:3px}.systemMeta span{display:block;font-size:7px;color:#586879}.systemMeta b{display:block;font-size:10px;margin-top:5px}
+.drawerFoot{margin-top:auto;padding-top:16px;border-top:1px solid #18232c;display:flex;justify-content:space-between;align-items:center;gap:10px}.drawerFoot span{font-size:7px;color:#536374}.drawerFoot button{min-width:80px;height:38px;border-radius:9px;border:1px solid #2c4639;background:#0c1913;color:var(--green);font-size:8px;font-weight:900}
+
+.dangerSoft{border-color:#493035!important;color:#d58c96!important}
+.socialComingSoon{position:relative;overflow:hidden;border-color:#313348!important;background:radial-gradient(circle at 80% 20%,rgba(118,87,205,.13),transparent 35%),linear-gradient(145deg,#0b1018,#090e14)!important}
+.socialComingSoon:after{content:'';position:absolute;width:220px;height:220px;border:1px solid rgba(132,102,211,.12);border-radius:50%;right:-100px;top:-120px}
+.comingSoonBadge{display:inline-flex;border:1px solid #463d65;background:#151326;color:#ac93ff;border-radius:999px;padding:5px 8px;font-size:7px;font-weight:900;letter-spacing:.12em}
+.comingSoonMain{display:grid;grid-template-columns:1fr 190px;gap:24px;align-items:center;margin-top:13px;position:relative;z-index:1}.comingSoonMain h3{font-size:18px;margin:5px 0}.comingSoonMain p{font-size:9px;color:#718091;line-height:1.6;max-width:650px;margin:0}.socialSoonScore{border:1px solid #292b3d;background:#0b1018;border-radius:12px;padding:14px;text-align:center}.socialSoonScore span{display:block;font-size:7px;color:#6e7289;letter-spacing:.1em}.socialSoonScore strong{display:block;font-size:26px;color:#aa91fb;margin:6px 0}.socialSoonScore small{display:block;font-size:7px;color:#5f6a7d;line-height:1.4}
+.comingSoonFeatures{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:12px;position:relative;z-index:1}.comingSoonFeatures span{border:1px solid #242c39;background:#0a1118;border-radius:9px;padding:9px;font-size:7px;color:#748396;text-align:center}
+
+@media(max-width:760px){
+  .commandGrid.three{grid-template-columns:1fr}
+  .commandMenu{position:fixed;top:calc(60px + env(safe-area-inset-top));left:8px;right:8px;width:auto;max-height:calc(100dvh - 150px)}
+  .systemDrawerGrid{grid-template-columns:1fr 1fr}
+  .comingSoonMain{grid-template-columns:1fr}.socialSoonScore{text-align:left}
+  .comingSoonFeatures{grid-template-columns:1fr 1fr}
+}
+@media(max-width:480px){
+  .menuButton{min-height:44px;padding:0 10px}
+  .commandGrid{grid-template-columns:1fr 1fr}
+  .workspaceDrawer{width:100%;border-left:0}
+  .comingSoonFeatures{grid-template-columns:1fr 1fr}
+  .systemDrawerGrid{grid-template-columns:1fr 1fr}
+}

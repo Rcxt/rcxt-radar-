@@ -58,6 +58,9 @@ export default function Home() {
   const [socialError, setSocialError] = useState('')
   const [socialLastRefresh, setSocialLastRefresh] = useState(null)
   const [calibration, setCalibration] = useState({ totalSamples: 0, rows: [] })
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [activeDrawer, setActiveDrawer] = useState('')
+  const [radarPreset, setRadarPreset] = useState('balanced')
 
   const loadRadar = useCallback(async () => {
     setRadarLoading(true)
@@ -219,8 +222,6 @@ export default function Home() {
       }
 
       if (!silent) {
-        loadSocial({ targetScan: data.scan })
-
         try {
           const historyResponse = await fetch(`/api/history?address=${encodeURIComponent(target)}`, { cache: 'no-store' })
           const historyData = await historyResponse.json()
@@ -273,14 +274,6 @@ export default function Home() {
 
     return () => clearInterval(timer)
   }, [autoRefresh, scan?.address, runScan])
-
-  useEffect(() => {
-    if (!scan?.address) return
-    const timer = setInterval(() => {
-      loadSocial({ targetScan: scan, silent: true })
-    }, 60000)
-    return () => clearInterval(timer)
-  }, [scan?.address, loadSocial])
 
   async function enableNotifications() {
     if (typeof window === 'undefined' || !('Notification' in window)) {
@@ -506,6 +499,61 @@ export default function Home() {
     localStorage.removeItem(HIDDEN_KEY)
   }
 
+  function applyRadarPreset(preset) {
+    setRadarPreset(preset)
+    setRadarSearch('')
+
+    if (preset === 'safer') {
+      setSignalFilter('ALL')
+      setMinScore(65)
+      setMinLiquidity(50000)
+      setRadarSort('score')
+    } else if (preset === 'discovery') {
+      setSignalFilter('ALL')
+      setMinScore(50)
+      setMinLiquidity(5000)
+      setRadarSort('momentum')
+    } else {
+      setSignalFilter('ALL')
+      setMinScore(0)
+      setMinLiquidity(15000)
+      setRadarSort('score')
+    }
+
+    setView('radar')
+    setMenuOpen(false)
+  }
+
+  function resetRadarWorkspace() {
+    setRadarPreset('balanced')
+    setRadarSearch('')
+    setSignalFilter('ALL')
+    setMinScore(0)
+    setMinLiquidity(0)
+    setRadarSort('score')
+    setCompare([])
+    setNotificationStatus('Radar workspace reset. Saved watchlist and hidden coins were kept.')
+    setMenuOpen(false)
+  }
+
+  function openDrawer(name) {
+    setActiveDrawer(name)
+    setMenuOpen(false)
+  }
+
+  function closeDrawer() {
+    setActiveDrawer('')
+  }
+
+  function openHistoryScan(entry) {
+    const address = entry?.address
+    if (!address) return
+    closeDrawer()
+    setView('scanner')
+    setTokenAddress(address)
+    runScan({ address })
+  }
+
   function toggleWatch(item) {
     const address = item?.address || item?.mint
     if (!address) return
@@ -666,6 +714,74 @@ export default function Home() {
         </nav>
 
         <div className="topActions">
+          <div className="commandMenuWrap">
+            <button
+              className={menuOpen ? 'menuButton active' : 'menuButton'}
+              onClick={() => setMenuOpen((value) => !value)}
+              aria-expanded={menuOpen}
+              aria-haspopup="menu"
+            >
+              <span className="menuIcon"><i /><i /><i /></span>
+              Menu
+            </button>
+
+            {menuOpen ? (
+              <div className="commandMenu" role="menu">
+                <div className="commandMenuHead">
+                  <div>
+                    <span>RCXT COMMAND CENTER</span>
+                    <strong>Everything in one place</strong>
+                  </div>
+                  <button onClick={() => setMenuOpen(false)} aria-label="Close menu">×</button>
+                </div>
+
+                <div className="commandSection">
+                  <span>NAVIGATE</span>
+                  <div className="commandGrid three">
+                    <button onClick={() => { setView('radar'); setMenuOpen(false) }}><b>Radar</b><small>Live opportunities</small></button>
+                    <button onClick={() => { setView('scanner'); setMenuOpen(false) }}><b>Scanner</b><small>Deep token intel</small></button>
+                    <button onClick={() => { setView('wallet'); setMenuOpen(false) }}><b>Wallet</b><small>Portfolio command</small></button>
+                  </div>
+                </div>
+
+                <div className="commandSection">
+                  <span>WORKSPACE</span>
+                  <div className="commandGrid">
+                    <button onClick={() => openDrawer('watchlist')}><b>★ Watchlist</b><small>{watchlist.length} saved tokens</small></button>
+                    <button onClick={() => openDrawer('hidden')}><b>Hidden Coins</b><small>{hiddenCoins.length} filtered out</small></button>
+                    <button onClick={() => openDrawer('history')}><b>Recent Scans</b><small>{history.length} local scans</small></button>
+                    <button onClick={() => openDrawer('system')}><b>System Health</b><small>{health?.healthy === false ? 'Needs attention' : 'All systems live'}</small></button>
+                    <button onClick={() => { setView('scanner'); setMenuOpen(false); setNotificationStatus('Alert Center is inside the Deep Token Scanner.') }}><b>Alert Center</b><small>Score · MC · signal rules</small></button>
+                    <button onClick={() => { exportRadarCsv(); setMenuOpen(false) }}><b>Export Center</b><small>Download radar CSV</small></button>
+                  </div>
+                </div>
+
+                <div className="commandSection">
+                  <span>RADAR PRESETS</span>
+                  <div className="presetRow">
+                    <button className={radarPreset === 'safer' ? 'active' : ''} onClick={() => applyRadarPreset('safer')}>Safer</button>
+                    <button className={radarPreset === 'balanced' ? 'active' : ''} onClick={() => applyRadarPreset('balanced')}>Balanced</button>
+                    <button className={radarPreset === 'discovery' ? 'active' : ''} onClick={() => applyRadarPreset('discovery')}>Discovery</button>
+                  </div>
+                </div>
+
+                <div className="commandComingSoon">
+                  <div>
+                    <span>COMING SOON</span>
+                    <strong>Social Intelligence</strong>
+                    <small>Reddit · X · Instagram signal layer</small>
+                  </div>
+                  <b>SOON</b>
+                </div>
+
+                <div className="commandFooter">
+                  <button onClick={resetRadarWorkspace}>Reset radar workspace</button>
+                  <span>v3.0 · Score Engine 4.0</span>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
           <button
             className={notificationsEnabled ? 'notifyButton enabled' : 'notifyButton'}
             onClick={notificationsEnabled ? disableNotifications : enableNotifications}
@@ -704,7 +820,7 @@ export default function Home() {
           </div>
           <div>
             <strong>RCXT Intelligence</strong>
-            <span>6-signal scoring engine</span>
+            <span>Risk-adjusted Score Engine 4.0</span>
             <small>No mock market data</small>
           </div>
         </div>
@@ -713,6 +829,81 @@ export default function Home() {
       {notificationStatus ? (
         <div className="notificationStatus" onClick={() => setNotificationStatus('')}>
           {notificationStatus}
+        </div>
+      ) : null}
+
+      {activeDrawer ? (
+        <div className="drawerBackdrop" onClick={closeDrawer}>
+          <aside className="workspaceDrawer" onClick={(event) => event.stopPropagation()} aria-label="RCXT workspace drawer">
+            <div className="drawerHead">
+              <div>
+                <span>RCXT WORKSPACE</span>
+                <h3>
+                  {activeDrawer === 'watchlist' ? 'Watchlist' :
+                   activeDrawer === 'hidden' ? 'Hidden Coins' :
+                   activeDrawer === 'history' ? 'Recent Scans' : 'System Health'}
+                </h3>
+              </div>
+              <button onClick={closeDrawer} aria-label="Close drawer">×</button>
+            </div>
+
+            {activeDrawer === 'watchlist' ? (
+              <div className="drawerList">
+                {watchlist.length ? watchlist.map((coin) => (
+                  <button key={coin.address} onClick={() => openRadarToken(coin)}>
+                    <div><strong>{coin.symbol}</strong><span>{coin.name}</span></div>
+                    <small>{shortAddress(coin.address, 5)} →</small>
+                  </button>
+                )) : <EmptyDrawer text="Nothing watched yet. Tap ☆ on a radar card or scanner." />}
+              </div>
+            ) : null}
+
+            {activeDrawer === 'hidden' ? (
+              <>
+                <div className="drawerToolbar">
+                  <span>{hiddenCoins.length} hidden</span>
+                  {hiddenCoins.length ? <button onClick={restoreAllCoins}>Restore all</button> : null}
+                </div>
+                <div className="drawerList">
+                  {hiddenCoins.length ? hiddenCoins.map((coin) => (
+                    <div className="drawerRow" key={coin.address}>
+                      <div><strong>{coin.symbol || 'TOKEN'}</strong><span>{coin.name || shortAddress(coin.address, 5)}</span></div>
+                      <button onClick={() => restoreCoin(coin.address)}>Restore</button>
+                    </div>
+                  )) : <EmptyDrawer text="No hidden coins. Hide noisy tokens from Radar or Scanner." />}
+                </div>
+              </>
+            ) : null}
+
+            {activeDrawer === 'history' ? (
+              <div className="drawerList">
+                {history.length ? history.map((entry, index) => (
+                  <button key={`${entry.address}-${index}`} onClick={() => openHistoryScan(entry)}>
+                    <div><strong>{entry.symbol || 'TOKEN'}</strong><span>{entry.signal || 'Saved scan'}</span></div>
+                    <small>{entry.score ?? '—'}/100 →</small>
+                  </button>
+                )) : <EmptyDrawer text="No recent scans yet. Manual token scans appear here." />}
+              </div>
+            ) : null}
+
+            {activeDrawer === 'system' ? (
+              <div className="systemDrawerGrid">
+                <ServiceTile label="RCXT App" service={health?.services?.app} />
+                <ServiceTile label="Solana RPC" service={health?.services?.solana} />
+                <ServiceTile label="DexScreener" service={health?.services?.dexscreener} />
+                <ServiceTile label="Supabase" service={health?.services?.supabase} />
+                <div className="systemMeta"><span>Score engine</span><b>{health?.scoreVersion || '4.0.0'}</b></div>
+                <div className="systemMeta"><span>Secure writes</span><b>{health?.oidc?.available ? 'OIDC ACTIVE' : 'CHECKING'}</b></div>
+                <div className="systemMeta"><span>Scanner</span><b>5 seconds</b></div>
+                <div className="systemMeta"><span>Radar</span><b>10 seconds</b></div>
+              </div>
+            ) : null}
+
+            <div className="drawerFoot">
+              <span>Saved workspace data stays on this device.</span>
+              <button onClick={closeDrawer}>Done</button>
+            </div>
+          </aside>
         </div>
       ) : null}
 
@@ -976,6 +1167,20 @@ export default function Home() {
                 </button>
                 <button className="toolButton" onClick={() => navigator.clipboard?.writeText(scan.address)}>Copy CA</button>
                 <button className="toolButton" onClick={shareCurrentToken}>Share</button>
+                <button
+                  className={hiddenAddresses.has(scan.address) ? 'toolButton active' : 'toolButton dangerSoft'}
+                  onClick={() => {
+                    if (hiddenAddresses.has(scan.address)) {
+                      restoreCoin(scan.address)
+                      setNotificationStatus(`${scan.token?.symbol || 'Token'} restored to Radar.`)
+                    } else {
+                      hideCoin({ address:scan.address, symbol:scan.token?.symbol, name:scan.token?.name })
+                      setNotificationStatus(`${scan.token?.symbol || 'Token'} hidden from Radar.`)
+                    }
+                  }}
+                >
+                  {hiddenAddresses.has(scan.address) ? 'Restore Coin' : 'Hide Coin'}
+                </button>
                 {scan.pair?.url ? <a className="toolLink" href={scan.pair.url} target="_blank" rel="noreferrer">DexScreener ↗</a> : null}
               </div>
 
@@ -1033,40 +1238,29 @@ export default function Home() {
                 <MetricCard label="24H Buy %" value={`${scan.intelligence.buyPercent24h}%`} />
               </div>
 
-              <article className="panel socialIntelPanel">
-                <PanelHeader eyebrow="SOCIAL INTELLIGENCE" title="Reddit · X · Instagram" />
-                <div className="socialSummary">
-                  <MetricCard label="Social Momentum" value={socialIntel?.available ? `${socialIntel.momentumScore}/100` : '—'} />
-                  <MetricCard label="Data Quality" value={socialIntel?.available ? `${socialIntel.qualityScore}/100` : '—'} />
-                  <MetricCard label="Mentions" value={socialIntel?.available ? socialIntel.mentionCount : '—'} />
-                  <MetricCard label="Unique Authors" value={socialIntel?.available ? socialIntel.uniqueAuthors : '—'} />
-                  <MetricCard label="Relevance" value={socialIntel?.available ? `${socialIntel.relevanceScore || 0}/100` : '—'} />
-                  <MetricCard
-                    label="Sentiment"
-                    value={socialIntel?.available ? socialSentimentLabel(socialIntel.sentiment) : '—'}
-                    tone={Number(socialIntel?.sentiment || 0) > 0.12 ? 'positive' : Number(socialIntel?.sentiment || 0) < -0.12 ? 'negative' : ''}
-                  />
+              <article className="panel socialComingSoon">
+                <div className="comingSoonBadge">COMING SOON</div>
+                <div className="comingSoonMain">
+                  <div>
+                    <span className="eyebrow">SOCIAL INTELLIGENCE</span>
+                    <h3>Reddit · X · Instagram intelligence layer</h3>
+                    <p>
+                      Provider adapters, relevance filtering, duplicate detection, sentiment,
+                      author concentration, and calibration infrastructure are built. RCXT will
+                      activate this layer once the official provider connections are enabled.
+                    </p>
+                  </div>
+                  <div className="socialSoonScore">
+                    <span>SOCIAL SIGNAL</span>
+                    <strong>SOON</strong>
+                    <small>Won’t influence RCXT Score until verified live data is available.</small>
+                  </div>
                 </div>
-                <div className="socialProviderGrid">
-                  {(socialIntel?.providers || [
-                    { source:'reddit', available:false, reason:'Scanning…' },
-                    { source:'x', available:false, reason:'Scanning…' },
-                    { source:'instagram', available:false, reason:'Scanning…' },
-                  ]).map((provider) => (
-                    <SocialProviderCard key={provider.source} provider={provider} />
-                  ))}
-                </div>
-                <div className="socialFooter">
-                  <span>
-                    {socialLoading
-                      ? 'Scanning social sources…'
-                      : socialLastRefresh
-                        ? `Social refreshed ${socialLastRefresh.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' })}`
-                        : socialError || 'Social scans use official provider adapters when configured.'}
-                  </span>
-                  <button className="toolButton" onClick={() => loadSocial({ targetScan: scan })} disabled={socialLoading}>
-                    {socialLoading ? 'Scanning…' : 'Refresh social'}
-                  </button>
+                <div className="comingSoonFeatures">
+                  <span>Relevant mention velocity</span>
+                  <span>Cross-source confirmation</span>
+                  <span>Bot / duplicate filtering</span>
+                  <span>Sentiment + author diversity</span>
                 </div>
               </article>
 
@@ -1428,6 +1622,21 @@ export default function Home() {
         </p>
       </footer>
     </main>
+  )
+}
+
+function EmptyDrawer({ text }) {
+  return <div className="emptyDrawer"><span>NO DATA YET</span><p>{text}</p></div>
+}
+
+function ServiceTile({ label, service }) {
+  const ok = service?.ok !== false
+  return (
+    <div className={ok ? 'serviceTile' : 'serviceTile degraded'}>
+      <div><span className="serviceDot" /><strong>{label}</strong></div>
+      <b>{service ? (ok ? 'LIVE' : 'ISSUE') : 'CHECKING'}</b>
+      <small>{service?.latencyMs != null ? `${service.latencyMs}ms` : '—'}</small>
+    </div>
   )
 }
 
