@@ -826,10 +826,11 @@ export default function Home() {
                   <div className="scoreLine">
                     <ScoreRing score={item.intelligence.score} />
                     <div>
-                      <small>RCXT SCORE</small>
+                      <small>RCXT RISK-ADJUSTED SCORE</small>
                       <b>{item.intelligence.grade} · {item.intelligence.confidence}% confidence</b>
                     </div>
                   </div>
+                  <ScoreAxes intelligence={item.intelligence} compact />
                   <div className="miniMetrics">
                     <Metric label="MC" value={compactUsd(item.marketCap)} />
                     <Metric label="LIQ" value={compactUsd(item.liquidityUsd)} />
@@ -926,10 +927,22 @@ export default function Home() {
                   <small>
                     {scan.intelligence.confidence}% confidence · {scan.intelligence.risk} risk
                   </small>
+                  <em>{scan.intelligence.preliminary ? 'Preliminary market score' : 'Full contract-verified scan'}</em>
                 </div>
 
                 <ScoreRing score={scan.intelligence.score} large />
               </div>
+
+              <article className="scoreModelPanel">
+                <div className="scoreModelHead">
+                  <div>
+                    <span>RCXT SCORE ENGINE {scan.intelligence.modelVersion}</span>
+                    <strong>Risk-adjusted setup quality</strong>
+                  </div>
+                  <small>Not a probability of profit</small>
+                </div>
+                <ScoreAxes intelligence={scan.intelligence} />
+              </article>
 
               <div className="metricGrid six">
                 <MetricCard label="Price" value={tinyUsd(scan.market.priceUsd)} />
@@ -1295,7 +1308,7 @@ export default function Home() {
       <footer className="footer">
         <div>
           <b>RCXT RADAR · v2.1.0 PRODUCTION</b>
-          <span>Score engine v3.0.0 · Solana · DexScreener · Supabase · Vercel</span>
+          <span>Score engine v4.0.0 · Solana · DexScreener · Supabase · Vercel</span>
         </div>
         <p>
           Signals are software-generated market intelligence, not guarantees or personalized financial advice.
@@ -1336,6 +1349,30 @@ function ScoreRing({ score, large = false }) {
         <strong>{value}</strong>
         <span>/100</span>
       </div>
+    </div>
+  )
+}
+
+function ScoreAxes({ intelligence, compact = false }) {
+  const axes = [
+    ['Setup', intelligence?.setupScore],
+    ['Execution', intelligence?.executionScore],
+    ['Safety', intelligence?.safetyScore],
+    ['Data', intelligence?.dataQualityScore],
+  ]
+
+  return (
+    <div className={compact ? 'scoreAxes compact' : 'scoreAxes'}>
+      {axes.map(([label, raw]) => {
+        const value = Math.max(0, Math.min(100, Number(raw ?? 0)))
+        const tone = value >= 70 ? 'good' : value >= 50 ? 'mid' : 'bad'
+        return (
+          <div className="scoreAxis" key={label}>
+            <div><span>{label}</span><b className={tone}>{value}</b></div>
+            <i><em className={tone} style={{ width: `${value}%` }} /></i>
+          </div>
+        )
+      })}
     </div>
   )
 }
