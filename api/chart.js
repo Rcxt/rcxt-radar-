@@ -1,28 +1,26 @@
 import { rateLimit, applyRateHeaders } from '../lib/rate-limit.js'
 import { analyzeCandles } from '../lib/market-analytics.js'
 
-const CACHE_TTL = 12_000
-const chartCache = new Map()
-
-const INTERVALS = {
-  '1m': { timeframe:'minute', aggregate:1, minutes:1, limit:180 },
-  '5m': { timeframe:'minute', aggregate:5, minutes:5, limit:180 },
-  '15m': { timeframe:'minute', aggregate:15, minutes:15, limit:160 },
-  '1h': { timeframe:'hour', aggregate:1, minutes:60, limit:168 },
+const CACHE_TTL=12_000
+const chartCache=new Map()
+const INTERVALS={
+  '1m':{timeframe:'minute',aggregate:1,minutes:1,limit:180},
+  '5m':{timeframe:'minute',aggregate:5,minutes:5,limit:180},
+  '15m':{timeframe:'minute',aggregate:15,minutes:15,limit:160},
+  '1h':{timeframe:'hour',aggregate:1,minutes:60,limit:168},
 }
 
 function cacheGet(key){
   const item=chartCache.get(key)
-  return item && Date.now()-item.time<CACHE_TTL ? item.value : null
+  return item&&Date.now()-item.time<CACHE_TTL?item.value:null
 }
-
 function cacheSet(key,value){
   chartCache.set(key,{time:Date.now(),value})
   if(chartCache.size>120) chartCache.delete(chartCache.keys().next().value)
 }
 
-async function fetchCandles(pairAddress, interval){
-  const config=INTERVALS[interval] || INTERVALS['5m']
+async function fetchCandles(pairAddress,interval){
+  const config=INTERVALS[interval]||INTERVALS['5m']
   const url=new URL(`https://api.geckoterminal.com/api/v2/networks/solana/pools/${encodeURIComponent(pairAddress)}/ohlcv/${config.timeframe}`)
   url.searchParams.set('aggregate',String(config.aggregate))
   url.searchParams.set('limit',String(config.limit))
@@ -35,10 +33,10 @@ async function fetchCandles(pairAddress, interval){
   })
   const text=await response.text()
   let data
-  try{ data=JSON.parse(text) }catch{ data=null }
-  if(!response.ok) throw new Error(data?.errors?.[0]?.detail || `Chart provider HTTP ${response.status}`)
+  try{data=JSON.parse(text)}catch{data=null}
+  if(!response.ok) throw new Error(data?.errors?.[0]?.detail||`Chart provider HTTP ${response.status}`)
 
-  const rows=data?.data?.attributes?.ohlcv_list || []
+  const rows=data?.data?.attributes?.ohlcv_list||[]
   const candles=rows.map((row)=>({
     timestamp:Number(row?.[0]||0),
     open:Number(row?.[1]||0),
@@ -58,8 +56,8 @@ export default async function handler(req,res){
   applyRateHeaders(res,limited,40)
   if(!limited.allowed) return res.status(429).json({success:false,error:'Too many chart requests. Try again shortly.'})
 
-  const pairAddress=String(req.query?.pair || '').trim()
-  const interval=String(req.query?.interval || '5m')
+  const pairAddress=String(req.query?.pair||'').trim()
+  const interval=String(req.query?.interval||'5m')
   if(!/^[1-9A-HJ-NP-Za-km-z]{32,50}$/.test(pairAddress)){
     return res.status(400).json({success:false,error:'Valid Solana pair address required.'})
   }
@@ -76,17 +74,7 @@ export default async function handler(req,res){
   try{
     const {candles,meta,config}=await fetchCandles(pairAddress,interval)
     const analytics=analyzeCandles(candles,{intervalMinutes:config.minutes})
-    const result={
-      success:true,
-      provider:'GeckoTerminal',
-      pairAddress,
-      interval,
-      generatedAt:new Date().toISOString(),
-      meta,
-      count:candles.length,
-      candles,
-      analytics,
-    }
+    const result={success:true,provider:'GeckoTerminal',pairAddress,interval,generatedAt:new Date().toISOString(),meta,count:candles.length,candles,analytics}
     cacheSet(key,result)
     res.setHeader('X-RCXT-Cache','MISS')
     res.setHeader('Cache-Control','public, s-maxage=8, stale-while-revalidate=20')
