@@ -44,7 +44,7 @@ export default async function handler(req, res) {
 
     const persistence = shouldPersist
       ? await Promise.race([
-          logTokenScan(scan),
+          logTokenScan(scan, null, req.headers?.['x-vercel-oidc-token']),
           new Promise(resolve=>setTimeout(()=>resolve({ok:false,status:0,error:'Persistence timeout'}),1800))
         ])
       : { ok:true, skipped:true, status:0, error:null }
