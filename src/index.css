@@ -2200,3 +2200,5 @@ input,select,textarea{font-size:16px}
   .trenchStrip{grid-template-columns:1fr 1fr}.trenchStrip>div:last-child{grid-column:1/-1}
   .pumpButton{min-height:36px}
 }
+
+.trenchState.reversal{color:#d6a84a}
