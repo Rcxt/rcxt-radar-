@@ -1613,3 +1613,21 @@ input:focus-visible {
     text-align: left;
   }
 }
+
+
+/* Hidden coin controls */
+.radarActions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.radarTopActions{display:flex;align-items:center;gap:7px}
+.hideCoinButton{background:transparent!important;color:#7c8998!important;border:1px solid #26323e!important;border-radius:999px!important;padding:5px 8px!important;font-size:7px!important;letter-spacing:.08em!important;font-weight:900!important;min-height:auto!important}
+.hideCoinButton:hover{color:#ff93a2!important;border-color:#5d2b37!important;background:#190d11!important}
+.hiddenTray{border:1px solid var(--line);border-radius:14px;background:#080d12;padding:13px;margin-bottom:13px}
+.hiddenTrayHead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+.hiddenTrayHead>div span{display:block;font-size:9px;font-weight:900;letter-spacing:.12em;color:#8795a5}
+.hiddenTrayHead>div small{display:block;color:#5f6d7c;font-size:8px;margin-top:3px}
+.hiddenTrayHead>button{background:transparent;color:#a7b3c1;border:1px solid #293541;padding:7px 9px;font-size:8px}
+.hiddenCoins{display:flex;gap:7px;flex-wrap:wrap}
+.hiddenCoins>button{display:flex;align-items:center;gap:7px;background:#0c1218;color:#dce4ec;border:1px solid #202b36;padding:8px 10px;border-radius:10px;text-align:left}
+.hiddenCoins>button strong{font-size:9px}.hiddenCoins>button span{font-size:8px;color:#6f7d8d}.hiddenCoins>button em{font-size:7px;color:var(--green);font-style:normal;font-weight:900;letter-spacing:.06em}
+.radarCard[role="button"]{cursor:pointer}
+.radarCard[role="button"]:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+@media(max-width:700px){.radarActions{width:100%;justify-content:flex-start}.sectionHeading{align-items:flex-start;flex-wrap:wrap}.hiddenTrayHead{align-items:flex-start}.hiddenCoins{display:grid;grid-template-columns:1fr}.hiddenCoins>button{width:100%}}
