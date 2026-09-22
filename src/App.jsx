@@ -28,6 +28,7 @@ export default function Home() {
   const [aiAnalysis, setAiAnalysis] = useState('')
   const [aiModel, setAiModel] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
+  const [aiMode, setAiMode] = useState('beginner')
 
   const [wallet, setWallet] = useState('')
   const [walletData, setWalletData] = useState(null)
@@ -429,9 +430,10 @@ export default function Home() {
     } catch {}
   }
 
-  async function askAI() {
+  async function askAI(mode = aiMode) {
     if (!scan) return
 
+    setAiMode(mode)
     setAiLoading(true)
     setAiAnalysis('')
 
@@ -439,7 +441,7 @@ export default function Home() {
       const response = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ scan, social: socialIntel }),
+        body: JSON.stringify({ scan, social: socialIntel, mode }),
       })
       const data = await response.json()
       if (!response.ok || !data.success) throw new Error(data.error || 'AI analysis failed')
@@ -1533,14 +1535,27 @@ export default function Home() {
                       <h3>Explain this setup</h3>
                     </div>
                   </div>
-                  <button className="aiButton" onClick={askAI} disabled={aiLoading}>
-                    {aiLoading ? 'THINKING…' : aiAnalysis ? 'REFRESH AI READ' : 'RUN AI ANALYSIS'}
-                  </button>
+                  <div className="aiModeButtons">
+                    <button
+                      className={aiMode === 'beginner' ? 'aiButton active' : 'aiButton secondary'}
+                      onClick={() => askAI('beginner')}
+                      disabled={aiLoading}
+                    >
+                      {aiLoading && aiMode === 'beginner' ? 'THINKING…' : 'EXPLAIN SIMPLY'}
+                    </button>
+                    <button
+                      className={aiMode === 'pro' ? 'aiButton active' : 'aiButton secondary'}
+                      onClick={() => askAI('pro')}
+                      disabled={aiLoading}
+                    >
+                      {aiLoading && aiMode === 'pro' ? 'THINKING…' : 'PRO READ'}
+                    </button>
+                  </div>
                 </div>
 
                 {aiAnalysis ? (
                   <div className="aiResponse">
-                    <div className="aiModel">{aiModel}</div>
+                    <div className="aiModel">{aiModel} · {aiMode === 'beginner' ? 'BEGINNER' : 'PRO'}</div>
                     <pre>{aiAnalysis}</pre>
                   </div>
                 ) : (
