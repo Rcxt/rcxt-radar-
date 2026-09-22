@@ -2293,3 +2293,14 @@ input,select,textarea{font-size:16px}
 .tapeFlags span{border:1px solid #342a2f;background:#130d10;color:#c48189;border-radius:999px;padding:4px 6px;font-size:6px;letter-spacing:.05em}
 @media(max-width:900px){.tradeTapeStats{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:520px){.tradeTapeStats{grid-template-columns:1fr 1fr}}
+
+
+/* v4 AI modes + challenge controls */
+.aiModeButtons{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.aiButton.secondary{background:#0a1117!important;border-color:#283640!important;color:#78899a!important}
+.aiButton.active{border-color:#4b705d!important;box-shadow:0 0 18px rgba(70,210,140,.08)}
+.challengeReset{border:0;background:transparent;color:#7d8894;font-size:7px;text-decoration:underline;cursor:pointer;padding:0}
+@media(max-width:520px){
+  .aiModeButtons{width:100%;justify-content:stretch}.aiModeButtons .aiButton{flex:1;min-height:42px}
+  .challengeFoot{flex-wrap:wrap}.challengeReset{width:100%;text-align:left}
+}
