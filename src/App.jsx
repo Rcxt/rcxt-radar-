@@ -7,6 +7,8 @@ const HISTORY_KEY = 'rcxt-scan-history-v1'
 const HIDDEN_KEY = 'rcxt-hidden-coins-v1'
 const NOTIFY_KEY = 'rcxt-notifications-v1'
 const WATCH_KEY = 'rcxt-watchlist-v1'
+const RULES_KEY = 'rcxt-alert-rules-v1'
+const NOTES_KEY = 'rcxt-token-notes-v1'
 
 export default function Home() {
   const [view, setView] = useState('radar')
@@ -46,6 +48,10 @@ export default function Home() {
   const [positionSize, setPositionSize] = useState('50')
   const [targetMarketCap, setTargetMarketCap] = useState('')
   const [health, setHealth] = useState(null)
+  const [alertScore, setAlertScore] = useState(75)
+  const [alertMarketCap, setAlertMarketCap] = useState('')
+  const [alertSignalChanges, setAlertSignalChanges] = useState(true)
+  const [tokenNote, setTokenNote] = useState('')
 
   const loadRadar = useCallback(async () => {
     setRadarLoading(true)
@@ -82,6 +88,11 @@ export default function Home() {
 
       const savedWatchlist = JSON.parse(localStorage.getItem(WATCH_KEY) || '[]')
       if (Array.isArray(savedWatchlist)) setWatchlist(savedWatchlist.filter((item) => item?.address).slice(0, 50))
+
+      const savedRules = JSON.parse(localStorage.getItem(RULES_KEY) || '{}')
+      if (Number.isFinite(Number(savedRules.score))) setAlertScore(Number(savedRules.score))
+      if (savedRules.marketCap != null) setAlertMarketCap(String(savedRules.marketCap))
+      if (typeof savedRules.signalChanges === 'boolean') setAlertSignalChanges(savedRules.signalChanges)
     } catch {
       // Ignore malformed local history.
     }
@@ -141,10 +152,18 @@ export default function Home() {
       setScan((previous) => {
         if (silent && previous?.address === data.scan.address) {
           maybeNotifySignalChange(previous, data.scan)
+          maybeNotifyRuleCrossings(previous, data.scan)
         }
         return data.scan
       })
       setLastRefresh(new Date())
+
+      try {
+        const notes = JSON.parse(localStorage.getItem(NOTES_KEY) || '{}')
+        setTokenNote(notes[data.scan.address] || '')
+      } catch {
+        setTokenNote('')
+      }
 
       if (!silent) {
         const entry = {
@@ -172,7 +191,15 @@ export default function Home() {
     } finally {
       if (!silent) setScanLoading(false)
     }
-  }, [tokenAddress, notificationsEnabled])
+  }, [tokenAddress, notificationsEnabled, alertScore, alertMarketCap, alertSignalChanges])
+
+  useEffect(() => {
+    const deepLinkedToken = new URLSearchParams(window.location.search).get('token')
+    if (!deepLinkedToken) return
+    setView('scanner')
+    setTokenAddress(deepLinkedToken)
+    runScan({ address: deepLinkedToken })
+  }, [])
 
   useEffect(() => {
     if (!autoRefresh || !scan?.address) return
@@ -221,6 +248,7 @@ export default function Home() {
   }
 
   function maybeNotifySignalChange(previous, next) {
+    if (!alertSignalChanges) return
     if (!notificationsEnabled || typeof Notification === 'undefined' || Notification.permission !== 'granted') return
     const before = previous?.intelligence?.signal
     const after = next?.intelligence?.signal
@@ -256,6 +284,80 @@ export default function Home() {
         })
       }).catch(() => {})
     }
+  }
+
+  function maybeNotifyRuleCrossings(previous, next) {
+    if (!notificationsEnabled || typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+
+    const scoreTarget = Number(alertScore || 0)
+    if (
+      scoreTarget > 0 &&
+      Number(previous?.intelligence?.score || 0) < scoreTarget &&
+      Number(next?.intelligence?.score || 0) >= scoreTarget
+    ) {
+      navigator.serviceWorker?.ready.then((registration) => {
+        registration.showNotification(`${next.token?.symbol || 'Token'} crossed score ${scoreTarget}`, {
+          body: `RCXT score is now ${next.intelligence?.score}/100 · ${next.intelligence?.signal}`,
+          icon: '/icon.svg',
+          badge: '/icon.svg',
+          tag: `score-${next.address}`,
+        })
+      }).catch(() => {})
+    }
+
+    const marketCapTarget = Number(alertMarketCap || 0)
+    if (
+      marketCapTarget > 0 &&
+      Number(previous?.market?.marketCap || 0) < marketCapTarget &&
+      Number(next?.market?.marketCap || 0) >= marketCapTarget
+    ) {
+      navigator.serviceWorker?.ready.then((registration) => {
+        registration.showNotification(`${next.token?.symbol || 'Token'} hit MC target`, {
+          body: `Market cap crossed ${compactUsd(marketCapTarget)} · now ${compactUsd(next.market?.marketCap)}`,
+          icon: '/icon.svg',
+          badge: '/icon.svg',
+          tag: `mc-${next.address}`,
+        })
+      }).catch(() => {})
+    }
+  }
+
+  function saveAlertRules(next = {}) {
+    const rules = {
+      score: next.score ?? alertScore,
+      marketCap: next.marketCap ?? alertMarketCap,
+      signalChanges: next.signalChanges ?? alertSignalChanges,
+    }
+    localStorage.setItem(RULES_KEY, JSON.stringify(rules))
+  }
+
+  function saveTokenNote() {
+    if (!scan?.address) return
+    try {
+      const notes = JSON.parse(localStorage.getItem(NOTES_KEY) || '{}')
+      notes[scan.address] = tokenNote.slice(0, 2000)
+      localStorage.setItem(NOTES_KEY, JSON.stringify(notes))
+      setNotificationStatus('Token note saved.')
+    } catch {
+      setNotificationStatus('Could not save token note.')
+    }
+  }
+
+  async function shareCurrentToken() {
+    if (!scan?.address) return
+    const url = `${window.location.origin}/?token=${encodeURIComponent(scan.address)}`
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: `RCXT Radar — ${scan.token?.symbol || 'Token'}`,
+          text: `${scan.token?.name || 'Token'} · RCXT ${scan.intelligence?.score ?? '—'}/100 · ${scan.intelligence?.signal || 'WATCH'}`,
+          url,
+        })
+      } else {
+        await navigator.clipboard.writeText(url)
+        setNotificationStatus('Share link copied.')
+      }
+    } catch {}
   }
 
   async function askAI() {
@@ -800,6 +902,7 @@ export default function Home() {
                   {watchAddresses.has(scan.address) ? '★ Watching' : '☆ Watch'}
                 </button>
                 <button className="toolButton" onClick={() => navigator.clipboard?.writeText(scan.address)}>Copy CA</button>
+                <button className="toolButton" onClick={shareCurrentToken}>Share</button>
                 {scan.pair?.url ? <a className="toolLink" href={scan.pair.url} target="_blank" rel="noreferrer">DexScreener ↗</a> : null}
               </div>
 
@@ -913,6 +1016,67 @@ export default function Home() {
                         : ['No major invalidation detected in current snapshot']
                       ).map((item) => <p key={item}><i className="dot bad" />{item}</p>)}
                     </div>
+                  </div>
+                </article>
+              </div>
+
+              <div className="proDetailGrid">
+                <article className="panel alertPanel">
+                  <PanelHeader eyebrow="ALERT ENGINE" title="Rules for this live scanner" />
+                  <div className="alertRules">
+                    <label>
+                      <span>Score crosses</span>
+                      <input
+                        value={alertScore}
+                        onChange={(event) => {
+                          const value = Math.max(0, Math.min(100, Number(event.target.value || 0)))
+                          setAlertScore(value)
+                          saveAlertRules({ score: value })
+                        }}
+                        type="number"
+                        min="0"
+                        max="100"
+                        inputMode="numeric"
+                      />
+                    </label>
+                    <label>
+                      <span>Market cap crosses ($)</span>
+                      <input
+                        value={alertMarketCap}
+                        onChange={(event) => {
+                          setAlertMarketCap(event.target.value)
+                          saveAlertRules({ marketCap: event.target.value })
+                        }}
+                        inputMode="decimal"
+                        placeholder="100000"
+                      />
+                    </label>
+                    <label className="ruleToggle">
+                      <input
+                        type="checkbox"
+                        checked={alertSignalChanges}
+                        onChange={(event) => {
+                          setAlertSignalChanges(event.target.checked)
+                          saveAlertRules({ signalChanges: event.target.checked })
+                        }}
+                      />
+                      <span>Signal-change alerts</span>
+                    </label>
+                  </div>
+                  <small className="panelHint">Alerts trigger while RCXT Radar is active. Add the PWA to your iPhone Home Screen for the best notification support.</small>
+                </article>
+
+                <article className="panel journalPanel">
+                  <PanelHeader eyebrow="TRADE JOURNAL" title="Private note for this token" />
+                  <textarea
+                    value={tokenNote}
+                    onChange={(event) => setTokenNote(event.target.value)}
+                    placeholder="Catalyst, entry idea, invalidation, what you noticed…"
+                    maxLength={2000}
+                  />
+                  <div className="journalFooter">
+                    <span>{tokenNote.length}/2000</span>
+                    <button className="toolButton" onClick={saveTokenNote}>Save note</button>
                   </div>
                 </article>
               </div>
