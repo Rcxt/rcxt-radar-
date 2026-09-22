@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 
 const TEST_WALLET = '976CYJJEVhntZhKS5wdUb3mz2w8FxViDbfCWK8xg2eQ7'
 const HISTORY_KEY = 'rcxt-scan-history-v1'
