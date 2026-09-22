@@ -52,6 +52,7 @@ export default function Home() {
   const [alertMarketCap, setAlertMarketCap] = useState('')
   const [alertSignalChanges, setAlertSignalChanges] = useState(true)
   const [tokenNote, setTokenNote] = useState('')
+  const [scoreHistory, setScoreHistory] = useState([])
 
   const loadRadar = useCallback(async () => {
     setRadarLoading(true)
@@ -167,6 +168,14 @@ export default function Home() {
       }
 
       if (!silent) {
+        try {
+          const historyResponse = await fetch(`/api/history?address=${encodeURIComponent(target)}`, { cache: 'no-store' })
+          const historyData = await historyResponse.json()
+          if (historyResponse.ok && historyData?.success) setScoreHistory(historyData.rows || [])
+        } catch {
+          setScoreHistory([])
+        }
+
         const entry = {
           address: data.scan.address,
           symbol: data.scan.token.symbol,
@@ -942,6 +951,7 @@ export default function Home() {
                   <small>Not a probability of profit</small>
                 </div>
                 <ScoreAxes intelligence={scan.intelligence} />
+                <ScoreTrend rows={scoreHistory} currentScore={scan.intelligence.score} />
               </article>
 
               <div className="metricGrid six">
@@ -1348,6 +1358,36 @@ function ScoreRing({ score, large = false }) {
       <div>
         <strong>{value}</strong>
         <span>/100</span>
+      </div>
+    </div>
+  )
+}
+
+function ScoreTrend({ rows, currentScore }) {
+  const ordered = [...(rows || [])].reverse()
+  const previous = ordered.length > 1 ? ordered[ordered.length - 2] : null
+  const delta = previous ? Number(currentScore || 0) - Number(previous.score || 0) : null
+
+  return (
+    <div className="scoreTrend">
+      <div className="scoreTrendHead">
+        <div>
+          <span>RECENT SCORE TREND</span>
+          <strong>
+            {delta === null ? 'Building history' : `${delta >= 0 ? '+' : ''}${delta} pts vs prior saved scan`}
+          </strong>
+        </div>
+        <small>{rows?.length || 0} saved scans</small>
+      </div>
+      <div className="trendBars">
+        {ordered.length
+          ? ordered.slice(-10).map((row, index) => (
+              <div className="trendPoint" key={`${row.createdAt}-${index}`}>
+                <i style={{ height: `${Math.max(8, Math.min(100, Number(row.score || 0)))}%` }} />
+                <span>{row.score}</span>
+              </div>
+            ))
+          : <p>No saved history yet. Manual scans create history; 5-second refreshes do not.</p>}
       </div>
     </div>
   )
