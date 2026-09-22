@@ -29,6 +29,7 @@ export default function Home() {
   const [aiModel, setAiModel] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
   const [aiMode, setAiMode] = useState('beginner')
+  const [marketContext, setMarketContext] = useState(null)
 
   const [wallet, setWallet] = useState('')
   const [walletData, setWalletData] = useState(null)
@@ -410,7 +411,7 @@ export default function Home() {
       const response = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ scan, social: null, mode }),
+        body: JSON.stringify({ scan, social: null, mode, marketContext }),
       })
       const data = await response.json()
       if (!response.ok || !data.success) throw new Error(data.error || 'AI analysis failed')
@@ -1493,6 +1494,7 @@ export default function Home() {
               <V4AnalyticsSuite
                 scan={scan}
                 walletEquity={Number(walletData?.portfolioTotalUsd || walletData?.portfolioTokenValueUsd || 0)}
+                onContext={setMarketContext}
               />
 
               <article className="panel aiPanel">
