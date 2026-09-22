@@ -1939,3 +1939,129 @@ button{touch-action:manipulation}
   .alertRules{grid-template-columns:1fr}
   .ruleToggle{grid-column:auto}
 }
+
+
+/* RCXT v4 scoring + iPhone 17 Pro / modern iOS hardening */
+.scoreAxes{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:12px}
+.scoreAxes.compact{grid-template-columns:repeat(4,1fr);gap:6px;margin-top:9px}
+.scoreAxis{min-width:0}
+.scoreAxis>div{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:5px}
+.scoreAxis span{font-size:7px;color:#667587;text-transform:uppercase;letter-spacing:.08em}
+.scoreAxis b{font-size:9px}.scoreAxis b.good{color:var(--green)}.scoreAxis b.mid{color:var(--amber)}.scoreAxis b.bad{color:var(--red)}
+.scoreAxis>i{display:block;height:4px;border-radius:99px;background:#17212b;overflow:hidden}
+.scoreAxis>i>em{display:block;height:100%;border-radius:inherit;background:#708090}
+.scoreAxis>i>em.good{background:var(--green)}.scoreAxis>i>em.mid{background:var(--amber)}.scoreAxis>i>em.bad{background:var(--red)}
+.scoreAxes.compact .scoreAxis span{font-size:6px}.scoreAxes.compact .scoreAxis b{font-size:8px}.scoreAxes.compact .scoreAxis>i{height:3px}
+
+.scoreModelPanel{margin-top:10px;border:1px solid #1d2a35;background:linear-gradient(145deg,#0a1118,#080d12);border-radius:14px;padding:14px}
+.scoreModelHead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.scoreModelHead span{display:block;color:var(--cyan);font-size:8px;font-weight:900;letter-spacing:.11em}
+.scoreModelHead strong{display:block;font-size:14px;margin-top:4px}
+.scoreModelHead small{color:#617082;font-size:8px;text-align:right;max-width:150px;line-height:1.4}
+.signalHero em{display:block;font-size:7px;color:#687788;font-style:normal;margin-top:4px;text-transform:uppercase;letter-spacing:.06em}
+
+.scoreTrend{border-top:1px solid #18232d;margin-top:13px;padding-top:12px}
+.scoreTrendHead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.scoreTrendHead span{display:block;color:#637385;font-size:7px;letter-spacing:.08em}
+.scoreTrendHead strong{display:block;font-size:10px;margin-top:3px}
+.scoreTrendHead small{font-size:7px;color:#526071}
+.trendBars{height:66px;display:flex;gap:5px;align-items:flex-end;margin-top:11px}
+.trendPoint{height:100%;flex:1;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:3px}
+.trendPoint i{display:block;width:100%;max-width:20px;border-radius:4px 4px 2px 2px;background:linear-gradient(180deg,var(--green),#1f7050);min-height:5px}
+.trendPoint span{font-size:6px;color:#718091}
+.trendBars>p{font-size:8px;color:#596879;align-self:center;margin:0;line-height:1.5}
+
+html{min-height:100%;background:#06080b}
+body,#root{min-height:100svh}
+@supports(height:100dvh){body,#root{min-height:100dvh}}
+body{overflow-x:hidden;overscroll-behavior-y:none;-webkit-overflow-scrolling:touch}
+.appShell{min-height:100svh}
+@supports(height:100dvh){.appShell{min-height:100dvh}}
+button,a,input,select,textarea{touch-action:manipulation}
+input,select,textarea{font-size:16px}
+.proToolbar,.intelStrip,.holdingsTableWrap{scrollbar-width:none}
+.proToolbar::-webkit-scrollbar,.intelStrip::-webkit-scrollbar,.holdingsTableWrap::-webkit-scrollbar{display:none}
+
+@media(max-width:480px){
+  .appShell{
+    padding-left:max(10px,env(safe-area-inset-left));
+    padding-right:max(10px,env(safe-area-inset-right));
+    padding-bottom:calc(104px + env(safe-area-inset-bottom));
+  }
+  .topbar{
+    min-height:calc(62px + env(safe-area-inset-top));
+    height:auto;
+    padding-top:max(8px,env(safe-area-inset-top));
+    padding-bottom:8px;
+  }
+  .brand{min-width:0}.brand b{font-size:15px;white-space:nowrap}
+  .topActions{min-width:0}.notifyButton{min-height:44px;padding:0 11px}
+  .hero{padding:24px 0 18px}.hero h1{font-size:clamp(34px,10.5vw,44px)}
+  .hero p{max-width:36ch}
+  .contentStack{padding-bottom:8px}
+  .sectionHeading{margin-bottom:11px}
+  .sectionHeading h2{font-size:19px}
+  .sectionHeading p{font-size:9px;line-height:1.45}
+  .scanBar{
+    top:calc(62px + env(safe-area-inset-top));
+    gap:7px;padding:8px;
+    border-radius:12px;
+  }
+  .scanBar input{min-height:48px;font-size:16px;padding:0 12px}
+  .scanBar .primaryButton{min-height:48px;padding:0 12px;font-size:8px}
+  .mobileNav{
+    left:max(8px,env(safe-area-inset-left));
+    right:max(8px,env(safe-area-inset-right));
+    bottom:max(8px,env(safe-area-inset-bottom));
+    padding:6px!important;
+    border-radius:17px;
+  }
+  .mobileNav .navButton{min-height:48px;font-size:8px}
+  .radarCard{padding:14px;border-radius:14px}
+  .radarTop{align-items:flex-start}.radarTopActions{gap:5px;flex-wrap:wrap;justify-content:flex-end}
+  .watchButton,.compareButton,.hideCoinButton{min-height:36px!important}
+  .watchButton{min-width:36px}
+  .compareButton,.hideCoinButton{padding-left:9px!important;padding-right:9px!important}
+  .scoreAxes.compact{grid-template-columns:1fr 1fr}
+  .scoreModelPanel{padding:12px;border-radius:13px}
+  .scoreModelHead{gap:8px}.scoreModelHead strong{font-size:13px}
+  .scoreAxes{grid-template-columns:1fr 1fr;gap:10px 8px}
+  .scanHero{grid-template-columns:1fr auto;gap:10px}
+  .scanIdentity{min-width:0}.scanIdentity h3{font-size:20px;overflow-wrap:anywhere}
+  .signalHero{grid-column:1/-1;order:3}
+  .scanHero>.scoreRing{width:68px;height:68px}
+  .metricGrid.six{grid-template-columns:1fr 1fr}
+  .analysisGrid{grid-template-columns:1fr}
+  .securityRows{grid-template-columns:1fr}
+  .proToolbar>*{min-height:46px}
+  .toolButton,.toolLink{min-height:46px}
+  .calculatorGrid{grid-template-columns:1fr 1fr}
+  .calculatorGrid input{min-height:48px;font-size:16px}
+  .alertRules input[type="number"],.alertRules input[inputmode="decimal"]{min-height:48px;font-size:16px}
+  .journalPanel textarea{font-size:16px;min-height:132px}
+  .walletSummary,.walletRiskStrip{grid-template-columns:1fr 1fr}
+  .metricCard{min-width:0}
+  .metricCard strong{overflow-wrap:anywhere}
+  .trendBars{height:58px}
+  .footer{padding-bottom:12px}
+}
+
+@media(max-width:390px){
+  .brand em{display:none}
+  .notifyButton{font-size:0}
+  .notifyButton::after{content:'Alerts';font-size:7px}
+  .hero h1{font-size:34px}
+  .scanBar{grid-template-columns:1fr}
+  .scanBar .primaryButton{width:100%}
+  .metricGrid.six,.walletSummary,.walletRiskStrip{grid-template-columns:1fr 1fr}
+}
+
+@supports(-webkit-touch-callout:none){
+  .topbar,.mobileNav,.notificationStatus{-webkit-backdrop-filter:blur(22px);backdrop-filter:blur(22px)}
+  input,textarea,select{-webkit-appearance:none}
+  .scanBar input{border-radius:9px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
