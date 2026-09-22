@@ -47,6 +47,7 @@ export default async function handler(req,res){
 
   const scan=body?.scan
   const social=body?.social || null
+  const marketContext=body?.marketContext || null
   const mode=body?.mode==='beginner'?'beginner':'pro'
   if(!scan?.address||!scan?.intelligence) return res.status(400).json({success:false,error:'Scan data is required.'})
 
@@ -56,6 +57,8 @@ export default async function handler(req,res){
     trading:scan.trading,
     security:scan.security,
     intelligence:scan.intelligence,
+    chart:marketContext?.chart || null,
+    tradeTape:marketContext?.tape || null,
     social,
     pair:scan.pair
   }
@@ -66,6 +69,9 @@ Analyze only the supplied token snapshot. Use plain language a brand-new trader 
 Avoid unexplained jargon. If you use a term like liquidity, RSI, slippage, or market cap, explain it in a few words.
 Never claim certainty, guaranteed profit, a win probability, insider information, or exact future prices.
 The deterministic RCXT v4 signal is the source of truth.
+When candle analytics are supplied, explain chart bias, RSI, support/resistance, volatility, and forecast ranges in plain language.
+When live trade tape is supplied, explain whether recent USD flow confirms or contradicts the token-level buy/sell counts.
+Forecast ranges are scenario bands, not promised targets.
 Use exactly four short sections: BOTTOM LINE, WHY, WHAT COULD GO WRONG, BEGINNER NOTE.
 Explicitly say that score/confidence are not a probability of profit.
 Social evidence is lower trust and must never override contract, liquidity, or execution risk.`
@@ -74,6 +80,9 @@ Be concise, skeptical, and practical. Never claim certainty, guaranteed profit, 
 The deterministic RCXT v4 signal is the source of truth. It separates setup, execution, safety, and data quality.
 Social data is lower-trust supporting evidence because it can be manipulated. Never let social momentum override contract, liquidity, execution, or market-structure risk.
 Explain contradictions explicitly. A high social score with weak setup/execution should be treated as hype risk, not confirmation.
+Use supplied candle regime, support/resistance, forecast ranges, and live trade tape as additional evidence.
+If chart/trade-tape evidence conflicts with the RCXT signal, explicitly call that out and lower the language of conviction.
+Forecast bands are volatility scenarios, not exact price predictions.
 Treat preliminary/unverified contract or concentration data as a limitation.
 Use exactly four short sections: SIGNAL, WHY, INVALIDATION, RISK.
 Never claim probability of profit, guaranteed returns, insider information, or certainty.`
