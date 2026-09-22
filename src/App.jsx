@@ -1,8 +1,10 @@
 'use client'
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import V4AnalyticsSuite from './components/V4Analytics.jsx'
+import ChallengeTracker from './components/ChallengeTracker.jsx'
 
-const TEST_WALLET = '976CYJJEVhntZhKS5wdUb3mz2w8FxViDbfCWK8xg2eQ7'
+const WALLET_KEY = 'rcxt-wallet-address-v1'
 const HISTORY_KEY = 'rcxt-scan-history-v1'
 const HIDDEN_KEY = 'rcxt-hidden-coins-v1'
 const NOTIFY_KEY = 'rcxt-notifications-v1'
@@ -27,7 +29,7 @@ export default function Home() {
   const [aiModel, setAiModel] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
 
-  const [wallet, setWallet] = useState(TEST_WALLET)
+  const [wallet, setWallet] = useState('')
   const [walletData, setWalletData] = useState(null)
   const [walletLoading, setWalletLoading] = useState(false)
   const [walletError, setWalletError] = useState('')
@@ -97,6 +99,9 @@ export default function Home() {
 
       const savedWatchlist = JSON.parse(localStorage.getItem(WATCH_KEY) || '[]')
       if (Array.isArray(savedWatchlist)) setWatchlist(savedWatchlist.filter((item) => item?.address).slice(0, 50))
+
+      const savedWallet = localStorage.getItem(WALLET_KEY) || ''
+      if (savedWallet) setWallet(savedWallet)
 
       const savedRules = JSON.parse(localStorage.getItem(RULES_KEY) || '{}')
       if (Number.isFinite(Number(savedRules.score))) setAlertScore(Number(savedRules.score))
@@ -461,6 +466,7 @@ export default function Home() {
       })
       const data = await response.json()
       if (!response.ok || !data.success) throw new Error(data.error || 'Wallet load failed')
+      localStorage.setItem(WALLET_KEY, address)
       setWalletData(data)
     } catch (error) {
       setWalletError(error.message)
@@ -1513,32 +1519,10 @@ export default function Home() {
                 </article>
               </div>
 
-              <article className="panel calculatorPanel">
-                <PanelHeader eyebrow="SCENARIO LAB" title="Market-cap target calculator" />
-                <p className="calcNote">A simple scenario calculator. It assumes token price changes proportionally with market cap and ignores slippage, taxes, supply changes, and execution.</p>
-                <div className="calculatorGrid">
-                  <label>
-                    <span>Position size ($)</span>
-                    <input value={positionSize} onChange={(event) => setPositionSize(event.target.value)} inputMode="decimal" />
-                  </label>
-                  <label>
-                    <span>Target market cap ($)</span>
-                    <input value={targetMarketCap} onChange={(event) => setTargetMarketCap(event.target.value)} inputMode="decimal" placeholder={String(Math.round((scan.market.marketCap || 0) * 2))} />
-                  </label>
-                  <div className="calcResult">
-                    <span>Projected value</span>
-                    <strong>{scenarioValue(positionSize, scan.market.marketCap, targetMarketCap)}</strong>
-                  </div>
-                  <div className="calcResult">
-                    <span>Projected P/L</span>
-                    <strong>{scenarioProfit(positionSize, scan.market.marketCap, targetMarketCap)}</strong>
-                  </div>
-                  <div className="calcResult">
-                    <span>Target multiple</span>
-                    <strong>{scenarioMultiple(scan.market.marketCap, targetMarketCap)}</strong>
-                  </div>
-                </div>
-              </article>
+              <V4AnalyticsSuite
+                scan={scan}
+                walletEquity={Number(walletData?.portfolioTotalUsd || walletData?.portfolioTokenValueUsd || 0)}
+              />
 
               <article className="panel aiPanel">
                 <div className="aiHeader">
@@ -1607,6 +1591,8 @@ export default function Home() {
           </div>
 
           {walletError ? <ErrorBox text={walletError} /> : null}
+
+          <ChallengeTracker walletAddress={wallet} walletData={walletData} />
 
           {walletData ? (
             <>

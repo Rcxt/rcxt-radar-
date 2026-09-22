@@ -2204,3 +2204,74 @@ input,select,textarea{font-size:16px}
 .trenchState.reversal{color:#d6a84a}
 
 .trenchState.dumping{color:#ff6b74;font-weight:900}
+
+
+/* RCXT v4 analytics suite */
+.v4Suite{display:grid;gap:10px}
+.v4PanelHead{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+.v4PanelHead>div>span{display:block;color:var(--cyan);font-size:7px;font-weight:900;letter-spacing:.12em}
+.v4PanelHead h3{font-size:16px;margin:4px 0 0}
+.intervalTabs{display:flex;gap:5px}
+.intervalTabs button{min-width:42px;height:34px;border:1px solid #22313c;background:#091016;color:#718294;border-radius:8px;font-size:8px;font-weight:900}
+.intervalTabs button.active{border-color:#2d6a52;color:var(--green);background:#0c1a14}
+.v4Loading,.v4Error,.v4ChartEmpty{margin-top:12px;border:1px dashed #25343f;border-radius:10px;padding:18px;text-align:center;color:#6b7c8d;font-size:9px}
+.v4Error{border-color:#4a2c32;color:#d78991}
+.v4ChartWrap{position:relative;margin-top:12px;border:1px solid #17232c;border-radius:12px;background:#070c11;overflow:hidden;padding-right:74px}
+.v4Chart{display:block;width:100%;height:auto;min-height:240px}
+.chartGridLine{stroke:#15212a;stroke-width:1}
+.candle line{stroke-width:1}.candle rect{stroke-width:0}.candle.up line{stroke:#45d18a}.candle.up rect{fill:#45d18a}.candle.down line{stroke:#e05e67}.candle.down rect{fill:#e05e67}
+.v4Chart text{fill:#465563;font-size:9px}
+.chartPriceScale{position:absolute;right:8px;top:16px;bottom:28px;display:flex;flex-direction:column;justify-content:space-between;text-align:right}
+.chartPriceScale span{font-size:7px;color:#647587}
+.technicalStrip{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;margin-top:10px}
+.technicalStrip>div{border:1px solid #1b2933;background:#091016;border-radius:9px;padding:9px;min-width:0}
+.technicalStrip span{display:block;font-size:6px;color:#596a7b;text-transform:uppercase;letter-spacing:.07em}
+.technicalStrip b{display:block;font-size:11px;margin-top:4px;overflow-wrap:anywhere}.technicalStrip b.good{color:var(--green)}.technicalStrip b.bad{color:var(--red)}.technicalStrip b.mid{color:var(--amber)}
+.technicalStrip small{display:block;font-size:6px;color:#4d5b68;margin-top:2px}
+.forecastGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.forecastCard{border:1px solid #202d37;background:#090f15;border-radius:11px;padding:11px}.forecastCard>span{font-size:7px;color:#6b7a89;letter-spacing:.08em}
+.forecastRange{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:8px}.forecastRange>div{border-radius:8px;padding:8px;background:#0b1218}.forecastRange small{display:block;font-size:6px;color:#657384}.forecastRange b{display:block;font-size:9px;margin-top:4px}.forecastRange em{display:block;font-size:7px;font-style:normal;margin-top:3px}
+.forecastRange .bear em{color:var(--red)}.forecastRange .bull em{color:var(--green)}.forecastRange .base em{color:var(--amber)}
+.forecastMove{display:block!important;font-size:7px!important;color:#536273!important;margin-top:8px}
+.levelsGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:10px}.levelsGrid>div{border:1px solid #1b2933;border-radius:9px;padding:10px;background:#080e13}.levelsGrid span{display:block;font-size:6px;color:#596a7b;letter-spacing:.08em}.levelsGrid b,.levelsGrid small{display:block;font-size:8px;color:#9ba8b5;margin-top:5px;line-height:1.35}
+.forecastDisclaimer,.profitNote{font-size:7px;color:#536273;line-height:1.5;margin:9px 0 0}
+.v4TwoCol{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.beginnerCards{display:grid;gap:7px;margin-top:10px}.beginnerCards>div{border-left:2px solid #284b3b;background:#091016;border-radius:0 9px 9px 0;padding:10px}.beginnerCards strong{font-size:9px}.beginnerCards p{font-size:8px;color:#718192;line-height:1.55;margin:4px 0 0}
+.plannerInputs,.profitInputs{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:10px}.profitInputs{grid-template-columns:repeat(4,1fr)}
+.plannerInputs label,.profitInputs label{display:grid;gap:5px}.plannerInputs span,.profitInputs span{font-size:7px;color:#5e6e7e}.plannerInputs input,.profitInputs input{min-height:42px;border:1px solid #22313c;background:#080e13;color:#dbe2e8;border-radius:8px;padding:0 10px;font-size:16px}
+.plannerResults{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:9px}.plannerResults>div{border:1px solid #1c2a34;border-radius:8px;padding:9px}.plannerResults span{display:block;font-size:6px;color:#596a7b}.plannerResults b{display:block;font-size:12px;margin-top:4px}.riskPlannerPanel>p{font-size:7px;color:#566676;line-height:1.5;margin:9px 0 0}
+.customProfitResult{display:flex;align-items:center;gap:12px;border:1px solid #2b4438;background:#0b1712;border-radius:10px;padding:10px;margin-top:10px}.customProfitResult span{font-size:7px;color:#638071}.customProfitResult strong{font-size:16px;color:var(--green)}.customProfitResult b{font-size:8px;color:#82988d}
+.profitTableWrap{overflow-x:auto;margin-top:10px;border:1px solid #1b2832;border-radius:10px}.profitTable{width:100%;border-collapse:collapse;min-width:620px}.profitTable th,.profitTable td{text-align:right;padding:9px;border-bottom:1px solid #16222b;font-size:8px}.profitTable th:first-child,.profitTable td:first-child{text-align:left}.profitTable th{color:#596a7b;font-size:6px;letter-spacing:.07em;text-transform:uppercase}.profitTable tbody tr:last-child td{border-bottom:0}
+
+/* Challenge tracker */
+.challengePanel{margin-top:10px}
+.challengeHead{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}.challengeHead>div>span{display:block;color:#e1b752;font-size:7px;font-weight:900;letter-spacing:.13em}.challengeHead h3{font-size:18px;margin:4px 0}.challengeHead p{font-size:8px;color:#677687;margin:0;line-height:1.45}
+.challengeMultiple{border:1px solid #4b3c1d;background:#171206;border-radius:10px;padding:10px 13px;text-align:right}.challengeMultiple span{font-size:6px!important;color:#78683d!important}.challengeMultiple b{display:block;color:#f0c85a;font-size:18px;margin-top:3px}
+.challengeSync{display:grid;grid-template-columns:1fr auto;gap:7px;margin-top:12px}.challengeSync input{min-height:46px;border:1px solid #22313c;background:#080e13;color:#dbe2e8;border-radius:9px;padding:0 11px;font-size:16px}.challengeSync .primaryButton{min-height:46px}
+.challengeStats{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;margin-top:10px}.challengeStats>div{border:1px solid #1c2933;background:#091016;border-radius:9px;padding:9px}.challengeStats span{display:block;font-size:6px;color:#586979}.challengeStats b{display:block;font-size:11px;margin-top:4px}.challengeStats b.bad{color:var(--red)}
+.challengeProgress{margin-top:11px}.challengeProgress>div{display:flex;justify-content:space-between}.challengeProgress span{font-size:7px;color:#5c6b7b}.challengeProgress b{font-size:8px}.challengeProgress>i{display:block;height:7px;border-radius:99px;background:#17222b;overflow:hidden;margin-top:6px}.challengeProgress>i>em{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#7e6427,#f0c85a)}
+.milestoneGrid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:10px}.milestoneGrid>div{border:1px solid #1c2831;background:#080e13;border-radius:7px;padding:7px;text-align:center}.milestoneGrid span{display:block;font-size:6px;color:#596a7a}.milestoneGrid b{display:block;font-size:9px;color:#4d5964;margin-top:3px}.milestoneGrid>div.done{border-color:#36513f;background:#0b1711}.milestoneGrid>div.done b{color:var(--green)}
+.equitySparkline{display:block;width:100%;height:120px;border:1px solid #1a2730;background:#070c11;border-radius:10px;margin-top:10px;padding:8px}.equitySparkline polyline{fill:none;stroke:#e2b94f;stroke-width:2;vector-effect:non-scaling-stroke}.challengeEmptyChart{margin-top:10px;border:1px dashed #26343e;border-radius:9px;padding:18px;text-align:center;font-size:8px;color:#5e6d7c}
+.challengeFoot{display:flex;justify-content:space-between;gap:10px;margin-top:8px}.challengeFoot span{font-size:7px;color:#526170}
+
+@media(max-width:900px){
+  .technicalStrip{grid-template-columns:repeat(3,1fr)}
+  .levelsGrid{grid-template-columns:1fr 1fr}
+  .challengeStats{grid-template-columns:repeat(3,1fr)}
+  .milestoneGrid{grid-template-columns:repeat(5,1fr)}
+}
+@media(max-width:600px){
+  .v4PanelHead{flex-direction:column}
+  .intervalTabs{width:100%}.intervalTabs button{flex:1;min-height:42px}
+  .v4ChartWrap{padding-right:54px}.v4Chart{min-height:210px}
+  .technicalStrip{grid-template-columns:1fr 1fr}
+  .forecastGrid{grid-template-columns:1fr}
+  .levelsGrid{grid-template-columns:1fr}
+  .v4TwoCol{grid-template-columns:1fr}
+  .plannerInputs,.profitInputs{grid-template-columns:1fr 1fr}
+  .plannerResults{grid-template-columns:1fr 1fr 1fr}
+  .challengeHead{flex-direction:column}.challengeMultiple{text-align:left}
+  .challengeSync{grid-template-columns:1fr}.challengeSync .primaryButton{width:100%}
+  .challengeStats{grid-template-columns:1fr 1fr}
+  .milestoneGrid{grid-template-columns:repeat(3,1fr)}
+}
