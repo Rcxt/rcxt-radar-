@@ -1,78 +1,110 @@
 # RCXT Radar
 
-RCXT Radar is a Solana market-intelligence workstation built with React + Vite and Vercel Functions.
+RCXT Radar is a Solana market-intelligence workstation focused on functional analytics, explainable risk signals, wallet tracking, fresh-pair discovery, and decision-support tools.
 
-## Production architecture
+## Production
 
-- Solana JSON-RPC wallet + mint inspection
-- SPL and Token-2022 holdings
-- DexScreener live market enrichment
-- RCXT risk-adjusted score engine
-- 5-second market scanner refresh
-- 10-second opportunity-radar refresh
-- 60-second social-intelligence refresh
-- Supabase scan, wallet, social, and calibration persistence
-- iPhone-first PWA interface
-- Vercel AI Gateway analyst with a deterministic fallback
+https://rcxt-radar.vercel.app
 
-## RCXT Score Engine
+Current production release: **v4.0.0**
 
-The score is **not a probability of profit**. It is a risk-adjusted decision-support score built from separate dimensions:
+## Main systems
 
-- **Setup** — multi-timeframe momentum, order flow, and volume acceleration
-- **Execution** — liquidity, liquidity-to-market-cap depth, turnover, and trading depth
-- **Safety** — pair maturity, mint/freeze controls, and concentration when available
-- **Data Quality** — how complete the underlying evidence is
+### RCXT Score Engine 4.0
 
-Critical weaknesses cap the final score so activity or hype cannot average away structural risk.
+The headline score is a risk-adjusted decision-support score, not a probability of profit.
 
-## Social intelligence
+Core dimensions:
 
-RCXT includes provider adapters for Reddit, X, and Instagram. Social evidence is deliberately lower-trust than contract/liquidity data because it can be manipulated.
+- Setup
+- Execution
+- Safety
+- Data Quality
 
-The social layer measures:
+Critical weaknesses cap the score so activity, hype, or volume cannot average away structural risk.
 
-- relevant mentions
-- recency-weighted mentions
-- unique authors
-- engagement
-- sentiment
-- exact token relevance
-- duplicate-content rate
-- author concentration
-- cross-source confirmation
+### Trench Mode
 
-Provider credentials are configured only through environment variables. Never commit them to GitHub.
+Fresh-pair workflow for viable pairs up to roughly six hours old.
 
-### Required social environment variables
+Includes:
 
-Reddit:
-- `REDDIT_CLIENT_ID`
-- `REDDIT_CLIENT_SECRET`
+- Trench Score
+- 5m and 1h flow
+- liquidity floor
+- seller/collapse caps
+- HOT / ACTIVE / WATCH / QUIET / REVERSAL / SELLERS / EXTENDED / THIN / DUMPING states
+- direct Pump.fun links where applicable
 
-Or, alternatively:
-- `REDDIT_BEARER_TOKEN`
+### V4 Market Lab
 
-X:
-- `X_BEARER_TOKEN`
+Real OHLCV candles are sourced server-side from GeckoTerminal.
 
-Instagram:
-- `INSTAGRAM_ACCESS_TOKEN`
-- `INSTAGRAM_USER_ID`
-- optional `META_GRAPH_VERSION`
+Indicators and analytics:
 
-## Calibration
+- 1m / 5m / 15m / 1h candles
+- EMA / SMA
+- RSI
+- ATR
+- realized volatility
+- volume acceleration
+- support / resistance
+- risk-reward structure
+- short-horizon volatility-based scenario ranges
+- RCXT + chart agreement
 
-Manual token scans create durable score history. When a later manual scan lands close enough to a 1h, 6h, or 24h observation window, RCXT labels the earlier scan with the realized return. Calibration results are grouped by score-engine version so incompatible score generations are never mixed.
+### Trade Tape
 
-Small samples are shown as **collecting data** rather than presented as a trustworthy hit rate.
+Recent GeckoTerminal trades are normalized into:
 
-## Deployment
+- buy/sell USD volume
+- net flow
+- buy-volume percentage
+- average/median trade size
+- largest buy/sell
+- whale-flow summary
+- unique wallets
+- concentration/pressure flags
 
-The connected Vercel project uses the Vite preset. API endpoints under `/api` deploy as Vercel Functions.
+### Profit List + Position Planner
 
-Production: https://rcxt-radar.vercel.app
+Profit List converts a position amount and entry market cap into common and custom target-MC outcomes.
 
-## Safety
+Position Planner works backward from account value, risk %, and invalidation distance to estimate a maximum theoretical position size and liquidity burden.
 
-RCXT signals are software-generated market intelligence. They are not guarantees, a probability of profit, or automated trading instructions.
+### Beginner / Pro explanations
+
+The scanner includes deterministic beginner explanations plus AI Beginner and Pro modes.
+
+The AI layer never changes the deterministic RCXT score.
+
+### $5 → $50K challenge
+
+Wallet-linked equity tracker with milestone progress, high-water mark, drawdown, required multiple, challenge-scoped history, and server snapshots.
+
+It is a tracker, not a promise that $5 will become $50K.
+
+## Backend
+
+- React 19 + Vite
+- Vercel Functions in sfo1
+- Solana JSON-RPC
+- DexScreener
+- GeckoTerminal
+- Supabase Edge Function + Postgres
+- OIDC-authenticated server writes
+- Vercel AI Gateway with deterministic fallback
+
+## Security
+
+Production Supabase writes require signed Vercel OIDC identity and are RLS-protected server-side.
+
+Never commit API secrets or service-role credentials.
+
+## Social Intelligence
+
+Reddit, X, and Instagram adapters exist but remain a **v5 / Coming Soon** feature until official provider credentials and live-data validation are complete.
+
+## Important interpretation
+
+Measured market data, computed analytics, and estimated scenario ranges are intentionally labeled differently. RCXT does not guarantee future prices, profitable trades, or execution quality.

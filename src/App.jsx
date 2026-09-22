@@ -775,7 +775,7 @@ export default function Home() {
 
                 <div className="commandFooter">
                   <button onClick={resetRadarWorkspace}>Reset radar workspace</button>
-                  <span>v3.0 · Score Engine 4.0</span>
+                  <span>v4.0 · Functional Analytics</span>
                 </div>
               </div>
             ) : null}
@@ -1662,7 +1662,7 @@ export default function Home() {
 
       <footer className="footer">
         <div>
-          <b>RCXT RADAR · v3.2.1 PRODUCTION</b>
+          <b>RCXT RADAR · v4.0.0 PRODUCTION</b>
           <span>Score engine v4.0.0 · Solana · DexScreener · Supabase · Vercel</span>
         </div>
         <p>

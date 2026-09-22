@@ -1,56 +1,166 @@
-# RCXT Radar v3.2.0 — Trench Mode
+# RCXT Radar v4.0.0 — Functional Analytics Suite
 
 Release status: **OFFICIAL PRODUCTION SNAPSHOT**
 
-## Trench Mode
-- dedicated Trench preset in Command Center
-- focuses on viable pairs up to 6 hours old
-- sorts by independent Trench Score
-- uses pair age, 5m activity, 1h activity, liquidity, discovery quality, and buy/sell balance
-- seller dominance and extreme moves cap Trench Score
-- states: HOT, ACTIVE, WATCH, QUIET, REVERSAL, SELLERS, EXTENDED, THIN
-- main RCXT Score remains independent and visible at all times
+## v4 design rule
 
-## New-pair discovery
-- Radar mixes DexScreener latest token profiles, latest boosts, and top boosts
-- roughly half of the candidate feed is reserved for viable sub-24h pairs when available
-- age labels: JUST LAUNCHED, VERY NEW, NEW, RECENT, ESTABLISHED
-- Early Discovery and Newest sorting
-- dead/illiquid launches do not rank purely because they are new
+RCXT v4 distinguishes three kinds of information:
 
-## Pump.fun
-- Pump.fun-origin / PumpSwap tokens receive a direct Pump.fun button on Radar
-- Deep Scanner also receives a Pump.fun link when the token is eligible
-- canonical token route uses https://pump.fun/coin/<mint>
-- DexScreener links remain available
+1. **Measured data** — on-chain wallet values, DexScreener market data, GeckoTerminal OHLCV candles and recent trades, Solana contract/holder data, persisted wallet/scan history.
+2. **Computed analytics** — RCXT Score, technical indicators, support/resistance, trade-flow summaries, profit ladders, position-risk math, challenge progress.
+3. **Estimated scenarios** — short-horizon forecast ranges derived from volatility and momentum. These are not guaranteed targets or probabilities of profit.
 
-## Risk controls
-- Trench Score is not a probability of profit
-- high short-term activity cannot override RCXT contract/liquidity/risk warnings
-- heavy 1h seller dominance caps Trench Score
-- fresh 5m rebounds after seller-heavy 1h flow are labeled REVERSAL instead of HOT
+## Real OHLCV market lab
 
-## Existing systems retained
+- GeckoTerminal public on-chain OHLCV integration
+- 1m / 5m / 15m / 1h chart intervals
+- server-side short cache and rate limiting
+- candlestick visualization
+- EMA 9 / EMA 21
+- SMA 20 / SMA 50
+- RSI 14
+- ATR and ATR %
+- realized return volatility
+- volume acceleration
+- recent range high / low
+- max observed drawdown
+- support and resistance zones
+- nearest support / resistance distance
+- structure risk-reward ratio
+- volatility regime
+- structure regime
+- RCXT-vs-chart agreement status
+
+## Forecast Lab
+
+- 15-minute scenario range
+- 1-hour scenario range
+- 6-hour scenario range
+- bear / base / bull price bands
+- model confidence and data-quality score
+- confidence is explicitly **not** a probability of profit
+- scenario bands expand with observed ATR/volatility and directional bias
+- limited-data tokens automatically receive lower confidence
+
+## Recent-trade tape / whale-flow analytics
+
+- cached GeckoTerminal recent-trade feed
+- recent buy and sell USD volume
+- net USD flow
+- buy-volume share
+- average and median trade size
+- largest recent buy
+- largest recent sell
+- unique-wallet count
+- dynamic whale threshold
+- whale buy/sell counts and USD volume
+- top-trade concentration
+- flags for buy/sell-volume dominance, whale pressure, trade concentration, and low wallet diversity
+
+## Profit List
+
+Built to answer the same market-cap questions users normally calculate manually:
+
+- configurable position amount
+- configurable entry market cap
+- common target-MC ladder
+- custom market-cap target
+- target multiple
+- projected position value
+- projected P/L
+- projected ROI
+- configurable estimated trading-cost percentage
+- one-tap Copy Profit List
+
+The calculator uses market-cap ratios and explicitly warns that real fills vary with liquidity, fees, slippage, taxes, supply changes, and execution.
+
+## Position Planner
+
+- account value
+- maximum risk %
+- stop / invalidation distance %
+- risk budget
+- maximum theoretical position size
+- position as % of account
+- planned position as % of reported pool liquidity
+- liquidity-burden state
+
+This is a risk-planning calculator, not an order executor.
+
+## Beginner Mode
+
+RCXT v4 includes two layers:
+
+- deterministic plain-English explanations that work without an AI provider
+- AI **Beginner** and **Pro** modes
+
+Beginner mode explains what the score means, liquidity/exit risk, chart state, and the biggest invalidation in plain language. Pro mode retains the compact market-structure analysis.
+
+AI model fallback chain remains:
+1. openai/gpt-5.6-sol
+2. openai/gpt-5.6-luna
+3. deterministic fallback
+
+## $5 → $50K Challenge Tracker
+
+- wallet-linked equity sync
+- fixed $5 reference and $50K goal
+- explicitly shows the full target is 10,000x total growth
+- logarithmic progress display
+- milestones: $5, $10, $25, $50, $100, $250, $500, $1K, $2.5K, $5K, $10K, $25K, $50K
+- current equity
+- next milestone
+- % required to next milestone
+- high-water mark
+- drawdown from high-water mark
+- required multiple from current equity to $50K
+- persisted server wallet snapshots
+- device-local challenge start time so old wallet history does not distort a new run
+- reset challenge-start control
+- equity-history sparkline
+
+The challenge is a measurement dashboard, not a promise or compounding strategy.
+
+## Privacy cleanup
+
+The old hard-coded public test-wallet value was removed from the production frontend. Wallet addresses are user-entered and can be stored locally on the device instead of being shipped in public source code.
+
+## Existing v3 systems retained
+
 - RCXT Score Engine 4.0
-- All-in-One Command Center
-- Hide Coin / Watchlist / Compare
-- 5-second scanner
-- 10-second Radar
-- iPhone-safe mobile UI
-- OIDC-secured persistence
+- Trench Mode
+- fresh/new-pair Radar
+- direct Pump.fun links
+- Watchlist
+- Hide Coin
+- Compare
+- alerts
+- token journal
 - wallet intelligence
-- calibration infrastructure
-- AI fallback chain
-- SFO compute
+- CSV exports
+- score calibration
+- OIDC-secured Supabase writes
+- iPhone/PWA layout
+- SFO Vercel Functions
+- Social Intelligence remains intentionally reserved for v5 until official provider connections are active
 
-## Validation
-- production deployment READY
-- Radar returned 24 live candidates
-- sub-6h pairs confirmed live
-- Trench Score/state confirmed live
-- Pump.fun URLs populated for eligible tokens
-- production warning/error/fatal logs: none
+## Data providers
+
+- Solana JSON-RPC
+- DexScreener
+- GeckoTerminal / CoinGecko on-chain public API
+- Supabase
+- Vercel AI Gateway when available
+
+## Reliability notes
+
+- Chart/tape upstream calls have timeouts, rate limits, and short caches
+- Market scanner and Radar remain independent of chart-provider failure
+- AI failure falls back to deterministic analysis
+- challenge history failure does not affect wallet loading
+- social providers remain excluded from v4 scoring
+- estimates are labeled separately from measured market data
 
 Production: https://rcxt-radar.vercel.app
 
-Rollback branch: `release/v3.2.0`
+Rollback branch: `release/v4.0.0`

@@ -1,14 +1,18 @@
 {
   "name": "RCXT Radar",
-  "version": "3.2.1",
+  "version": "4.0.0",
   "channel": "production",
   "status": "official",
   "scoreEngine": "4.0.0",
   "trenchEngine": "1.0.0",
-  "socialEngine": "2.0.0-coming-soon",
+  "chartEngine": "1.0.0",
+  "forecastEngine": "1.0.0",
+  "tradeTapeEngine": "1.0.0",
+  "challengeEngine": "1.0.0",
+  "socialEngine": "reserved-for-v5",
   "persistence": "oidc-secured",
   "region": "sfo1",
-  "release": "trench-mode-risk-hotfix",
+  "release": "functional-analytics-suite",
   "releasedAt": "2026-09-22",
   "productionUrl": "https://rcxt-radar.vercel.app"
 }
