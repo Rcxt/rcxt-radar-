@@ -81,6 +81,7 @@ function ForecastCard({label,forecast}){
 export default function V4AnalyticsSuite({scan,walletEquity=0}){
   const [interval,setIntervalValue]=useState('5m')
   const [chart,setChart]=useState(null)
+  const [tape,setTape]=useState(null)
   const [loading,setLoading]=useState(false)
   const [error,setError]=useState('')
   const [investment,setInvestment]=useState('20')
@@ -118,6 +119,24 @@ export default function V4AnalyticsSuite({scan,walletEquity=0}){
     const timer=setInterval(load,30000)
     return()=>{active=false;clearInterval(timer)}
   },[scan?.pair?.pairAddress,interval])
+
+  useEffect(()=>{
+    let active=true
+    const pair=scan?.pair?.pairAddress
+    if(!pair){setTape(null);return}
+
+    async function loadTape(){
+      try{
+        const response=await fetch('/api/trades?pair='+encodeURIComponent(pair),{cache:'no-store'})
+        const data=await response.json()
+        if(response.ok&&data?.success&&active) setTape(data)
+      }catch{}
+    }
+
+    loadTape()
+    const timer=setInterval(loadTape,30000)
+    return()=>{active=false;clearInterval(timer)}
+  },[scan?.pair?.pairAddress])
 
   const ladder=useMemo(()=>buildProfitLadder({
     investment,
@@ -178,6 +197,26 @@ export default function V4AnalyticsSuite({scan,walletEquity=0}){
               <div><span>Volume Accel.</span><b>{analytics.indicators?.volumeAcceleration??'—'}×</b></div>
               <div><span>Max Drawdown</span><b className="bad">{pct(analytics.indicators?.maxDrawdown)}</b></div>
             </div>
+            {tape?.summary?(
+              <div className="tradeTape">
+                <div className="tradeTapeHead">
+                  <div><span>LIVE TRADE TAPE</span><strong>Recent USD flow</strong></div>
+                  <small>{tape.summary.sampleSize} trades · {tape.summary.uniqueWallets} wallets</small>
+                </div>
+                <div className="tradeTapeStats">
+                  <div><span>Buy volume</span><b className="good">{money(tape.summary.buyVolumeUsd)}</b><small>{tape.summary.buyVolumePercent}% of sample</small></div>
+                  <div><span>Sell volume</span><b className="bad">{money(tape.summary.sellVolumeUsd)}</b><small>{100-tape.summary.buyVolumePercent}% of sample</small></div>
+                  <div><span>Net flow</span><b className={tape.summary.netFlowUsd>=0?'good':'bad'}>{money(tape.summary.netFlowUsd)}</b></div>
+                  <div><span>Largest buy</span><b>{money(tape.summary.largestBuyUsd)}</b></div>
+                  <div><span>Largest sell</span><b>{money(tape.summary.largestSellUsd)}</b></div>
+                  <div><span>Whale flow</span><b>{tape.summary.whaleBuyCount}B / {tape.summary.whaleSellCount}S</b><small>≥ {money(tape.summary.whaleThresholdUsd)}</small></div>
+                </div>
+                {tape.summary.flags?.length?(
+                  <div className="tapeFlags">{tape.summary.flags.map(flag=><span key={flag}>{flag.replaceAll('_',' ')}</span>)}</div>
+                ):null}
+              </div>
+            ):null}
+
             <div className="forecastGrid">
               <ForecastCard label="NEXT 15M RANGE" forecast={analytics.forecast?.m15}/>
               <ForecastCard label="NEXT 1H RANGE" forecast={analytics.forecast?.h1}/>
