@@ -40,17 +40,28 @@ export default function ChallengeTracker({walletAddress='',walletData=null}){
   const [current,setCurrent]=useState(0)
   const [loading,setLoading]=useState(false)
   const [error,setError]=useState('')
+  const [startedAt,setStartedAt]=useState(null)
 
   useEffect(()=>{
     const saved=localStorage.getItem('rcxt-challenge-wallet-v1')||''
-    setAddress(walletAddress||saved)
+    const nextAddress=walletAddress||saved
+    setAddress(nextAddress)
+    if(nextAddress){
+      const savedStart=localStorage.getItem('rcxt-challenge-start-v1:'+nextAddress)
+      setStartedAt(savedStart?Number(savedStart):null)
+    }
   },[walletAddress])
 
   useEffect(()=>{
     if(walletData?.portfolioTotalUsd!=null) setCurrent(Number(walletData.portfolioTotalUsd||0))
   },[walletData?.portfolioTotalUsd])
 
-  const stats=useMemo(()=>challengeStats(current,data?.rows||[]),[current,data?.rows])
+  const scopedRows=useMemo(()=>{
+    if(!startedAt) return data?.rows||[]
+    return (data?.rows||[]).filter(row=>new Date(row.createdAt).getTime()>=startedAt)
+  },[data?.rows,startedAt])
+
+  const stats=useMemo(()=>challengeStats(current,scopedRows),[current,scopedRows])
 
   async function sync(){
     const target=address.trim()
@@ -59,6 +70,13 @@ export default function ChallengeTracker({walletAddress='',walletData=null}){
     setError('')
     try{
       localStorage.setItem('rcxt-challenge-wallet-v1',target)
+      let start=Number(localStorage.getItem('rcxt-challenge-start-v1:'+target)||0)
+      if(!start){
+        start=Date.now()
+        localStorage.setItem('rcxt-challenge-start-v1:'+target,String(start))
+      }
+      setStartedAt(start)
+
       const walletResponse=await fetch('/api/wallet?address='+encodeURIComponent(target),{cache:'no-store'})
       const walletJson=await walletResponse.json()
       if(!walletResponse.ok||!walletJson?.success) throw new Error(walletJson?.error||'Wallet sync failed')
@@ -74,6 +92,15 @@ export default function ChallengeTracker({walletAddress='',walletData=null}){
     }finally{
       setLoading(false)
     }
+  }
+
+  function resetChallenge(){
+    const target=address.trim()
+    if(!target) return
+    const now=Date.now()
+    localStorage.setItem('rcxt-challenge-start-v1:'+target,String(now))
+    setStartedAt(now)
+    setData((currentData)=>currentData?{...currentData,rows:[]}:currentData)
   }
 
   return (
@@ -113,11 +140,12 @@ export default function ChallengeTracker({walletAddress='',walletData=null}){
         ))}
       </div>
 
-      <EquitySparkline rows={data?.rows||[]} current={stats.current}/>
+      <EquitySparkline rows={scopedRows} current={stats.current}/>
 
       <div className="challengeFoot">
-        <span>{data?.count||0} server snapshots</span>
+        <span>{scopedRows.length} challenge snapshots{startedAt?' · started '+new Date(startedAt).toLocaleDateString():''}</span>
         <span>{stats.requiredMultiple?stats.requiredMultiple.toFixed(1)+'× from current equity to $50K':'Sync a wallet to begin tracking'}</span>
+        <button className="challengeReset" onClick={resetChallenge}>Reset challenge start</button>
       </div>
     </article>
   )
