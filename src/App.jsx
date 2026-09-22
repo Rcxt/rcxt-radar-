@@ -57,6 +57,7 @@ export default function Home() {
   const [socialLoading, setSocialLoading] = useState(false)
   const [socialError, setSocialError] = useState('')
   const [socialLastRefresh, setSocialLastRefresh] = useState(null)
+  const [calibration, setCalibration] = useState({ totalSamples: 0, rows: [] })
 
   const loadRadar = useCallback(async () => {
     setRadarLoading(true)
@@ -118,6 +119,27 @@ export default function Home() {
 
     loadHealth()
     const timer = setInterval(loadHealth, 30000)
+    return () => {
+      active = false
+      clearInterval(timer)
+    }
+  }, [])
+
+  useEffect(() => {
+    let active = true
+
+    async function loadCalibration() {
+      try {
+        const response = await fetch('/api/calibration', { cache: 'no-store' })
+        const data = await response.json()
+        if (active && response.ok && data?.success) {
+          setCalibration({ totalSamples: data.totalSamples || 0, rows: data.rows || [] })
+        }
+      } catch {}
+    }
+
+    loadCalibration()
+    const timer = setInterval(loadCalibration, 300000)
     return () => {
       active = false
       clearInterval(timer)
@@ -991,6 +1013,11 @@ export default function Home() {
                 </div>
                 <ScoreAxes intelligence={scan.intelligence} />
                 <ScoreTrend rows={scoreHistory} currentScore={scan.intelligence.score} modelVersion={scan.intelligence.modelVersion} />
+                <CalibrationStrip
+                  calibration={calibration}
+                  modelVersion={scan.intelligence.modelVersion}
+                  signal={scan.intelligence.signal}
+                />
               </article>
 
               <div className="metricGrid six">
@@ -1433,6 +1460,50 @@ function ScoreRing({ score, large = false }) {
       <div>
         <strong>{value}</strong>
         <span>/100</span>
+      </div>
+    </div>
+  )
+}
+
+function CalibrationStrip({ calibration, modelVersion, signal }) {
+  const rows = (calibration?.rows || []).filter(
+    (row) => row.scoreVersion === modelVersion && row.signal === signal,
+  )
+  const samples = rows.reduce((sum, row) => sum + Number(row.samples || 0), 0)
+
+  if (samples < 20) {
+    return (
+      <div className="calibrationStrip collecting">
+        <div>
+          <span>MODEL CALIBRATION</span>
+          <strong>Collecting forward outcomes</strong>
+        </div>
+        <small>{samples}/20 minimum signal samples · {calibration?.totalSamples || 0} total labeled outcomes</small>
+      </div>
+    )
+  }
+
+  return (
+    <div className="calibrationStrip">
+      <div className="calibrationTitle">
+        <span>MODEL CALIBRATION · {signal}</span>
+        <small>{samples} labeled outcomes</small>
+      </div>
+      <div className="calibrationRows">
+        {rows.map((row) => (
+          <div key={row.horizon}>
+            <span>{row.horizon}</span>
+            <strong>
+              {row.directionalHitRate == null
+                ? '—'
+                : `${Math.round(row.directionalHitRate * 100)}% direction hit`}
+            </strong>
+            <small>
+              avg {row.avgReturnPct == null ? '—' : `${row.avgReturnPct >= 0 ? '+' : ''}${row.avgReturnPct.toFixed(1)}%`}
+              {' · '}{row.samples} samples
+            </small>
+          </div>
+        ))}
       </div>
     </div>
   )
