@@ -62,6 +62,16 @@ export default function Home() {
     }
   }, [loadRadar])
 
+  useEffect(() => {
+    if (view !== 'radar') return
+
+    const timer = setInterval(() => {
+      loadRadar()
+    }, 10000)
+
+    return () => clearInterval(timer)
+  }, [view, loadRadar])
+
   const runScan = useCallback(async ({ address, silent = false } = {}) => {
     const target = String(address ?? tokenAddress).trim()
     if (!target) return
@@ -118,7 +128,7 @@ export default function Home() {
 
     const timer = setInterval(() => {
       runScan({ address: scan.address, silent: true })
-    }, 15000)
+    }, 5000)
 
     return () => clearInterval(timer)
   }, [autoRefresh, scan?.address, runScan])
@@ -410,7 +420,7 @@ export default function Home() {
                 onChange={(event) => setAutoRefresh(event.target.checked)}
               />
               <span />
-              15S AUTO
+              5S AUTO
             </label>
           </div>
 
@@ -576,7 +586,7 @@ export default function Home() {
 
               <div className="refreshLine">
                 <span className={autoRefresh ? 'pulse' : 'pulse paused'} />
-                {autoRefresh ? 'Auto-refreshing every 15 seconds' : 'Auto-refresh paused'}
+                {autoRefresh ? 'Auto-refreshing every 5 seconds' : 'Auto-refresh paused'}
                 {lastRefresh ? <small>Last update {lastRefresh.toLocaleTimeString()}</small> : null}
               </div>
             </>
