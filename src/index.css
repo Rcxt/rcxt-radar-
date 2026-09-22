@@ -2202,3 +2202,5 @@ input,select,textarea{font-size:16px}
 }
 
 .trenchState.reversal{color:#d6a84a}
+
+.trenchState.dumping{color:#ff6b74;font-weight:900}
