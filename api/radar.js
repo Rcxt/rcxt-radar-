@@ -66,12 +66,16 @@ export default async function handler(req, res) {
       if (liquidityUsd < 3000) trenchScore -= 18
       if (change5m > 35 || change1h > 120) trenchScore -= 14
       if (change5m < -15) trenchScore -= 12
+      if (change5m < -20) trenchScore = Math.min(trenchScore, 55)
+      if (change1h < -25) trenchScore = Math.min(trenchScore, 52)
+      if (change5m < -35 || change1h < -45) trenchScore = Math.min(trenchScore, 42)
       trenchScore = Math.max(0, Math.min(100, trenchScore))
 
       if (buyPct1h < 35 && tx1h >= 50) trenchScore = Math.min(trenchScore, 68)
       if (buyPct5m < 30 && tx5m >= 20) trenchScore = Math.min(trenchScore, 55)
 
       const trenchState =
+        (change5m < -35 || change1h < -45) ? 'DUMPING' :
         liquidityUsd < 3000 ? 'THIN' :
         (buyPct5m < 35 && tx5m >= 10) ? 'SELLERS' :
         (buyPct1h < 38 && tx1h >= 20 && buyPct5m >= 50) ? 'REVERSAL' :
