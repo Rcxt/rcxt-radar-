@@ -56,6 +56,7 @@ export default async function handler(req,res){
     services,
     refresh:{radarSeconds:10,scannerSeconds:5},
     ai:{mode:'multi-model-gateway-with-deterministic-fallback'},
+    oidc:{available:Boolean(req.headers?.['x-vercel-oidc-token'])},
     socialProviders:{
       reddit:Boolean(process.env.REDDIT_BEARER_TOKEN),
       x:Boolean(process.env.X_BEARER_TOKEN),
