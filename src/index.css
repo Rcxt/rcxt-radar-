@@ -1631,3 +1631,92 @@ input:focus-visible {
 .radarCard[role="button"]{cursor:pointer}
 .radarCard[role="button"]:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
 @media(max-width:700px){.radarActions{width:100%;justify-content:flex-start}.sectionHeading{align-items:flex-start;flex-wrap:wrap}.hiddenTrayHead{align-items:flex-start}.hiddenCoins{display:grid;grid-template-columns:1fr}.hiddenCoins>button{width:100%}}
+
+
+/* iPhone / PWA hardening */
+html,body,#root{min-height:100%;width:100%}
+body{-webkit-text-size-adjust:100%;-webkit-font-smoothing:antialiased;overscroll-behavior-y:none}
+button,input{-webkit-tap-highlight-color:transparent}
+button{touch-action:manipulation}
+.appShell{
+  padding-left:max(0px,env(safe-area-inset-left));
+  padding-right:max(0px,env(safe-area-inset-right));
+  padding-bottom:max(42px,calc(env(safe-area-inset-bottom) + 26px));
+}
+.topbar{
+  padding-top:env(safe-area-inset-top);
+  height:calc(84px + env(safe-area-inset-top));
+}
+.topActions{justify-self:end;display:flex;align-items:center;gap:9px}
+.notifyButton{
+  appearance:none;border:1px solid #263545;background:#0b1118;color:#8391a2;
+  border-radius:999px;padding:8px 10px;font-size:8px;font-weight:900;letter-spacing:.07em;cursor:pointer
+}
+.notifyButton.enabled{color:var(--green);border-color:#285b42;background:#0d1d15}
+.notificationStatus{
+  position:fixed;z-index:100;top:max(12px,calc(env(safe-area-inset-top) + 8px));left:50%;
+  transform:translateX(-50%);width:min(92vw,480px);padding:11px 13px;border-radius:12px;
+  border:1px solid #2a3b49;background:rgba(10,15,21,.96);backdrop-filter:blur(20px);
+  color:#cbd5df;font-size:10px;text-align:center;box-shadow:0 16px 50px rgba(0,0,0,.3)
+}
+.fatalScreen{
+  min-height:100dvh;display:grid;place-items:center;padding:24px;
+  background:radial-gradient(circle at 20% 0,rgba(87,215,255,.08),transparent 28rem),#06080b
+}
+.fatalCard{width:min(100%,520px);border:1px solid #263544;border-radius:18px;background:#0b1017;padding:24px}
+.fatalCard>span{color:var(--cyan);font-size:9px;font-weight:900;letter-spacing:.14em}
+.fatalCard h1{font-size:26px;margin:8px 0 10px}
+.fatalCard p{color:#8c9aab;font-size:12px;line-height:1.5;word-break:break-word}
+.fatalCard button{margin-top:10px;min-height:44px;border:1px solid #31536a;background:#10202b;border-radius:10px;color:white;padding:0 14px}
+
+@media(max-width:820px){
+  .appShell{width:100%;padding-left:12px;padding-right:12px}
+  .topbar{
+    position:sticky;top:0;height:calc(66px + env(safe-area-inset-top));
+    margin-left:-12px;margin-right:-12px;padding-left:12px;padding-right:12px;
+    grid-template-columns:1fr auto;background:rgba(6,8,11,.94)
+  }
+  .topActions{gap:6px}
+  .systemStatus{display:none}
+  .notifyButton{padding:8px 9px;font-size:7px}
+  .hero{padding:30px 0 22px}
+  .hero h1{font-size:clamp(38px,11vw,56px);line-height:1}
+  .hero p{font-size:12px;line-height:1.55}
+  .mobileNav{
+    position:fixed!important;z-index:80;left:10px;right:10px;
+    bottom:max(10px,calc(env(safe-area-inset-bottom) + 8px));
+    margin:0!important;padding:6px!important;border-radius:14px;
+    background:rgba(9,14,20,.96)!important;backdrop-filter:blur(22px);
+    border:1px solid #1d2b37;box-shadow:0 16px 55px rgba(0,0,0,.42)
+  }
+  .mobileNav .navButton{flex:1;min-height:42px}
+  .contentStack{padding-bottom:86px}
+  .radarGrid{grid-template-columns:1fr}
+  .radarCard{min-height:0;padding:16px}
+  .sectionHeading{gap:12px}
+  .sectionHeading>div:first-child{align-items:flex-start}
+  .radarActions{width:100%;display:grid;grid-template-columns:1fr 1fr}
+  .radarActions .ghostButton{min-height:42px}
+  .scanBar{position:sticky;top:calc(68px + env(safe-area-inset-top));z-index:20}
+  .scanBar input{font-size:16px}
+  .primaryButton{min-height:46px}
+  .scanHero{grid-template-columns:1fr auto;padding:15px}
+  .signalHero{grid-column:1/-1}
+  .metricCard{padding:11px}
+  .analysisGrid{grid-template-columns:1fr}
+  .intelStrip{overflow-x:auto;grid-template-columns:repeat(6,minmax(120px,1fr));scroll-snap-type:x proximity}
+  .intelStrip>div{scroll-snap-align:start;border-bottom:0!important}
+  .holdingsTableWrap{-webkit-overflow-scrolling:touch}
+  .footer{padding-bottom:80px}
+}
+@media(max-width:430px){
+  .brand b{font-size:16px}.brand em{display:none}
+  .brandMark{width:30px;height:30px}
+  .hero h1{font-size:39px}
+  .hero p{font-size:11px}
+  .sectionHeading h2{font-size:20px}
+  .metricGrid.six,.walletSummary{grid-template-columns:1fr 1fr}
+  .scanHero>.scoreRing{width:70px;height:70px}
+  .scanHero>.scoreRing>div{padding-top:19px}
+  .hiddenTray{padding:11px}
+}
