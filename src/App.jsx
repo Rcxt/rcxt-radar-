@@ -53,6 +53,10 @@ export default function Home() {
   const [alertSignalChanges, setAlertSignalChanges] = useState(true)
   const [tokenNote, setTokenNote] = useState('')
   const [scoreHistory, setScoreHistory] = useState([])
+  const [socialIntel, setSocialIntel] = useState(null)
+  const [socialLoading, setSocialLoading] = useState(false)
+  const [socialError, setSocialError] = useState('')
+  const [socialLastRefresh, setSocialLastRefresh] = useState(null)
 
   const loadRadar = useCallback(async () => {
     setRadarLoading(true)
@@ -130,6 +134,31 @@ export default function Home() {
     return () => clearInterval(timer)
   }, [view, loadRadar])
 
+  const loadSocial = useCallback(async ({ targetScan = scan, silent = false } = {}) => {
+    if (!targetScan?.address) return
+    if (!silent) setSocialLoading(true)
+    setSocialError('')
+
+    try {
+      const params = new URLSearchParams({
+        address: targetScan.address,
+        symbol: targetScan.token?.symbol || '',
+        name: targetScan.token?.name || '',
+        persist: silent ? '0' : '1',
+      })
+      const response = await fetch(`/api/social?${params.toString()}`, { cache: 'no-store' })
+      const data = await response.json()
+      if (!response.ok || !data.success) throw new Error(data.error || 'Social scan failed')
+      setSocialIntel(data.social)
+      setSocialLastRefresh(new Date())
+    } catch (error) {
+      if (!silent) setSocialIntel(null)
+      setSocialError(error.message)
+    } finally {
+      if (!silent) setSocialLoading(false)
+    }
+  }, [scan])
+
   const runScan = useCallback(async ({ address, silent = false } = {}) => {
     const target = String(address ?? tokenAddress).trim()
     if (!target) return
@@ -168,6 +197,8 @@ export default function Home() {
       }
 
       if (!silent) {
+        loadSocial({ targetScan: data.scan })
+
         try {
           const historyResponse = await fetch(`/api/history?address=${encodeURIComponent(target)}`, { cache: 'no-store' })
           const historyData = await historyResponse.json()
@@ -201,7 +232,7 @@ export default function Home() {
     } finally {
       if (!silent) setScanLoading(false)
     }
-  }, [tokenAddress, notificationsEnabled, alertScore, alertMarketCap, alertSignalChanges])
+  }, [tokenAddress, notificationsEnabled, alertScore, alertMarketCap, alertSignalChanges, loadSocial])
 
   useEffect(() => {
     const deepLinkedToken = new URLSearchParams(window.location.search).get('token')
@@ -220,6 +251,14 @@ export default function Home() {
 
     return () => clearInterval(timer)
   }, [autoRefresh, scan?.address, runScan])
+
+  useEffect(() => {
+    if (!scan?.address) return
+    const timer = setInterval(() => {
+      loadSocial({ targetScan: scan, silent: true })
+    }, 60000)
+    return () => clearInterval(timer)
+  }, [scan?.address, loadSocial])
 
   async function enableNotifications() {
     if (typeof window === 'undefined' || !('Notification' in window)) {
@@ -380,7 +419,7 @@ export default function Home() {
       const response = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ scan }),
+        body: JSON.stringify({ scan, social: socialIntel }),
       })
       const data = await response.json()
       if (!response.ok || !data.success) throw new Error(data.error || 'AI analysis failed')
@@ -967,6 +1006,42 @@ export default function Home() {
                 <MetricCard label="24H Buy %" value={`${scan.intelligence.buyPercent24h}%`} />
               </div>
 
+              <article className="panel socialIntelPanel">
+                <PanelHeader eyebrow="SOCIAL INTELLIGENCE" title="Reddit · X · Instagram" />
+                <div className="socialSummary">
+                  <MetricCard label="Social Momentum" value={socialIntel?.available ? `${socialIntel.momentumScore}/100` : '—'} />
+                  <MetricCard label="Data Quality" value={socialIntel?.available ? `${socialIntel.qualityScore}/100` : '—'} />
+                  <MetricCard label="Mentions" value={socialIntel?.available ? socialIntel.mentionCount : '—'} />
+                  <MetricCard label="Unique Authors" value={socialIntel?.available ? socialIntel.uniqueAuthors : '—'} />
+                  <MetricCard
+                    label="Sentiment"
+                    value={socialIntel?.available ? socialSentimentLabel(socialIntel.sentiment) : '—'}
+                    tone={Number(socialIntel?.sentiment || 0) > 0.12 ? 'positive' : Number(socialIntel?.sentiment || 0) < -0.12 ? 'negative' : ''}
+                  />
+                </div>
+                <div className="socialProviderGrid">
+                  {(socialIntel?.providers || [
+                    { source:'reddit', available:false, reason:'Scanning…' },
+                    { source:'x', available:false, reason:'Scanning…' },
+                    { source:'instagram', available:false, reason:'Scanning…' },
+                  ]).map((provider) => (
+                    <SocialProviderCard key={provider.source} provider={provider} />
+                  ))}
+                </div>
+                <div className="socialFooter">
+                  <span>
+                    {socialLoading
+                      ? 'Scanning social sources…'
+                      : socialLastRefresh
+                        ? `Social refreshed ${socialLastRefresh.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' })}`
+                        : socialError || 'Social scans use official provider adapters when configured.'}
+                  </span>
+                  <button className="toolButton" onClick={() => loadSocial({ targetScan: scan })} disabled={socialLoading}>
+                    {socialLoading ? 'Scanning…' : 'Refresh social'}
+                  </button>
+                </div>
+              </article>
+
               <div className="analysisGrid">
                 <article className="panel scorePanel">
                   <PanelHeader eyebrow="SIGNAL ENGINE" title="Why the score moved" />
@@ -1529,6 +1604,51 @@ function EmptyScanner({ history, onSelect }) {
       ) : null}
     </div>
   )
+}
+
+function SocialProviderCard({ provider }) {
+  const label = provider.source === 'x' ? 'X' : provider.source === 'reddit' ? 'Reddit' : 'Instagram'
+  return (
+    <div className={provider.available ? 'socialProvider active' : 'socialProvider unavailable'}>
+      <div className="socialProviderHead">
+        <strong>{label}</strong>
+        <span>{provider.available ? 'LIVE' : 'OFFLINE'}</span>
+      </div>
+      {provider.available ? (
+        <>
+          <div className="socialProviderStats">
+            <span>{provider.mentionCount} mentions</span>
+            <span>{provider.uniqueAuthors} authors</span>
+            <span>{provider.engagement} engagement</span>
+          </div>
+          <small>
+            Sentiment {socialSentimentLabel(provider.sentiment)} · duplicate rate {Math.round(Number(provider.duplicateRatio || 0) * 100)}%
+          </small>
+          {provider.posts?.length ? (
+            <div className="socialPostList">
+              {provider.posts.slice(0, 3).map((post) => (
+                <a key={post.id || post.url} href={post.url || '#'} target="_blank" rel="noreferrer">
+                  <span>{String(post.text || '').replace(/\s+/g, ' ').slice(0, 110)}</span>
+                  <small>{post.engagement || 0} engagement</small>
+                </a>
+              ))}
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <small>{provider.reason || 'Provider not configured.'}</small>
+      )}
+    </div>
+  )
+}
+
+function socialSentimentLabel(value) {
+  const n = Number(value || 0)
+  if (n >= 0.25) return 'Bullish'
+  if (n >= 0.08) return 'Positive'
+  if (n <= -0.25) return 'Bearish'
+  if (n <= -0.08) return 'Negative'
+  return 'Neutral'
 }
 
 function CompareTray({ items, onRemove, onOpen }) {
