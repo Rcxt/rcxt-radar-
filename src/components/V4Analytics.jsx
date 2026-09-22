@@ -161,6 +161,28 @@ export default function V4AnalyticsSuite({scan,walletEquity=0}){
   const beginner=useMemo(()=>beginnerMarketExplanation(scan,chart?.analytics),[scan,chart?.analytics])
   const analytics=chart?.analytics
 
+  const liquidityBurden=useMemo(()=>{
+    const liquidity=Number(scan?.market?.liquidityUsd||0)
+    if(!liquidity||!riskPlan.positionSize) return null
+    const percent=riskPlan.positionSize/liquidity*100
+    return {
+      percent,
+      label:percent<=0.25?'LOW':percent<=1?'MODERATE':percent<=3?'HIGH':'EXTREME',
+    }
+  },[riskPlan.positionSize,scan?.market?.liquidityUsd])
+
+  const consensus=useMemo(()=>{
+    if(!analytics?.available) return null
+    const signal=String(scan?.intelligence?.signal||'')
+    const coreBull=['BUY SETUP','LEAN BUY'].includes(signal)
+    const coreBear=['REDUCE','SELL / AVOID'].includes(signal)
+    const chartBull=analytics.trend==='BULLISH'
+    const chartBear=analytics.trend==='BEARISH'
+    if((coreBull&&chartBull)||(coreBear&&chartBear)) return {label:'ALIGNED',tone:'good',text:'RCXT market structure and candle model point in the same direction.'}
+    if((coreBull&&chartBear)||(coreBear&&chartBull)) return {label:'CONFLICT',tone:'bad',text:'RCXT and candle structure disagree. Treat the setup as lower-conviction until they converge.'}
+    return {label:'MIXED',tone:'mid',text:'At least one layer is neutral or watch-only. Confirmation is incomplete.'}
+  },[analytics?.available,analytics?.trend,scan?.intelligence?.signal])
+
   async function copyProfitList(){
     if(!ladder.length) return
     const lines=[
@@ -192,10 +214,12 @@ export default function V4AnalyticsSuite({scan,walletEquity=0}){
             <div className="technicalStrip">
               <div><span>Chart Bias</span><b className={analytics.trend==='BULLISH'?'good':analytics.trend==='BEARISH'?'bad':'mid'}>{analytics.trend}</b></div>
               <div><span>Model Confidence</span><b>{analytics.modelConfidence}%</b><small>not win probability</small></div>
+              <div><span>RCXT + Chart</span><b className={consensus?.tone||'mid'}>{consensus?.label||'—'}</b><small>{consensus?.text||'Waiting for chart'}</small></div>
               <div><span>RSI 14</span><b>{analytics.indicators?.rsi14??'—'}</b></div>
               <div><span>ATR / Candle</span><b>{analytics.indicators?.atrPercent??'—'}%</b></div>
               <div><span>Volume Accel.</span><b>{analytics.indicators?.volumeAcceleration??'—'}×</b></div>
               <div><span>Max Drawdown</span><b className="bad">{pct(analytics.indicators?.maxDrawdown)}</b></div>
+              <div><span>Data Quality</span><b>{analytics.dataQuality}%</b><small>{analytics.sampleSize} candles</small></div>
             </div>
             {tape?.summary?(
               <div className="tradeTape">
@@ -252,8 +276,9 @@ export default function V4AnalyticsSuite({scan,walletEquity=0}){
             <div><span>Risk budget</span><b>{money(riskPlan.riskBudget)}</b></div>
             <div><span>Max position</span><b>{money(riskPlan.positionSize)}</b></div>
             <div><span>% of account</span><b>{riskPlan.positionPercent.toFixed(1)}%</b></div>
+            <div><span>Liquidity burden</span><b className={liquidityBurden?.label==='LOW'?'good':liquidityBurden?.label==='MODERATE'?'mid':'bad'}>{liquidityBurden?liquidityBurden.percent.toFixed(2)+'%':'—'}</b><small>{liquidityBurden?.label||'No liquidity data'}</small></div>
           </div>
-          <p>Uses your chosen stop distance. Real losses can exceed the estimate because of slippage or failed exits.</p>
+          <p>Uses your chosen stop distance. Liquidity burden compares planned position size with reported pool liquidity. Real losses can exceed the estimate because of slippage or failed exits.</p>
         </article>
       </div>
 
