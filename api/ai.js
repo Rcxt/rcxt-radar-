@@ -2,15 +2,18 @@ import { generateText } from 'ai'
 import { logTokenScan } from '../lib/supabase-log.js'
 import { rateLimit, applyRateHeaders } from '../lib/rate-limit.js'
 
-function fallbackAnalysis(scan){
+function fallbackAnalysis(scan,social){
   const intel=scan?.intelligence
   const positives=intel?.positives?.slice(0,3).join('; ')||'No strong positive signals.'
   const negatives=intel?.negatives?.slice(0,3).join('; ')||'No major negative signals.'
+  const socialLine = social?.available
+    ? `Social momentum ${social.momentumScore}/100 with quality ${social.qualityScore}/100 across ${social.sourceDiversity} source(s). Treat this as supporting evidence, not primary evidence.`
+    : 'Social data is unavailable or not configured; do not infer social confirmation.'
   return [
-    `SIGNAL\n${intel?.signal||'WATCH'} — score ${intel?.score??0}/100 with ${intel?.confidence??0}% data confidence.`,
-    `WHY\n${positives}`,
+    `SIGNAL\n${intel?.signal||'WATCH'} — risk-adjusted score ${intel?.score??0}/100. Setup ${intel?.setupScore??'—'}, execution ${intel?.executionScore??'—'}, safety ${intel?.safetyScore??'—'}, data quality ${intel?.dataQualityScore??'—'}.`,
+    `WHY\n${positives}\n${socialLine}`,
     `INVALIDATION\n${negatives}`,
-    'RISK\nWait for confirmation from liquidity, order flow, and momentum rather than chasing one candle. This is market intelligence, not a guaranteed outcome.'
+    'RISK\nTreat RCXT as decision support, not a profit forecast. Liquidity, contract risk, slippage, and changing market structure can invalidate the setup quickly.'
   ].join('\n\n')
 }
 
@@ -28,6 +31,7 @@ export default async function handler(req,res){
   }
 
   const scan=body?.scan
+  const social=body?.social || null
   if(!scan?.address||!scan?.intelligence) return res.status(400).json({success:false,error:'Scan data is required.'})
 
   const compact={
@@ -36,15 +40,18 @@ export default async function handler(req,res){
     trading:scan.trading,
     security:scan.security,
     intelligence:scan.intelligence,
+    social,
     pair:scan.pair
   }
 
   const system=`You are RCXT Radar's market analyst. Analyze only the supplied Solana token snapshot.
 Be concise, skeptical, and practical. Never claim certainty, guaranteed profit, insider knowledge, or future prices.
-The deterministic RCXT signal is the source of truth. Explain it, point out contradictions, and describe what would strengthen or invalidate it.
-Treat preliminary/unverified contract data as a limitation. If risk flags conflict with bullish activity, emphasize the risk.
+The deterministic RCXT v4 signal is the source of truth. It separates setup, execution, safety, and data quality.
+Social data is lower-trust supporting evidence because it can be manipulated. Never let social momentum override contract, liquidity, execution, or market-structure risk.
+Explain contradictions explicitly. A high social score with weak setup/execution should be treated as hype risk, not confirmation.
+Treat preliminary/unverified contract or concentration data as a limitation.
 Use exactly four short sections: SIGNAL, WHY, INVALIDATION, RISK.
-Do not tell the user to risk money they cannot afford to lose.`
+Never claim probability of profit, guaranteed returns, insider information, or certainty.`
 
   try{
     const {text}=await generateText({
@@ -56,7 +63,7 @@ Do not tell the user to risk money they cannot afford to lose.`
     await logTokenScan(scan,text)
     return res.status(200).json({success:true,model:'openai/gpt-5.6-sol',analysis:text})
   }catch(error){
-    const analysis=fallbackAnalysis(scan)
+    const analysis=fallbackAnalysis(scan,social)
     return res.status(200).json({
       success:true,
       model:'deterministic-fallback',
