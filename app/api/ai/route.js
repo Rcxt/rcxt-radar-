@@ -4,6 +4,7 @@ import { logTokenScan } from '@/lib/supabase-log'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+export const maxDuration = 30
 
 function fallbackAnalysis(scan) {
   const intel = scan?.intelligence
