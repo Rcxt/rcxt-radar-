@@ -1,7 +1,5 @@
 {
-  "functions": {
-    "app/api/ai/route.js": {
-      "maxDuration": 30
-    }
-  }
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "buildCommand": "next build"
 }
