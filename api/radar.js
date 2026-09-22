@@ -16,25 +16,96 @@ export default async function handler(req, res) {
       const createdAt = Number(pair?.pairCreatedAt || 0)
       const ageHours = createdAt ? Math.max(0, (Date.now() - createdAt) / 3_600_000) : null
 
+      const buys5m = Number(pair?.txns?.m5?.buys || 0)
+      const sells5m = Number(pair?.txns?.m5?.sells || 0)
+      const tx5m = buys5m + sells5m
+      const buys1h = Number(pair?.txns?.h1?.buys || 0)
+      const sells1h = Number(pair?.txns?.h1?.sells || 0)
+      const tx1h = buys1h + sells1h
+      const buyPct5m = tx5m ? (buys5m / tx5m) * 100 : 50
+      const buyPct1h = tx1h ? (buys1h / tx1h) * 100 : 50
+      const liquidityUsd = Number(pair?.liquidity?.usd || 0)
+      const volume5m = Number(pair?.volume?.m5 || 0)
+      const change5m = Number(pair?.priceChange?.m5 || 0)
+      const change1h = Number(pair?.priceChange?.h1 || 0)
+
+      const freshnessScore =
+        ageHours === null ? 15 :
+        ageHours <= 0.25 ? 100 :
+        ageHours <= 0.5 ? 96 :
+        ageHours <= 1 ? 90 :
+        ageHours <= 3 ? 82 :
+        ageHours <= 6 ? 70 :
+        ageHours <= 12 ? 52 :
+        ageHours <= 24 ? 32 : 10
+
+      const flowScore =
+        tx5m >= 120 ? 100 :
+        tx5m >= 60 ? 88 :
+        tx5m >= 25 ? 72 :
+        tx5m >= 10 ? 56 :
+        tx5m >= 4 ? 38 : 12
+
+      const liquidityScore =
+        liquidityUsd >= 50000 ? 100 :
+        liquidityUsd >= 20000 ? 84 :
+        liquidityUsd >= 8000 ? 68 :
+        liquidityUsd >= 3000 ? 50 : 18
+
+      let trenchScore = Math.round(
+        freshnessScore * 0.35 +
+        flowScore * 0.28 +
+        liquidityScore * 0.22 +
+        Number(pair?.rcxtDiscovery?.score || 0) * 0.15
+      )
+
+      if (buyPct5m >= 52 && buyPct5m <= 72) trenchScore += 7
+      if (buyPct1h >= 50 && buyPct1h <= 70) trenchScore += 4
+      if (buyPct5m < 35 && tx5m >= 10) trenchScore -= 18
+      if (buyPct1h < 38 && tx1h >= 20) trenchScore -= 12
+      if (liquidityUsd < 3000) trenchScore -= 18
+      if (change5m > 35 || change1h > 120) trenchScore -= 14
+      if (change5m < -15) trenchScore -= 12
+      trenchScore = Math.max(0, Math.min(100, trenchScore))
+
+      const trenchState =
+        liquidityUsd < 3000 ? 'THIN' :
+        (buyPct5m < 35 && tx5m >= 10) ? 'SELLERS' :
+        (change5m > 35 || change1h > 120) ? 'EXTENDED' :
+        trenchScore >= 78 ? 'HOT' :
+        trenchScore >= 62 ? 'ACTIVE' :
+        trenchScore >= 45 ? 'WATCH' : 'QUIET'
+
+      const address = pair?.baseToken?.address
+      const pumpFunEligible =
+        String(address || '').endsWith('pump') ||
+        ['pumpfun','pumpswap'].includes(String(pair?.dexId || '').toLowerCase())
+
       return {
-        address: pair?.baseToken?.address,
+        address,
         name: pair?.baseToken?.name || 'Unknown',
         symbol: pair?.baseToken?.symbol || 'UNKNOWN',
         priceUsd: Number(pair?.priceUsd || 0),
         priceNative: Number(pair?.priceNative || 0),
         marketCap: Number(pair?.marketCap || 0),
         fdv: Number(pair?.fdv || 0),
-        liquidityUsd: Number(pair?.liquidity?.usd || 0),
-        volume5m: Number(pair?.volume?.m5 || 0),
+        liquidityUsd,
+        volume5m,
         volume1h: Number(pair?.volume?.h1 || 0),
         volume6h: Number(pair?.volume?.h6 || 0),
         volume24h: Number(pair?.volume?.h24 || 0),
-        change5m: Number(pair?.priceChange?.m5 || 0),
-        change1h: Number(pair?.priceChange?.h1 || 0),
+        change5m,
+        change1h,
         change6h: Number(pair?.priceChange?.h6 || 0),
         change24h: Number(pair?.priceChange?.h24 || 0),
-        buys1h: Number(pair?.txns?.h1?.buys || 0),
-        sells1h: Number(pair?.txns?.h1?.sells || 0),
+        buys5m,
+        sells5m,
+        tx5m,
+        buyPct5m: Number(buyPct5m.toFixed(1)),
+        buys1h,
+        sells1h,
+        tx1h,
+        buyPct1h: Number(buyPct1h.toFixed(1)),
         buys24h: Number(pair?.txns?.h24?.buys || 0),
         sells24h: Number(pair?.txns?.h24?.sells || 0),
         ageHours: ageHours === null ? null : Number(ageHours.toFixed(1)),
@@ -47,6 +118,10 @@ export default async function handler(req, res) {
           ageHours <= 48 ? 'RECENT' : 'ESTABLISHED',
         discoveryScore: Number(pair?.rcxtDiscovery?.score || 0),
         discoverySources: pair?.rcxtDiscovery?.sourceTags || [],
+        trenchScore,
+        trenchState,
+        pumpFunEligible,
+        pumpFunUrl: pumpFunEligible ? `https://pump.fun/coin/${address}` : null,
         dex: pair?.dexId || null,
         pairAddress: pair?.pairAddress || null,
         url: pair?.url || null,

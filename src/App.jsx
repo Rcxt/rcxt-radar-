@@ -503,7 +503,12 @@ export default function Home() {
     setRadarPreset(preset)
     setRadarSearch('')
 
-    if (preset === 'safer') {
+    if (preset === 'trench') {
+      setSignalFilter('ALL')
+      setMinScore(25)
+      setMinLiquidity(3000)
+      setRadarSort('trench')
+    } else if (preset === 'safer') {
       setSignalFilter('ALL')
       setMinScore(65)
       setMinLiquidity(50000)
@@ -597,9 +602,10 @@ export default function Home() {
 
   function exportRadarCsv() {
     const rows = [
-      ['symbol','name','address','score','signal','risk','priceUsd','marketCap','liquidityUsd','volume24h','change24h'],
+      ['symbol','name','address','score','signal','risk','trenchScore','trenchState','ageHours','tx5m','buyPct5m','priceUsd','marketCap','liquidityUsd','volume24h','change24h'],
       ...visibleRadar.map((item) => [
         item.symbol,item.name,item.address,item.intelligence?.score,item.intelligence?.signal,item.intelligence?.risk,
+        item.trenchScore,item.trenchState,item.ageHours,item.tx5m,item.buyPct5m,
         item.priceUsd,item.marketCap,item.liquidityUsd,item.volume24h,item.change24h
       ])
     ]
@@ -634,6 +640,7 @@ export default function Home() {
     const filtered = radar.filter((item) => {
       if (hiddenAddresses.has(item.address)) return false
       if (radarPreset === 'new' && (item.ageHours == null || Number(item.ageHours) > 24)) return false
+      if (radarPreset === 'trench' && (item.ageHours == null || Number(item.ageHours) > 6)) return false
       if (query && !`${item.symbol} ${item.name} ${item.address}`.toLowerCase().includes(query)) return false
       if (signalFilter !== 'ALL' && item.intelligence?.signal !== signalFilter) return false
       if (Number(item.intelligence?.score || 0) < Number(minScore || 0)) return false
@@ -644,6 +651,7 @@ export default function Home() {
     const sorters = {
       score: (a,b) => Number(b.intelligence?.score || 0) - Number(a.intelligence?.score || 0),
       discovery: (a,b) => Number(b.discoveryScore || 0) - Number(a.discoveryScore || 0),
+      trench: (a,b) => Number(b.trenchScore || 0) - Number(a.trenchScore || 0),
       newest: (a,b) => {
         const aAge = a.ageHours == null ? Number.POSITIVE_INFINITY : Number(a.ageHours)
         const bAge = b.ageHours == null ? Number.POSITIVE_INFINITY : Number(b.ageHours)
@@ -770,7 +778,8 @@ export default function Home() {
 
                 <div className="commandSection">
                   <span>RADAR PRESETS</span>
-                  <div className="presetRow four">
+                  <div className="presetRow five">
+                    <button className={radarPreset === 'trench' ? 'active trenchPreset' : 'trenchPreset'} onClick={() => applyRadarPreset('trench')}>Trench</button>
                     <button className={radarPreset === 'new' ? 'active' : ''} onClick={() => applyRadarPreset('new')}>New</button>
                     <button className={radarPreset === 'safer' ? 'active' : ''} onClick={() => applyRadarPreset('safer')}>Safer</button>
                     <button className={radarPreset === 'balanced' ? 'active' : ''} onClick={() => applyRadarPreset('balanced')}>Balanced</button>
@@ -950,6 +959,21 @@ export default function Home() {
 
           {radarError ? <ErrorBox text={radarError} /> : null}
 
+          {radarPreset === 'trench' ? (
+            <div className="trenchModeBanner">
+              <div>
+                <span>TRENCH MODE</span>
+                <strong>Fresh-pair execution view</strong>
+                <small>≤6h pairs · 5m flow · liquidity floor · main RCXT risk gates stay active</small>
+              </div>
+              <div className="trenchLegend">
+                <span><i className="hot" /> HOT</span>
+                <span><i className="active" /> ACTIVE</span>
+                <span><i className="risk" /> SELLERS / EXTENDED</span>
+              </div>
+            </div>
+          ) : null}
+
           <div className="marketPulse">
             <MetricCard label="Buy Setups" value={radarPulse.buys} tone={radarPulse.buys ? 'positive' : ''} />
             <MetricCard label="Median Score" value={radarPulse.medianScore} />
@@ -967,6 +991,7 @@ export default function Home() {
             />
             <select value={radarSort} onChange={(event) => setRadarSort(event.target.value)}>
               <option value="score">Sort: Score</option>
+              <option value="trench">Sort: Trench Score</option>
               <option value="discovery">Sort: Early Discovery</option>
               <option value="newest">Sort: Newest</option>
               <option value="volume">Sort: Volume</option>
@@ -1050,7 +1075,7 @@ export default function Home() {
               ? Array.from({ length: 6 }).map((_, index) => <RadarSkeleton key={index} />)
               : visibleRadar.map((item, index) => (
                 <div
-                  className="radarCard"
+                  className={radarPreset === 'trench' ? 'radarCard trenchCard' : 'radarCard'}
                   key={item.address}
                   role="button"
                   tabIndex={0}
@@ -1092,6 +1117,17 @@ export default function Home() {
                       >
                         Hide
                       </button>
+                      {item.pumpFunUrl ? (
+                        <a
+                          className="pumpButton"
+                          href={item.pumpFunUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          Pump.fun ↗
+                        </a>
+                      ) : null}
                       <SignalBadge signal={item.intelligence.signal} />
                     </div>
                   </div>
@@ -1104,6 +1140,22 @@ export default function Home() {
                       </em>
                     ) : null}
                   </div>
+                  {radarPreset === 'trench' ? (
+                    <div className="trenchStrip">
+                      <div>
+                        <span>TRENCH SCORE</span>
+                        <strong>{item.trenchScore ?? '—'}</strong>
+                      </div>
+                      <div>
+                        <span>STATE</span>
+                        <strong className={`trenchState ${String(item.trenchState || '').toLowerCase()}`}>{item.trenchState || '—'}</strong>
+                      </div>
+                      <div>
+                        <span>5M FLOW</span>
+                        <strong>{item.tx5m ?? 0} tx · {item.buyPct5m ?? 50}% buys</strong>
+                      </div>
+                    </div>
+                  ) : null}
                   <div className="scoreLine">
                     <ScoreRing score={item.intelligence.score} />
                     <div>
@@ -1203,6 +1255,11 @@ export default function Home() {
                   {hiddenAddresses.has(scan.address) ? 'Restore Coin' : 'Hide Coin'}
                 </button>
                 {scan.pair?.url ? <a className="toolLink" href={scan.pair.url} target="_blank" rel="noreferrer">DexScreener ↗</a> : null}
+                {isPumpFunToken(scan) ? (
+                  <a className="toolLink pumpLink" href={`https://pump.fun/coin/${scan.address}`} target="_blank" rel="noreferrer">
+                    Pump.fun ↗
+                  </a>
+                ) : null}
               </div>
 
               <div className="scanHero">
@@ -2060,6 +2117,12 @@ function percent(value) {
 function shortAddress(value, size = 6) {
   if (!value) return '—'
   return `${value.slice(0, size)}…${value.slice(-size)}`
+}
+
+function isPumpFunToken(scan) {
+  const address = String(scan?.address || '')
+  const dex = String(scan?.pair?.dex || '').toLowerCase()
+  return address.endsWith('pump') || dex === 'pumpfun' || dex === 'pumpswap'
 }
 
 function formatAge(hours) {

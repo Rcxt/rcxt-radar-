@@ -2174,3 +2174,29 @@ input,select,textarea{font-size:16px}
 @media(max-width:480px){
   .presetRow.four{grid-template-columns:1fr 1fr}
 }
+
+
+/* Trench Mode */
+.presetRow.five{grid-template-columns:repeat(5,1fr)}
+.presetRow .trenchPreset{border-color:#3a3320;color:#d1a948;background:#151207}
+.presetRow .trenchPreset.active{border-color:#967225;color:#ffd15a;background:#201907;box-shadow:0 0 18px rgba(255,196,62,.08)}
+.trenchModeBanner{display:flex;align-items:center;justify-content:space-between;gap:18px;border:1px solid #493a18;background:radial-gradient(circle at 92% 10%,rgba(245,190,60,.12),transparent 34%),linear-gradient(135deg,#141006,#0b0e11);border-radius:13px;padding:13px 15px;margin-bottom:10px}
+.trenchModeBanner>div>span{display:block;color:#f0bd46;font-size:7px;letter-spacing:.14em;font-weight:900}.trenchModeBanner strong{display:block;font-size:14px;margin-top:3px}.trenchModeBanner small{display:block;color:#736b58;font-size:8px;margin-top:4px}
+.trenchLegend{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}.trenchLegend span{display:flex;align-items:center;gap:4px!important;font-size:7px!important;color:#7d7769!important}.trenchLegend i{width:6px;height:6px;border-radius:50%;background:#6e7580}.trenchLegend i.hot{background:#f0bd46;box-shadow:0 0 10px #f0bd46}.trenchLegend i.active{background:var(--green)}.trenchLegend i.risk{background:var(--red)}
+.trenchCard{border-color:#372f1d;background:radial-gradient(circle at 100% 0,rgba(231,177,47,.055),transparent 28%),var(--panel)}
+.trenchStrip{display:grid;grid-template-columns:.7fr .8fr 1.5fr;gap:6px;margin:10px 0 8px}.trenchStrip>div{border:1px solid #2b281e;background:#0d0e0c;border-radius:8px;padding:7px 8px;min-width:0}.trenchStrip span{display:block;font-size:6px;color:#6d6859;letter-spacing:.08em}.trenchStrip strong{display:block;font-size:9px;margin-top:3px;overflow-wrap:anywhere}.trenchStrip>div:first-child strong{font-size:15px;color:#e5b84b}
+.trenchState.hot{color:#f1c14b}.trenchState.active{color:var(--green)}.trenchState.sellers,.trenchState.extended,.trenchState.thin{color:var(--red)}.trenchState.watch{color:var(--amber)}.trenchState.quiet{color:#718091}
+.pumpButton,.pumpLink{border-color:#355b3d!important;color:#76dc8c!important;background:#0d1810!important;text-decoration:none}
+.pumpButton{display:inline-flex;align-items:center;min-height:27px;padding:0 7px;border:1px solid #355b3d;border-radius:7px;font-size:7px;font-weight:900;white-space:nowrap}
+.pumpButton:hover,.pumpLink:hover{border-color:#56a56a!important;color:#a1f3b2!important}
+
+@media(max-width:760px){
+  .presetRow.five{grid-template-columns:repeat(3,1fr)}
+  .trenchModeBanner{align-items:flex-start;flex-direction:column}
+  .trenchLegend{justify-content:flex-start}
+}
+@media(max-width:480px){
+  .presetRow.five{grid-template-columns:1fr 1fr}
+  .trenchStrip{grid-template-columns:1fr 1fr}.trenchStrip>div:last-child{grid-column:1/-1}
+  .pumpButton{min-height:36px}
+}
