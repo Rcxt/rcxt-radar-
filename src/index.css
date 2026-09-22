@@ -1845,3 +1845,16 @@ button{touch-action:manipulation}
   .calculatorGrid{grid-template-columns:1fr 1fr}
   .calcResult strong{font-size:12px}
 }
+
+
+/* Market pulse + health */
+.marketPulse{
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:8px;
+  margin-bottom:12px;
+}
+.systemStatus.degraded .pulse{background:var(--red);box-shadow:0 0 10px rgba(255,111,131,.45)}
+.systemStatus.degraded>span:nth-child(2){color:var(--red)}
+@media(max-width:900px){.marketPulse{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:620px){.marketPulse{grid-template-columns:repeat(2,1fr)}}
