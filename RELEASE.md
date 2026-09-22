@@ -1,54 +1,56 @@
-# RCXT Radar v3.1.0 — All-in-One Command Center
+# RCXT Radar v3.2.0 — Trench Mode
 
 Release status: **OFFICIAL PRODUCTION SNAPSHOT**
 
-## Command Center
-- new main dropdown menu for navigation and advanced workspace tools
-- Watchlist manager
-- Hidden Coins manager
-- Recent Scans launcher
-- System Health drawer
-- Alert Center shortcut
-- Export Center
-- one-tap Radar presets: Safer, Balanced, Discovery
-- workspace reset that preserves saved watchlist/hidden coins
+## Trench Mode
+- dedicated Trench preset in Command Center
+- focuses on viable pairs up to 6 hours old
+- sorts by independent Trench Score
+- uses pair age, 5m activity, 1h activity, liquidity, discovery quality, and buy/sell balance
+- seller dominance and extreme moves cap Trench Score
+- states: HOT, ACTIVE, WATCH, QUIET, REVERSAL, SELLERS, EXTENDED, THIN
+- main RCXT Score remains independent and visible at all times
 
-## Hide Coin
-- Radar cards retain Hide Coin
-- Deep Scanner now includes Hide Coin / Restore Coin
-- hidden list persists locally across refreshes
-- global restore controls available from the Command Center
+## New-pair discovery
+- Radar mixes DexScreener latest token profiles, latest boosts, and top boosts
+- roughly half of the candidate feed is reserved for viable sub-24h pairs when available
+- age labels: JUST LAUNCHED, VERY NEW, NEW, RECENT, ESTABLISHED
+- Early Discovery and Newest sorting
+- dead/illiquid launches do not rank purely because they are new
 
-## Social Intelligence
-- UI deliberately marked COMING SOON
-- Reddit, X, and Instagram provider adapters remain deployed underneath
-- no mock/fake social data is shown
-- social intelligence does not affect RCXT score until verified provider data is connected
+## Pump.fun
+- Pump.fun-origin / PumpSwap tokens receive a direct Pump.fun button on Radar
+- Deep Scanner also receives a Pump.fun link when the token is eligible
+- canonical token route uses https://pump.fun/coin/<mint>
+- DexScreener links remain available
 
-## Mobile / iPhone
-- command menu adapts to narrow iPhone layouts
-- safe-area-aware full-height workspace drawer
-- touch-friendly controls
-- command menu remains clear of bottom navigation and home indicator
+## Risk controls
+- Trench Score is not a probability of profit
+- high short-term activity cannot override RCXT contract/liquidity/risk warnings
+- heavy 1h seller dominance caps Trench Score
+- fresh 5m rebounds after seller-heavy 1h flow are labeled REVERSAL instead of HOT
 
-## Existing production systems retained
-- Score Engine 4.0.0
-- 5-second token scanner
+## Existing systems retained
+- RCXT Score Engine 4.0
+- All-in-One Command Center
+- Hide Coin / Watchlist / Compare
+- 5-second scanner
 - 10-second Radar
-- OIDC-secured Supabase persistence
-- wallet snapshots + SOL valuation
-- score calibration infrastructure
-- AI model fallback
-- SFO Vercel functions
-- RLS-protected server-side history
+- iPhone-safe mobile UI
+- OIDC-secured persistence
+- wallet intelligence
+- calibration infrastructure
+- AI fallback chain
+- SFO compute
 
-## Release validation
-- production homepage: 200
-- health endpoint: 200 / healthy
-- radar endpoint: 200
-- scanner endpoint: 200
-- current production warning/error/fatal logs: none
+## Validation
+- production deployment READY
+- Radar returned 24 live candidates
+- sub-6h pairs confirmed live
+- Trench Score/state confirmed live
+- Pump.fun URLs populated for eligible tokens
+- production warning/error/fatal logs: none
 
 Production: https://rcxt-radar.vercel.app
 
-The branch `release/v3.1.0` is the rollback snapshot for this build.
+Rollback branch: `release/v3.2.0`
