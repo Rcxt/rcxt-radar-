@@ -29,7 +29,7 @@ Do not tell the user to risk money they cannot afford to lose.`
 
   try{
     const {text}=await generateText({model:'openai/gpt-5.6-sol',system,prompt:JSON.stringify(compact),maxOutputTokens:500})
-    await Promise.race([logTokenScan(scan,text),new Promise(resolve=>setTimeout(resolve,800))])
+    await logTokenScan(scan,text)
     return res.status(200).json({success:true,model:'openai/gpt-5.6-sol',analysis:text})
   }catch{
     const analysis=fallbackAnalysis(scan)
