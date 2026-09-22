@@ -29,8 +29,11 @@ export default async function handler(req, res) {
       pair:{dex:pair?.dexId||null,pairAddress:pair?.pairAddress||null,url:pair?.url||null,createdAt:pair?.pairCreatedAt||null},
       intelligence
     }
-    await Promise.race([logTokenScan(scan),new Promise(resolve=>setTimeout(resolve,800))])
-    return res.status(200).json({ success:true, scannedAt:new Date().toISOString(), scan })
+    const persistence = await Promise.race([
+      logTokenScan(scan),
+      new Promise(resolve=>setTimeout(()=>resolve({ok:false,status:0,error:'Persistence timeout'}),1500))
+    ])
+    return res.status(200).json({ success:true, scannedAt:new Date().toISOString(), persistence, scan })
   } catch (error) {
     return res.status(500).json({ success:false, error:error?.message || 'Token scan failed.' })
   }
