@@ -78,7 +78,7 @@ function ForecastCard({label,forecast}){
   )
 }
 
-export default function V4AnalyticsSuite({scan,walletEquity=0}){
+export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
   const [interval,setIntervalValue]=useState('5m')
   const [chart,setChart]=useState(null)
   const [tape,setTape]=useState(null)
@@ -160,6 +160,26 @@ export default function V4AnalyticsSuite({scan,walletEquity=0}){
 
   const beginner=useMemo(()=>beginnerMarketExplanation(scan,chart?.analytics),[scan,chart?.analytics])
   const analytics=chart?.analytics
+
+  useEffect(()=>{
+    if(typeof onContext!=='function') return
+    onContext({
+      chart: analytics?.available ? {
+        trend: analytics.trend,
+        bias: analytics.bias,
+        modelConfidence: analytics.modelConfidence,
+        dataQuality: analytics.dataQuality,
+        indicators: analytics.indicators,
+        momentum: analytics.momentum,
+        levels: analytics.levels,
+        regime: analytics.regime,
+        forecast: analytics.forecast,
+        reasons: analytics.reasons,
+        risks: analytics.risks,
+      } : null,
+      tape: tape?.summary || null,
+    })
+  },[analytics,tape?.summary,onContext])
 
   const liquidityBurden=useMemo(()=>{
     const liquidity=Number(scan?.market?.liquidityUsd||0)
