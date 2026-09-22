@@ -6,6 +6,7 @@ const TEST_WALLET = '976CYJJEVhntZhKS5wdUb3mz2w8FxViDbfCWK8xg2eQ7'
 const HISTORY_KEY = 'rcxt-scan-history-v1'
 const HIDDEN_KEY = 'rcxt-hidden-coins-v1'
 const NOTIFY_KEY = 'rcxt-notifications-v1'
+const WATCH_KEY = 'rcxt-watchlist-v1'
 
 export default function Home() {
   const [view, setView] = useState('radar')
@@ -34,6 +35,16 @@ export default function Home() {
   const [showHidden, setShowHidden] = useState(false)
   const [notificationsEnabled, setNotificationsEnabled] = useState(false)
   const [notificationStatus, setNotificationStatus] = useState('')
+  const [watchlist, setWatchlist] = useState([])
+  const [showWatchlist, setShowWatchlist] = useState(false)
+  const [compare, setCompare] = useState([])
+  const [radarSearch, setRadarSearch] = useState('')
+  const [radarSort, setRadarSort] = useState('score')
+  const [signalFilter, setSignalFilter] = useState('ALL')
+  const [minScore, setMinScore] = useState(0)
+  const [minLiquidity, setMinLiquidity] = useState(0)
+  const [positionSize, setPositionSize] = useState('50')
+  const [targetMarketCap, setTargetMarketCap] = useState('')
 
   const loadRadar = useCallback(async () => {
     setRadarLoading(true)
@@ -53,7 +64,7 @@ export default function Home() {
     } finally {
       setRadarLoading(false)
     }
-  }, [])
+  }, [notificationsEnabled])
 
   useEffect(() => {
     loadRadar()
@@ -67,6 +78,9 @@ export default function Home() {
 
       const notifySaved = localStorage.getItem(NOTIFY_KEY) === 'enabled'
       setNotificationsEnabled(notifySaved && typeof Notification !== 'undefined' && Notification.permission === 'granted')
+
+      const savedWatchlist = JSON.parse(localStorage.getItem(WATCH_KEY) || '[]')
+      if (Array.isArray(savedWatchlist)) setWatchlist(savedWatchlist.filter((item) => item?.address).slice(0, 50))
     } catch {
       // Ignore malformed local history.
     }
@@ -136,7 +150,7 @@ export default function Home() {
     } finally {
       if (!silent) setScanLoading(false)
     }
-  }, [tokenAddress])
+  }, [tokenAddress, notificationsEnabled])
 
   useEffect(() => {
     if (!autoRefresh || !scan?.address) return
@@ -297,15 +311,114 @@ export default function Home() {
     localStorage.removeItem(HIDDEN_KEY)
   }
 
+  function toggleWatch(item) {
+    const address = item?.address || item?.mint
+    if (!address) return
+
+    setWatchlist((current) => {
+      const exists = current.some((coin) => coin.address === address)
+      const next = exists
+        ? current.filter((coin) => coin.address !== address)
+        : [{
+            address,
+            symbol: item?.symbol || item?.token?.symbol || 'TOKEN',
+            name: item?.name || item?.token?.name || 'Unknown',
+            addedAt: Date.now(),
+          }, ...current].slice(0, 50)
+
+      localStorage.setItem(WATCH_KEY, JSON.stringify(next))
+      return next
+    })
+  }
+
+  function toggleCompare(item) {
+    const address = item?.address || item?.mint
+    if (!address) return
+
+    setCompare((current) => {
+      if (current.some((coin) => coin.address === address)) {
+        return current.filter((coin) => coin.address !== address)
+      }
+      if (current.length >= 4) {
+        setNotificationStatus('Compare supports up to 4 tokens at once.')
+        return current
+      }
+      return [...current, { ...item, address }]
+    })
+  }
+
+  function exportRadarCsv() {
+    const rows = [
+      ['symbol','name','address','score','signal','risk','priceUsd','marketCap','liquidityUsd','volume24h','change24h'],
+      ...visibleRadar.map((item) => [
+        item.symbol,item.name,item.address,item.intelligence?.score,item.intelligence?.signal,item.intelligence?.risk,
+        item.priceUsd,item.marketCap,item.liquidityUsd,item.volume24h,item.change24h
+      ])
+    ]
+    downloadCsv('rcxt-radar.csv', rows)
+  }
+
+  function exportWalletCsv() {
+    if (!walletData?.holdings) return
+    const rows = [
+      ['symbol','name','mint','balance','priceUsd','valueUsd','change24h','liquidityUsd','score','signal'],
+      ...walletData.holdings.map((item) => [
+        item.symbol || '',item.name || '',item.mint,item.balance,item.priceUsd,item.valueUsd,
+        item.change24h,item.liquidityUsd,item.intelligence?.score || '',item.intelligence?.signal || ''
+      ])
+    ]
+    downloadCsv('rcxt-wallet.csv', rows)
+  }
+
   const hiddenAddresses = useMemo(
     () => new Set(hiddenCoins.map((coin) => coin.address)),
     [hiddenCoins],
   )
 
-  const visibleRadar = useMemo(
-    () => radar.filter((item) => !hiddenAddresses.has(item.address)),
-    [radar, hiddenAddresses],
+  const watchAddresses = useMemo(
+    () => new Set(watchlist.map((coin) => coin.address)),
+    [watchlist],
   )
+
+  const visibleRadar = useMemo(() => {
+    const query = radarSearch.trim().toLowerCase()
+    const filtered = radar.filter((item) => {
+      if (hiddenAddresses.has(item.address)) return false
+      if (query && !`${item.symbol} ${item.name} ${item.address}`.toLowerCase().includes(query)) return false
+      if (signalFilter !== 'ALL' && item.intelligence?.signal !== signalFilter) return false
+      if (Number(item.intelligence?.score || 0) < Number(minScore || 0)) return false
+      if (Number(item.liquidityUsd || 0) < Number(minLiquidity || 0)) return false
+      return true
+    })
+
+    const sorters = {
+      score: (a,b) => Number(b.intelligence?.score || 0) - Number(a.intelligence?.score || 0),
+      volume: (a,b) => Number(b.volume24h || 0) - Number(a.volume24h || 0),
+      liquidity: (a,b) => Number(b.liquidityUsd || 0) - Number(a.liquidityUsd || 0),
+      momentum: (a,b) => Number(b.change1h || 0) - Number(a.change1h || 0),
+      marketCap: (a,b) => Number(b.marketCap || 0) - Number(a.marketCap || 0),
+    }
+    return [...filtered].sort(sorters[radarSort] || sorters.score)
+  }, [radar, hiddenAddresses, radarSearch, signalFilter, minScore, minLiquidity, radarSort])
+
+  const portfolioStats = useMemo(() => {
+    const holdings = walletData?.holdings || []
+    const total = Number(walletData?.portfolioTokenValueUsd || 0)
+    const priced = holdings.filter((item) => Number(item.valueUsd || 0) > 0)
+    const largest = priced[0]
+    const concentration = total > 0 && largest ? (Number(largest.valueUsd || 0) / total) * 100 : 0
+    const highRisk = holdings.filter((item) => ['HIGH','EXTREME'].includes(item.intelligence?.risk)).length
+    const liquidValue = holdings
+      .filter((item) => Number(item.liquidityUsd || 0) >= 10000)
+      .reduce((sum, item) => sum + Number(item.valueUsd || 0), 0)
+
+    return {
+      concentration,
+      highRisk,
+      liquidPercent: total > 0 ? (liquidValue / total) * 100 : 0,
+      largestSymbol: largest?.symbol || '—',
+    }
+  }, [walletData])
 
   const walletSignals = useMemo(() => {
     if (!walletData?.holdings) return { buy: 0, watch: 0, reduce: 0 }
@@ -414,6 +527,70 @@ export default function Home() {
 
           {radarError ? <ErrorBox text={radarError} /> : null}
 
+          <div className="proToolbar">
+            <input
+              className="proSearch"
+              value={radarSearch}
+              onChange={(event) => setRadarSearch(event.target.value)}
+              placeholder="Search symbol, name, or CA"
+            />
+            <select value={radarSort} onChange={(event) => setRadarSort(event.target.value)}>
+              <option value="score">Sort: Score</option>
+              <option value="volume">Sort: Volume</option>
+              <option value="liquidity">Sort: Liquidity</option>
+              <option value="momentum">Sort: 1H Momentum</option>
+              <option value="marketCap">Sort: Market Cap</option>
+            </select>
+            <select value={signalFilter} onChange={(event) => setSignalFilter(event.target.value)}>
+              <option value="ALL">All signals</option>
+              <option value="BUY SETUP">Buy setup</option>
+              <option value="LEAN BUY">Lean buy</option>
+              <option value="WATCH">Watch</option>
+              <option value="REDUCE">Reduce</option>
+              <option value="SELL / AVOID">Sell / avoid</option>
+            </select>
+            <select value={minScore} onChange={(event) => setMinScore(Number(event.target.value))}>
+              <option value="0">Any score</option>
+              <option value="50">50+ score</option>
+              <option value="60">60+ score</option>
+              <option value="70">70+ score</option>
+              <option value="80">80+ score</option>
+            </select>
+            <select value={minLiquidity} onChange={(event) => setMinLiquidity(Number(event.target.value))}>
+              <option value="0">Any liquidity</option>
+              <option value="5000">$5K+ liq</option>
+              <option value="15000">$15K+ liq</option>
+              <option value="50000">$50K+ liq</option>
+              <option value="100000">$100K+ liq</option>
+            </select>
+            <button className="toolButton" onClick={() => setShowWatchlist((value) => !value)}>
+              Watchlist {watchlist.length ? `(${watchlist.length})` : ''}
+            </button>
+            <button className="toolButton" onClick={exportRadarCsv}>Export CSV</button>
+          </div>
+
+          {showWatchlist ? (
+            <div className="watchTray">
+              <div className="watchTrayHead">
+                <div><span>WATCHLIST</span><small>Saved on this device.</small></div>
+                <button onClick={() => setShowWatchlist(false)}>Close</button>
+              </div>
+              {watchlist.length ? (
+                <div className="watchGrid">
+                  {watchlist.map((coin) => (
+                    <button key={coin.address} onClick={() => openRadarToken(coin)}>
+                      <strong>{coin.symbol}</strong>
+                      <span>{coin.name}</span>
+                      <small>{shortAddress(coin.address, 4)}</small>
+                    </button>
+                  ))}
+                </div>
+              ) : <p className="trayEmpty">Tap ☆ on a radar card or scanner to save a token.</p>}
+            </div>
+          ) : null}
+
+          {compare.length ? <CompareTray items={compare} onRemove={toggleCompare} onOpen={openRadarToken} /> : null}
+
           {showHidden && hiddenCoins.length ? (
             <div className="hiddenTray">
               <div className="hiddenTrayHead">
@@ -452,6 +629,25 @@ export default function Home() {
                   <div className="radarTop">
                     <span className="rank">#{String(index + 1).padStart(2, '0')}</span>
                     <div className="radarTopActions">
+                      <button
+                        className={watchAddresses.has(item.address) ? 'watchButton active' : 'watchButton'}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          toggleWatch(item)
+                        }}
+                        aria-label={watchAddresses.has(item.address) ? `Remove ${item.symbol} from watchlist` : `Watch ${item.symbol}`}
+                      >
+                        {watchAddresses.has(item.address) ? '★' : '☆'}
+                      </button>
+                      <button
+                        className={compare.some((coin) => coin.address === item.address) ? 'compareButton active' : 'compareButton'}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          toggleCompare(item)
+                        }}
+                      >
+                        Compare
+                      </button>
                       <button
                         className="hideCoinButton"
                         onClick={(event) => {
@@ -546,6 +742,14 @@ export default function Home() {
 
           {scan ? (
             <>
+              <div className="scanQuickActions">
+                <button className={watchAddresses.has(scan.address) ? 'toolButton active' : 'toolButton'} onClick={() => toggleWatch(scan)}>
+                  {watchAddresses.has(scan.address) ? '★ Watching' : '☆ Watch'}
+                </button>
+                <button className="toolButton" onClick={() => navigator.clipboard?.writeText(scan.address)}>Copy CA</button>
+                {scan.pair?.url ? <a className="toolLink" href={scan.pair.url} target="_blank" rel="noreferrer">DexScreener ↗</a> : null}
+              </div>
+
               <div className="scanHero">
                 <div className="scanIdentity">
                   <span className="tokenSymbol">{scan.token.symbol}</span>
@@ -660,6 +864,33 @@ export default function Home() {
                 </article>
               </div>
 
+              <article className="panel calculatorPanel">
+                <PanelHeader eyebrow="SCENARIO LAB" title="Market-cap target calculator" />
+                <p className="calcNote">A simple scenario calculator. It assumes token price changes proportionally with market cap and ignores slippage, taxes, supply changes, and execution.</p>
+                <div className="calculatorGrid">
+                  <label>
+                    <span>Position size ($)</span>
+                    <input value={positionSize} onChange={(event) => setPositionSize(event.target.value)} inputMode="decimal" />
+                  </label>
+                  <label>
+                    <span>Target market cap ($)</span>
+                    <input value={targetMarketCap} onChange={(event) => setTargetMarketCap(event.target.value)} inputMode="decimal" placeholder={String(Math.round((scan.market.marketCap || 0) * 2))} />
+                  </label>
+                  <div className="calcResult">
+                    <span>Projected value</span>
+                    <strong>{scenarioValue(positionSize, scan.market.marketCap, targetMarketCap)}</strong>
+                  </div>
+                  <div className="calcResult">
+                    <span>Projected P/L</span>
+                    <strong>{scenarioProfit(positionSize, scan.market.marketCap, targetMarketCap)}</strong>
+                  </div>
+                  <div className="calcResult">
+                    <span>Target multiple</span>
+                    <strong>{scenarioMultiple(scan.market.marketCap, targetMarketCap)}</strong>
+                  </div>
+                </div>
+              </article>
+
               <article className="panel aiPanel">
                 <div className="aiHeader">
                   <div>
@@ -730,6 +961,14 @@ export default function Home() {
 
           {walletData ? (
             <>
+              <div className="walletRiskStrip">
+                <MetricCard label="Largest Position" value={portfolioStats.largestSymbol} />
+                <MetricCard label="Top Concentration" value={`${portfolioStats.concentration.toFixed(1)}%`} tone={portfolioStats.concentration > 50 ? 'negative' : ''} />
+                <MetricCard label="High-Risk Positions" value={portfolioStats.highRisk} tone={portfolioStats.highRisk ? 'negative' : 'positive'} />
+                <MetricCard label="Value in $10K+ Liq" value={`${portfolioStats.liquidPercent.toFixed(0)}%`} />
+                <button className="toolButton walletExport" onClick={exportWalletCsv}>Export wallet CSV</button>
+              </div>
+
               <div className="walletSummary">
                 <MetricCard label="SOL Balance" value={number(walletData.solBalance, 4)} />
                 <MetricCard label="Token Positions" value={walletData.tokenCount.toLocaleString()} />
@@ -960,6 +1199,72 @@ function EmptyScanner({ history, onSelect }) {
       ) : null}
     </div>
   )
+}
+
+function CompareTray({ items, onRemove, onOpen }) {
+  return (
+    <div className="compareTray">
+      <div className="compareHead">
+        <div><span>COMPARE MODE</span><small>{items.length}/4 tokens</small></div>
+      </div>
+      <div className="compareGrid">
+        {items.map((item) => (
+          <div className="compareCard" key={item.address}>
+            <button className="compareRemove" onClick={() => onRemove(item)}>×</button>
+            <button className="compareOpen" onClick={() => onOpen(item)}>
+              <strong>{item.symbol || item.token?.symbol || 'TOKEN'}</strong>
+              <span>{item.intelligence?.score ?? '—'}/100</span>
+            </button>
+            <small>{item.intelligence?.signal || 'WATCH'}</small>
+            <div><span>MC</span><b>{compactUsd(item.marketCap || item.market?.marketCap)}</b></div>
+            <div><span>LIQ</span><b>{compactUsd(item.liquidityUsd || item.market?.liquidityUsd)}</b></div>
+            <div><span>24H</span><b className={Number(item.change24h ?? item.market?.priceChange?.h24) >= 0 ? 'positiveText' : 'negativeText'}>{percent(item.change24h ?? item.market?.priceChange?.h24)}</b></div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function downloadCsv(filename, rows) {
+  const csv = rows.map((row) => row.map((value) => {
+    const text = String(value ?? '')
+    return `"${text.replaceAll('"', '""')}"`
+  }).join(',')).join('\n')
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
+function scenarioMultiple(currentMarketCap, targetMarketCap) {
+  const current = Number(currentMarketCap || 0)
+  const target = Number(targetMarketCap || 0)
+  if (!current || !target) return '—'
+  return `${(target / current).toFixed(2)}x`
+}
+
+function scenarioValue(positionSize, currentMarketCap, targetMarketCap) {
+  const position = Number(positionSize || 0)
+  const current = Number(currentMarketCap || 0)
+  const target = Number(targetMarketCap || 0)
+  if (!position || !current || !target) return '—'
+  return usd(position * (target / current))
+}
+
+function scenarioProfit(positionSize, currentMarketCap, targetMarketCap) {
+  const position = Number(positionSize || 0)
+  const current = Number(currentMarketCap || 0)
+  const target = Number(targetMarketCap || 0)
+  if (!position || !current || !target) return '—'
+  const profit = position * (target / current) - position
+  return `${profit >= 0 ? '+' : ''}${usd(profit)}`
 }
 
 function number(value, digits = 2) {
