@@ -1,0 +1,8 @@
+{
+  "name": "RCXT Radar",
+  "version": "2.0.0",
+  "channel": "production",
+  "status": "official",
+  "releasedAt": "2026-09-22",
+  "productionUrl": "https://rcxt-radar.vercel.app"
+}

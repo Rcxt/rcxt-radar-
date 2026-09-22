@@ -1260,8 +1260,8 @@ export default function Home() {
 
       <footer className="footer">
         <div>
-          <b>RCXT RADAR</b>
-          <span>Built on Solana · DexScreener · Supabase · Vercel AI Gateway</span>
+          <b>RCXT RADAR · v2.0.0 PRODUCTION</b>
+          <span>Official production build · Solana · DexScreener · Supabase · Vercel</span>
         </div>
         <p>
           Signals are software-generated market intelligence, not guarantees or personalized financial advice.
