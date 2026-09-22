@@ -1040,6 +1040,7 @@ export default function Home() {
                   <MetricCard label="Data Quality" value={socialIntel?.available ? `${socialIntel.qualityScore}/100` : '—'} />
                   <MetricCard label="Mentions" value={socialIntel?.available ? socialIntel.mentionCount : '—'} />
                   <MetricCard label="Unique Authors" value={socialIntel?.available ? socialIntel.uniqueAuthors : '—'} />
+                  <MetricCard label="Relevance" value={socialIntel?.available ? `${socialIntel.relevanceScore || 0}/100` : '—'} />
                   <MetricCard
                     label="Sentiment"
                     value={socialIntel?.available ? socialSentimentLabel(socialIntel.sentiment) : '—'}
@@ -1693,7 +1694,11 @@ function SocialProviderCard({ provider }) {
             <span>{provider.engagement} engagement</span>
           </div>
           <small>
-            Sentiment {socialSentimentLabel(provider.sentiment)} · duplicate rate {Math.round(Number(provider.duplicateRatio || 0) * 100)}%
+            Relevance {Math.round(Number(provider.relevanceScore || 0))}/100 · sentiment {socialSentimentLabel(provider.sentiment)}
+            {' · '}duplicates {Math.round(Number(provider.duplicateRatio || 0) * 100)}%
+            {provider.authorConcentration
+              ? ` · top-author share ${Math.round(Number(provider.authorConcentration) * 100)}%`
+              : ''}
           </small>
           {provider.posts?.length ? (
             <div className="socialPostList">
