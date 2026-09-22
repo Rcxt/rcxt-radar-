@@ -2165,3 +2165,12 @@ input,select,textarea{font-size:16px}
   .comingSoonFeatures{grid-template-columns:1fr 1fr}
   .systemDrawerGrid{grid-template-columns:1fr 1fr}
 }
+
+
+/* New-coin radar discovery */
+.presetRow.four{grid-template-columns:repeat(4,1fr)}
+.ageBadge{display:inline-flex!important;width:max-content;margin-top:6px;padding:4px 6px;border:1px solid #29343e;border-radius:999px;color:#6e7e8e!important;background:#0a1016;font-size:6px!important;font-style:normal;text-transform:uppercase;letter-spacing:.08em}
+.ageBadge.new{border-color:#3d4f35;color:#9fcb72!important;background:#10180d}
+@media(max-width:480px){
+  .presetRow.four{grid-template-columns:1fr 1fr}
+}

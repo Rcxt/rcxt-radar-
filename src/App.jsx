@@ -508,6 +508,11 @@ export default function Home() {
       setMinScore(65)
       setMinLiquidity(50000)
       setRadarSort('score')
+    } else if (preset === 'new') {
+      setSignalFilter('ALL')
+      setMinScore(35)
+      setMinLiquidity(3000)
+      setRadarSort('discovery')
     } else if (preset === 'discovery') {
       setSignalFilter('ALL')
       setMinScore(50)
@@ -628,6 +633,7 @@ export default function Home() {
     const query = radarSearch.trim().toLowerCase()
     const filtered = radar.filter((item) => {
       if (hiddenAddresses.has(item.address)) return false
+      if (radarPreset === 'new' && (item.ageHours == null || Number(item.ageHours) > 24)) return false
       if (query && !`${item.symbol} ${item.name} ${item.address}`.toLowerCase().includes(query)) return false
       if (signalFilter !== 'ALL' && item.intelligence?.signal !== signalFilter) return false
       if (Number(item.intelligence?.score || 0) < Number(minScore || 0)) return false
@@ -637,13 +643,19 @@ export default function Home() {
 
     const sorters = {
       score: (a,b) => Number(b.intelligence?.score || 0) - Number(a.intelligence?.score || 0),
+      discovery: (a,b) => Number(b.discoveryScore || 0) - Number(a.discoveryScore || 0),
+      newest: (a,b) => {
+        const aAge = a.ageHours == null ? Number.POSITIVE_INFINITY : Number(a.ageHours)
+        const bAge = b.ageHours == null ? Number.POSITIVE_INFINITY : Number(b.ageHours)
+        return aAge - bAge
+      },
       volume: (a,b) => Number(b.volume24h || 0) - Number(a.volume24h || 0),
       liquidity: (a,b) => Number(b.liquidityUsd || 0) - Number(a.liquidityUsd || 0),
       momentum: (a,b) => Number(b.change1h || 0) - Number(a.change1h || 0),
       marketCap: (a,b) => Number(b.marketCap || 0) - Number(a.marketCap || 0),
     }
     return [...filtered].sort(sorters[radarSort] || sorters.score)
-  }, [radar, hiddenAddresses, radarSearch, signalFilter, minScore, minLiquidity, radarSort])
+  }, [radar, hiddenAddresses, radarSearch, signalFilter, minScore, minLiquidity, radarSort, radarPreset])
 
   const radarPulse = useMemo(() => {
     const items = visibleRadar
@@ -758,7 +770,8 @@ export default function Home() {
 
                 <div className="commandSection">
                   <span>RADAR PRESETS</span>
-                  <div className="presetRow">
+                  <div className="presetRow four">
+                    <button className={radarPreset === 'new' ? 'active' : ''} onClick={() => applyRadarPreset('new')}>New</button>
                     <button className={radarPreset === 'safer' ? 'active' : ''} onClick={() => applyRadarPreset('safer')}>Safer</button>
                     <button className={radarPreset === 'balanced' ? 'active' : ''} onClick={() => applyRadarPreset('balanced')}>Balanced</button>
                     <button className={radarPreset === 'discovery' ? 'active' : ''} onClick={() => applyRadarPreset('discovery')}>Discovery</button>
@@ -920,7 +933,7 @@ export default function Home() {
               <span className="sectionNumber">01</span>
               <div>
                 <h2>Opportunity Radar</h2>
-                <p>Boosted Solana markets ranked by RCXT signal quality—not by hype.</p>
+                <p>Fresh launches + active Solana markets ranked by RCXT quality, liquidity, activity, and age.</p>
               </div>
             </div>
             <div className="radarActions">
@@ -954,6 +967,8 @@ export default function Home() {
             />
             <select value={radarSort} onChange={(event) => setRadarSort(event.target.value)}>
               <option value="score">Sort: Score</option>
+              <option value="discovery">Sort: Early Discovery</option>
+              <option value="newest">Sort: Newest</option>
               <option value="volume">Sort: Volume</option>
               <option value="liquidity">Sort: Liquidity</option>
               <option value="momentum">Sort: 1H Momentum</option>
@@ -1083,6 +1098,11 @@ export default function Home() {
                   <div className="tokenName">
                     <strong>{item.symbol}</strong>
                     <span>{item.name}</span>
+                    {item.ageHours != null ? (
+                      <em className={item.isNew ? 'ageBadge new' : 'ageBadge'}>
+                        {item.freshnessBand} · {formatAge(item.ageHours)}
+                      </em>
+                    ) : null}
                   </div>
                   <div className="scoreLine">
                     <ScoreRing score={item.intelligence.score} />
@@ -1095,6 +1115,7 @@ export default function Home() {
                   <div className="miniMetrics">
                     <Metric label="MC" value={compactUsd(item.marketCap)} />
                     <Metric label="LIQ" value={compactUsd(item.liquidityUsd)} />
+                    <Metric label="DISCOVERY" value={item.discoveryScore ? `${item.discoveryScore}/100` : '—'} />
                     <Metric label="24H VOL" value={compactUsd(item.volume24h)} />
                     <Metric
                       label="24H"

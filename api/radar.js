@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   if (!limited.allowed) return res.status(429).json({ success:false, error:'Too many radar requests. Try again shortly.' })
 
   try {
-    const pairs = await getRadarCandidates(18)
+    const pairs = await getRadarCandidates(24)
     const items = pairs.map((pair) => {
       const intelligence = analyzePair(pair, null)
       const createdAt = Number(pair?.pairCreatedAt || 0)
@@ -38,12 +38,25 @@ export default async function handler(req, res) {
         buys24h: Number(pair?.txns?.h24?.buys || 0),
         sells24h: Number(pair?.txns?.h24?.sells || 0),
         ageHours: ageHours === null ? null : Number(ageHours.toFixed(1)),
+        isNew: ageHours !== null && ageHours <= 24,
+        freshnessBand:
+          ageHours === null ? 'UNKNOWN' :
+          ageHours <= 1 ? 'JUST LAUNCHED' :
+          ageHours <= 6 ? 'VERY NEW' :
+          ageHours <= 24 ? 'NEW' :
+          ageHours <= 48 ? 'RECENT' : 'ESTABLISHED',
+        discoveryScore: Number(pair?.rcxtDiscovery?.score || 0),
+        discoverySources: pair?.rcxtDiscovery?.sourceTags || [],
         dex: pair?.dexId || null,
         pairAddress: pair?.pairAddress || null,
         url: pair?.url || null,
         intelligence,
       }
-    }).sort((a,b)=>b.intelligence.score-a.intelligence.score)
+    }).sort((a,b)=>{
+      const aRank = Number(a.intelligence.score || 0) * 0.72 + Number(a.discoveryScore || 0) * 0.28
+      const bRank = Number(b.intelligence.score || 0) * 0.72 + Number(b.discoveryScore || 0) * 0.28
+      return bRank - aRank
+    })
 
     res.setHeader('Cache-Control','public, s-maxage=5, stale-while-revalidate=10')
     return res.status(200).json({
