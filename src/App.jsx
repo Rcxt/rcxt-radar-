@@ -48,18 +48,12 @@ export default function Home() {
   const [signalFilter, setSignalFilter] = useState('ALL')
   const [minScore, setMinScore] = useState(0)
   const [minLiquidity, setMinLiquidity] = useState(0)
-  const [positionSize, setPositionSize] = useState('50')
-  const [targetMarketCap, setTargetMarketCap] = useState('')
   const [health, setHealth] = useState(null)
   const [alertScore, setAlertScore] = useState(75)
   const [alertMarketCap, setAlertMarketCap] = useState('')
   const [alertSignalChanges, setAlertSignalChanges] = useState(true)
   const [tokenNote, setTokenNote] = useState('')
   const [scoreHistory, setScoreHistory] = useState([])
-  const [socialIntel, setSocialIntel] = useState(null)
-  const [socialLoading, setSocialLoading] = useState(false)
-  const [socialError, setSocialError] = useState('')
-  const [socialLastRefresh, setSocialLastRefresh] = useState(null)
   const [calibration, setCalibration] = useState({ totalSamples: 0, rows: [] })
   const [menuOpen, setMenuOpen] = useState(false)
   const [activeDrawer, setActiveDrawer] = useState('')
@@ -165,31 +159,6 @@ export default function Home() {
     return () => clearInterval(timer)
   }, [view, loadRadar])
 
-  const loadSocial = useCallback(async ({ targetScan, silent = false } = {}) => {
-    if (!targetScan?.address) return
-    if (!silent) setSocialLoading(true)
-    setSocialError('')
-
-    try {
-      const params = new URLSearchParams({
-        address: targetScan.address,
-        symbol: targetScan.token?.symbol || '',
-        name: targetScan.token?.name || '',
-        persist: silent ? '0' : '1',
-      })
-      const response = await fetch(`/api/social?${params.toString()}`, { cache: 'no-store' })
-      const data = await response.json()
-      if (!response.ok || !data.success) throw new Error(data.error || 'Social scan failed')
-      setSocialIntel(data.social)
-      setSocialLastRefresh(new Date())
-    } catch (error) {
-      if (!silent) setSocialIntel(null)
-      setSocialError(error.message)
-    } finally {
-      if (!silent) setSocialLoading(false)
-    }
-  }, [])
-
   const runScan = useCallback(async ({ address, silent = false } = {}) => {
     const target = String(address ?? tokenAddress).trim()
     if (!target) return
@@ -261,7 +230,7 @@ export default function Home() {
     } finally {
       if (!silent) setScanLoading(false)
     }
-  }, [tokenAddress, notificationsEnabled, alertScore, alertMarketCap, alertSignalChanges, loadSocial])
+  }, [tokenAddress, notificationsEnabled, alertScore, alertMarketCap, alertSignalChanges])
 
   useEffect(() => {
     const deepLinkedToken = new URLSearchParams(window.location.search).get('token')
@@ -441,7 +410,7 @@ export default function Home() {
       const response = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ scan, social: socialIntel, mode }),
+        body: JSON.stringify({ scan, social: null, mode }),
       })
       const data = await response.json()
       if (!response.ok || !data.success) throw new Error(data.error || 'AI analysis failed')
@@ -2055,30 +2024,6 @@ function downloadCsv(filename, rows) {
   link.click()
   link.remove()
   URL.revokeObjectURL(url)
-}
-
-function scenarioMultiple(currentMarketCap, targetMarketCap) {
-  const current = Number(currentMarketCap || 0)
-  const target = Number(targetMarketCap || 0)
-  if (!current || !target) return '—'
-  return `${(target / current).toFixed(2)}x`
-}
-
-function scenarioValue(positionSize, currentMarketCap, targetMarketCap) {
-  const position = Number(positionSize || 0)
-  const current = Number(currentMarketCap || 0)
-  const target = Number(targetMarketCap || 0)
-  if (!position || !current || !target) return '—'
-  return usd(position * (target / current))
-}
-
-function scenarioProfit(positionSize, currentMarketCap, targetMarketCap) {
-  const position = Number(positionSize || 0)
-  const current = Number(currentMarketCap || 0)
-  const target = Number(targetMarketCap || 0)
-  if (!position || !current || !target) return '—'
-  const profit = position * (target / current) - position
-  return `${profit >= 0 ? '+' : ''}${usd(profit)}`
 }
 
 function number(value, digits = 2) {
