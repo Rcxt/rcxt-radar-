@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 const TEST_WALLET = '976CYJJEVhntZhKS5wdUb3mz2w8FxViDbfCWK8xg2eQ7'
 const HISTORY_KEY = 'rcxt-scan-history-v1'
 const HIDDEN_KEY = 'rcxt-hidden-coins-v1'
+const NOTIFY_KEY = 'rcxt-notifications-v1'
 
 export default function Home() {
   const [view, setView] = useState('radar')
@@ -31,6 +32,8 @@ export default function Home() {
   const [history, setHistory] = useState([])
   const [hiddenCoins, setHiddenCoins] = useState([])
   const [showHidden, setShowHidden] = useState(false)
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false)
+  const [notificationStatus, setNotificationStatus] = useState('')
 
   const loadRadar = useCallback(async () => {
     setRadarLoading(true)
@@ -40,7 +43,11 @@ export default function Home() {
       const response = await fetch('/api/radar', { cache: 'no-store' })
       const data = await response.json()
       if (!response.ok || !data.success) throw new Error(data.error || 'Radar failed')
-      setRadar(data.items || [])
+      const nextItems = data.items || []
+      setRadar((previous) => {
+        maybeNotifyRadarChanges(previous, nextItems)
+        return nextItems
+      })
     } catch (error) {
       setRadarError(error.message)
     } finally {
@@ -57,6 +64,9 @@ export default function Home() {
 
       const hidden = JSON.parse(localStorage.getItem(HIDDEN_KEY) || '[]')
       if (Array.isArray(hidden)) setHiddenCoins(hidden.filter((item) => item?.address))
+
+      const notifySaved = localStorage.getItem(NOTIFY_KEY) === 'enabled'
+      setNotificationsEnabled(notifySaved && typeof Notification !== 'undefined' && Notification.permission === 'granted')
     } catch {
       // Ignore malformed local history.
     }
@@ -92,7 +102,12 @@ export default function Home() {
       if (!response.ok || !data.success) throw new Error(data.error || 'Scan failed')
 
       setTokenAddress(target)
-      setScan(data.scan)
+      setScan((previous) => {
+        if (silent && previous?.address === data.scan.address) {
+          maybeNotifySignalChange(previous, data.scan)
+        }
+        return data.scan
+      })
       setLastRefresh(new Date())
 
       if (!silent) {
@@ -132,6 +147,80 @@ export default function Home() {
 
     return () => clearInterval(timer)
   }, [autoRefresh, scan?.address, runScan])
+
+  async function enableNotifications() {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      setNotificationStatus('Notifications are not supported in this browser.')
+      return
+    }
+
+    try {
+      const permission = await Notification.requestPermission()
+      if (permission === 'granted') {
+        localStorage.setItem(NOTIFY_KEY, 'enabled')
+        setNotificationsEnabled(true)
+        setNotificationStatus('Notifications enabled.')
+        const registration = await navigator.serviceWorker?.ready
+        if (registration?.showNotification) {
+          registration.showNotification('RCXT Radar', {
+            body: 'Signal alerts are enabled on this device.',
+            icon: '/icon.svg',
+            badge: '/icon.svg',
+          })
+        }
+      } else {
+        setNotificationsEnabled(false)
+        localStorage.removeItem(NOTIFY_KEY)
+        setNotificationStatus('Notification permission was not granted.')
+      }
+    } catch {
+      setNotificationStatus('Could not enable notifications.')
+    }
+  }
+
+  function disableNotifications() {
+    localStorage.removeItem(NOTIFY_KEY)
+    setNotificationsEnabled(false)
+    setNotificationStatus('Notifications disabled.')
+  }
+
+  function maybeNotifySignalChange(previous, next) {
+    if (!notificationsEnabled || typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+    const before = previous?.intelligence?.signal
+    const after = next?.intelligence?.signal
+    if (!before || !after || before === after) return
+
+    navigator.serviceWorker?.ready.then((registration) => {
+      registration.showNotification(`${next.token?.symbol || 'Token'} signal changed`, {
+        body: `${before} → ${after} · Score ${next.intelligence?.score ?? '—'}/100`,
+        icon: '/icon.svg',
+        badge: '/icon.svg',
+        tag: `scan-${next.address}`,
+      })
+    }).catch(() => {})
+  }
+
+  function maybeNotifyRadarChanges(previous, next) {
+    if (!notificationsEnabled || typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+    if (!Array.isArray(previous) || previous.length === 0) return
+
+    const before = new Map(previous.map((item) => [item.address, item.intelligence?.signal]))
+    for (const item of next) {
+      const oldSignal = before.get(item.address)
+      const newSignal = item.intelligence?.signal
+      if (!oldSignal || !newSignal || oldSignal === newSignal) continue
+      if (!['BUY SETUP', 'LEAN BUY', 'REDUCE', 'SELL / AVOID'].includes(newSignal)) continue
+
+      navigator.serviceWorker?.ready.then((registration) => {
+        registration.showNotification(`${item.symbol || 'Token'}: ${newSignal}`, {
+          body: `RCXT score ${item.intelligence?.score ?? '—'}/100 · ${item.intelligence?.risk || 'risk'} risk`,
+          icon: '/icon.svg',
+          badge: '/icon.svg',
+          tag: `radar-${item.address}`,
+        })
+      }).catch(() => {})
+    }
+  }
 
   async function askAI() {
     if (!scan) return
@@ -250,10 +339,18 @@ export default function Home() {
           <NavButton active={view === 'wallet'} onClick={() => setView('wallet')}>Wallet</NavButton>
         </nav>
 
-        <div className="systemStatus">
-          <span className="pulse" />
-          <span>LIVE</span>
-          <small>Solana + DexScreener</small>
+        <div className="topActions">
+          <button
+            className={notificationsEnabled ? 'notifyButton enabled' : 'notifyButton'}
+            onClick={notificationsEnabled ? disableNotifications : enableNotifications}
+          >
+            {notificationsEnabled ? 'Alerts On' : 'Enable Alerts'}
+          </button>
+          <div className="systemStatus">
+            <span className="pulse" />
+            <span>LIVE</span>
+            <small>Solana + DexScreener</small>
+          </div>
         </div>
       </header>
 
@@ -280,6 +377,12 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {notificationStatus ? (
+        <div className="notificationStatus" onClick={() => setNotificationStatus('')}>
+          {notificationStatus}
+        </div>
+      ) : null}
 
       <div className="mobileNav">
         <NavButton active={view === 'radar'} onClick={() => setView('radar')}>Radar</NavButton>
