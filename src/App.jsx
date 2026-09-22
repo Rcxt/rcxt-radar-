@@ -1614,7 +1614,7 @@ export default function Home() {
 
       <footer className="footer">
         <div>
-          <b>RCXT RADAR · v3.0.0 PRODUCTION</b>
+          <b>RCXT RADAR · v3.1.0 PRODUCTION</b>
           <span>Score engine v4.0.0 · Solana · DexScreener · Supabase · Vercel</span>
         </div>
         <p>
