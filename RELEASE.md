@@ -1,55 +1,55 @@
-# RCXT Radar v2.1.0 — Hardened Production Build
+# RCXT Radar v2.2.0 — Risk-Adjusted Production Build
 
 Release status: **OFFICIAL PRODUCTION SNAPSHOT**
 
-v2.1.0 is the post-audit hardening release of RCXT Radar.
+## RCXT Score Engine v4.0.0
+- separates Setup, Execution, Safety, and Data Quality
+- overall score is risk-adjusted rather than a raw activity score
+- critical weak dimensions cap the headline score
+- bot/churn-style extreme turnover is no longer treated as a free positive
+- multi-timeframe momentum agreement/conflict is explicitly scored
+- strongest BUY SETUP requires verified contract controls
+- Radar/Wallet remain preliminary until a full scanner security check
+- stablecoins keep directional signals suppressed
+- headline score remains aligned with WATCH / REDUCE / SELL states
+- score history only compares scans created by the same model version
 
-## Intelligence engine
-- RCXT deterministic score engine v3.0.0
-- tighter score/signal alignment
-- WATCH / REDUCE / SELL ceilings to avoid contradictory headline scores
-- stronger multi-timeframe momentum penalties
-- seller-dominance detection
-- parabolic/chase-risk caps
-- contract-verification gating: strongest BUY SETUP requires verified mint/freeze authorities
-- preliminary scoring flag for Radar/Wallet views that do not perform full contract checks
-- optional token-account concentration analysis when Solana RPC supplies largest-account data
-- stable-asset directional-signal suppression
-- score-version persistence in Supabase
+## Backend additions
+- Supabase Edge logger v6
+- protected token score-history reads
+- /api/history endpoint with rate limiting
+- scanner 5-second refresh does not create database spam
+- manual scans persist score version for comparable history
+- manual wallet snapshots persist total portfolio history
+- app, Solana, DexScreener, and Supabase health checks
+- pinned Node 22 runtime line
+- pinned Vite 7.3.6 production dependency
+- upstream caching, retry logic, request timeouts, and route rate limits
+- security headers on production responses
 
-## Backend hardening
-- 5-second scanner stays live without writing a database row every refresh
-- manual token scans persist; silent auto-refreshes do not
-- wallet snapshots persist on manual wallet loads
-- live SOL/USD valuation and total wallet value
-- soft per-instance API rate limiting for scan, wallet, radar, and AI routes
-- upstream Solana/DexScreener request timeouts
-- DexScreener retry + short-lived cache layer
-- cached token security checks
-- partial-success Solana security enrichment
-- AI endpoint payload/rate controls
-- health endpoint verifies app, Solana, DexScreener, and Supabase
-- Supabase Edge logger v5 with explicit auth, payload limits, token/wallet log types
-- removed public execution from internal SECURITY DEFINER RLS helper
+## iPhone 17 Pro / iOS
+- viewport-fit=cover and safe-area-aware top/bottom layout
+- dynamic viewport units for modern Safari
+- Dynamic Island / home-indicator clearance
+- 48px primary touch targets
+- 16px form controls to prevent unwanted Safari zoom
+- keyboard-friendly sticky token scanner
+- fixed bottom navigation with safe-area clearance
+- compact score axes for narrow screens
+- reduced horizontal overflow
+- reduced-motion support
+- iOS-specific backdrop and control handling
+- accessibility zoom remains enabled
 
-## Verified persistence
-- silent scan refresh: no history row
-- manual scan: exactly one history row
-- manual wallet load: exactly one wallet snapshot
-- score_version stored with token scans
+## Score interpretation
+RCXT Score is a risk-adjusted market/setup score. It is not a probability of profit and does not guarantee future price direction.
 
-## Frontend transparency
-- preliminary Radar labels
-- contract verification state
-- largest-account / top-10 concentration shown when available
-- score engine version shown in production UI
-
-## Known external limitation
-Vercel AI Gateway model execution still depends on the Vercel account's billing requirement. RCXT's deterministic analyst fallback remains available.
+## External limitation
+GPT analysis still depends on Vercel AI Gateway account billing. The deterministic RCXT v4 scoring engine and fallback analyst remain functional without it.
 
 ## Production URL
 https://rcxt-radar.vercel.app
 
 ## Release policy
-The branch `release/v2.1.0` is the immutable rollback snapshot for this build.
+The branch `release/v2.2.0` is the immutable rollback snapshot for this build.
 Future development continues on `main`.
