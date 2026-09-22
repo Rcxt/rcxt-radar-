@@ -1,56 +1,20 @@
 # RCXT Radar
 
-RCXT Radar is a live Solana wallet and token intelligence terminal built with Next.js, Vercel, Supabase, Solana JSON-RPC, DexScreener, and Vercel AI Gateway.
+Advanced Solana intelligence terminal built with React + Vite and Vercel Functions.
 
-## What is live
-
-- Solana SOL balance
-- SPL Token + Token-2022 wallet holdings
-- DexScreener token enrichment
-- Boosted Solana opportunity radar
-- 15-second token auto-refresh
-- Mint-authority and freeze-authority checks
-- RCXT 0-100 scoring engine
+## Live systems
+- Solana JSON-RPC wallet + mint inspection
+- SPL and Token-2022 holdings
+- DexScreener market enrichment and opportunity radar
+- Six-factor deterministic RCXT scoring engine
 - BUY SETUP / LEAN BUY / WATCH / REDUCE / SELL-Avoid signals
-- Signal confidence and risk classification
-- Liquidity, turnover, volume acceleration, buy/sell flow, momentum, pair maturity, and contract-risk scoring
-- AI analyst powered by Vercel AI Gateway with OIDC
-- Supabase scan logging through a sanitized Edge Function
-- Responsive dark terminal UI
+- Vercel AI Gateway analyst with deterministic fallback
+- Supabase scan-history persistence through the rcxt-log Edge Function
+- 15-second scanner refresh
+- Responsive mobile/desktop UI
 
-## Architecture
+## Deployment
+This repository intentionally uses Vite because the connected Vercel project is configured with the Vite framework preset. API endpoints live under /api as Vercel Functions.
 
-### Frontend
-Next.js App Router on Vercel.
-
-### Live market data
-- Solana JSON-RPC
-- DexScreener API
-
-### Intelligence
-The deterministic RCXT score is the source of truth. The AI analyst explains the score and identifies contradictions; it does not overwrite the deterministic signal.
-
-### AI
-The deployed Vercel app uses AI Gateway OIDC, so no OpenAI API key is committed or required in the repository.
-
-### Supabase
-The database remains RLS locked. Public clients do not receive database write credentials. A narrow Edge Function validates a publishable Supabase key and writes only sanitized token-scan telemetry.
-
-## Optional environment variable
-
-```bash
-SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
-```
-
-A dedicated Solana RPC is recommended for heavier production traffic.
-
-## API routes
-
-- `GET /api/radar`
-- `GET /api/scan?address=<token-ca>`
-- `GET /api/wallet?address=<wallet>`
-- `POST /api/ai`
-
-## Important
-
-RCXT Radar provides software-generated market intelligence. Signals are not guarantees or personalized financial advice, and meme-coin markets can move extremely quickly.
+## Safety
+RCXT signals are software-generated market intelligence. They are not guarantees or automated trading instructions.
