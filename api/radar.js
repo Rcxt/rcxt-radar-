@@ -62,15 +62,20 @@ export default async function handler(req, res) {
       if (buyPct5m >= 52 && buyPct5m <= 72) trenchScore += 7
       if (buyPct1h >= 50 && buyPct1h <= 70) trenchScore += 4
       if (buyPct5m < 35 && tx5m >= 10) trenchScore -= 18
-      if (buyPct1h < 38 && tx1h >= 20) trenchScore -= 12
+      if (buyPct1h < 38 && tx1h >= 20) trenchScore -= 24
       if (liquidityUsd < 3000) trenchScore -= 18
       if (change5m > 35 || change1h > 120) trenchScore -= 14
       if (change5m < -15) trenchScore -= 12
       trenchScore = Math.max(0, Math.min(100, trenchScore))
 
+      if (buyPct1h < 35 && tx1h >= 50) trenchScore = Math.min(trenchScore, 68)
+      if (buyPct5m < 30 && tx5m >= 20) trenchScore = Math.min(trenchScore, 55)
+
       const trenchState =
         liquidityUsd < 3000 ? 'THIN' :
         (buyPct5m < 35 && tx5m >= 10) ? 'SELLERS' :
+        (buyPct1h < 38 && tx1h >= 20 && buyPct5m >= 50) ? 'REVERSAL' :
+        (buyPct1h < 38 && tx1h >= 20) ? 'SELLERS' :
         (change5m > 35 || change1h > 120) ? 'EXTENDED' :
         trenchScore >= 78 ? 'HOT' :
         trenchScore >= 62 ? 'ACTIVE' :
