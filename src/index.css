@@ -2096,3 +2096,26 @@ input,select,textarea{font-size:16px}
   .socialFooter{align-items:stretch;flex-direction:column}
   .socialFooter .toolButton{width:100%}
 }
+
+
+/* Calibration transparency */
+.calibrationStrip{border-top:1px solid #18232d;margin-top:12px;padding-top:12px}
+.calibrationStrip.collecting{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.calibrationStrip>div>span,.calibrationTitle>span{display:block;color:#647486;font-size:7px;letter-spacing:.09em}
+.calibrationStrip>div>strong{display:block;font-size:10px;margin-top:3px}
+.calibrationStrip>small,.calibrationTitle>small{font-size:7px;color:#536274;line-height:1.4}
+.calibrationTitle{display:flex;justify-content:space-between;gap:10px}
+.calibrationRows{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:9px}
+.calibrationRows>div{border:1px solid #1a2630;background:#080e13;border-radius:9px;padding:9px}
+.calibrationRows span{display:block;font-size:7px;color:#607082;text-transform:uppercase}
+.calibrationRows strong{display:block;font-size:10px;margin-top:4px}
+.calibrationRows small{display:block;font-size:7px;color:#556475;margin-top:3px;line-height:1.35}
+
+/* Extra social quality detail */
+.socialProviderStats+small{line-height:1.5}
+.socialProvider.active small{color:#708093}
+
+@media(max-width:480px){
+  .calibrationStrip.collecting{flex-direction:column}
+  .calibrationRows{grid-template-columns:1fr}
+}
