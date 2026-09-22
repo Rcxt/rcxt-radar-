@@ -1720,3 +1720,128 @@ button{touch-action:manipulation}
   .scanHero>.scoreRing>div{padding-top:19px}
   .hiddenTray{padding:11px}
 }
+
+
+/* Pro terminal controls */
+.proToolbar{
+  display:grid;
+  grid-template-columns:minmax(180px,1.4fr) repeat(4,minmax(120px,.7fr)) auto auto;
+  gap:8px;
+  margin-bottom:12px;
+}
+.proToolbar input,.proToolbar select,.calculatorGrid input{
+  min-width:0;
+  border:1px solid #1f2c38;
+  background:#090e14;
+  color:#dce5ee;
+  border-radius:10px;
+  min-height:40px;
+  padding:0 11px;
+  font-size:10px;
+  outline:none;
+}
+.proToolbar input:focus,.proToolbar select:focus,.calculatorGrid input:focus{border-color:#365a70}
+.proToolbar select{appearance:none}
+.toolButton,.toolLink{
+  min-height:40px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  border:1px solid #273644;
+  border-radius:10px;
+  background:#0c1218;
+  color:#9facba;
+  padding:0 11px;
+  font-size:9px;
+  font-weight:850;
+  text-decoration:none;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.toolButton:hover,.toolLink:hover,.toolButton.active{border-color:#3d6277;color:#dff6ff;background:#0e1820}
+.watchButton,.compareButton{
+  border:1px solid #26323e!important;
+  background:#0c1218!important;
+  color:#8190a0!important;
+  border-radius:999px!important;
+  min-height:auto!important;
+  padding:5px 8px!important;
+  font-size:7px!important;
+  font-weight:900!important;
+}
+.watchButton{font-size:12px!important;line-height:1;padding:3px 7px!important}
+.watchButton.active{color:var(--amber)!important;border-color:#5c5129!important;background:#1b180c!important}
+.compareButton.active{color:var(--cyan)!important;border-color:#31576b!important}
+.watchTray,.compareTray{
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:linear-gradient(145deg,#0c1219,#080d12);
+  padding:13px;
+  margin-bottom:12px;
+}
+.watchTrayHead,.compareHead{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}
+.watchTrayHead span,.compareHead span{display:block;font-size:9px;font-weight:900;letter-spacing:.12em;color:#94a2b2}
+.watchTrayHead small,.compareHead small{display:block;font-size:8px;color:#5e6c7c;margin-top:3px}
+.watchTrayHead button{border:1px solid #283745;background:#0d141b;color:#8e9cab;border-radius:8px;padding:7px 9px;font-size:8px}
+.watchGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+.watchGrid>button{
+  border:1px solid #1e2b36;background:#091017;border-radius:10px;padding:10px;text-align:left;color:inherit
+}
+.watchGrid strong{display:block;font-size:11px}
+.watchGrid span{display:block;font-size:8px;color:#687789;margin-top:3px}
+.watchGrid small{display:block;font-size:7px;color:#4f5d6d;margin-top:5px}
+.trayEmpty{margin:4px 0;color:#667486;font-size:9px}
+.compareGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.compareCard{position:relative;border:1px solid #1e2b36;border-radius:11px;background:#091017;padding:11px}
+.compareRemove{position:absolute;top:7px;right:7px;width:24px;height:24px;border-radius:50%;border:1px solid #37222a;background:#170d11;color:#db7f8d}
+.compareOpen{border:0;background:transparent;color:inherit;padding:0;text-align:left}
+.compareOpen strong{display:block;font-size:13px}
+.compareOpen span{display:block;color:var(--green);font-size:9px;margin-top:2px}
+.compareCard>small{display:inline-block;margin:7px 0;color:#768496;font-size:7px}
+.compareCard>div{display:flex;justify-content:space-between;gap:8px;border-top:1px solid #18232d;padding-top:6px;margin-top:6px}
+.compareCard>div span{font-size:7px;color:#566475}.compareCard>div b{font-size:8px}
+.scanQuickActions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.calculatorPanel{margin-top:10px}
+.calcNote{color:#687688;font-size:9px;line-height:1.55;margin:-4px 0 13px}
+.calculatorGrid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.calculatorGrid label{display:flex;flex-direction:column;gap:6px}
+.calculatorGrid label span,.calcResult span{font-size:8px;color:#5f6e7e;text-transform:uppercase;letter-spacing:.07em}
+.calcResult{border:1px solid #1d2934;background:#090e14;border-radius:10px;padding:10px;display:flex;flex-direction:column;justify-content:center;gap:7px}
+.calcResult strong{font-size:14px}
+.walletRiskStrip{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:12px}
+.walletRiskStrip .metricCard{margin:0}
+.walletExport{height:100%}
+@media(max-width:1120px){
+  .proToolbar{grid-template-columns:repeat(4,1fr)}
+  .proSearch{grid-column:span 2}
+  .watchGrid,.compareGrid{grid-template-columns:repeat(2,1fr)}
+  .calculatorGrid{grid-template-columns:repeat(3,1fr)}
+  .walletRiskStrip{grid-template-columns:repeat(3,1fr)}
+}
+@media(max-width:700px){
+  .proToolbar{
+    display:flex;
+    overflow-x:auto;
+    padding-bottom:4px;
+    gap:7px;
+    scroll-snap-type:x proximity;
+    -webkit-overflow-scrolling:touch;
+  }
+  .proToolbar>*{flex:0 0 auto;min-width:138px;scroll-snap-align:start}
+  .proToolbar .proSearch{min-width:220px}
+  .watchGrid,.compareGrid{grid-template-columns:1fr 1fr}
+  .compareTray,.watchTray{padding:11px}
+  .scanQuickActions{display:grid;grid-template-columns:1fr 1fr}
+  .scanQuickActions>*:last-child{grid-column:1/-1}
+  .calculatorGrid{grid-template-columns:1fr 1fr}
+  .calculatorGrid label{grid-column:span 1}
+  .calcResult:last-child{grid-column:1/-1}
+  .walletRiskStrip{grid-template-columns:1fr 1fr}
+  .walletExport{min-height:44px}
+}
+@media(max-width:430px){
+  .watchGrid,.compareGrid{grid-template-columns:1fr}
+  .calculatorGrid{grid-template-columns:1fr 1fr}
+  .calcResult strong{font-size:12px}
+}
