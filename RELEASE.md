@@ -1,38 +1,55 @@
-# RCXT Radar v2.0.0 — Official Production Build
+# RCXT Radar v2.1.0 — Hardened Production Build
 
-Release status: **LOCKED PRODUCTION SNAPSHOT**
+Release status: **OFFICIAL PRODUCTION SNAPSHOT**
 
-This release records the first official production-grade RCXT Radar build.
+v2.1.0 is the post-audit hardening release of RCXT Radar.
 
-## Verified production systems
-- Vite + React 19 production frontend
-- Vercel production deployment
-- Solana JSON-RPC wallet and mint inspection
-- SPL + Token-2022 wallet holdings
-- DexScreener market enrichment
-- RCXT deterministic scoring and signal engine
-- 5-second token scanner refresh
-- 10-second opportunity radar refresh
-- contract mint/freeze authority checks
-- Supabase scan-history persistence
-- opportunity radar search, sort, and filters
-- watchlist and hidden-token controls
-- four-token compare mode
-- market pulse
-- portfolio concentration/risk metrics
-- market-cap scenario calculator
-- per-token trade journal
-- CSV exports
-- iPhone/PWA support
-- service-worker notifications while the app is active
-- health endpoint for app, Solana, and DexScreener
-- Safari-safe automatic JSX runtime and React error boundary
+## Intelligence engine
+- RCXT deterministic score engine v3.0.0
+- tighter score/signal alignment
+- WATCH / REDUCE / SELL ceilings to avoid contradictory headline scores
+- stronger multi-timeframe momentum penalties
+- seller-dominance detection
+- parabolic/chase-risk caps
+- contract-verification gating: strongest BUY SETUP requires verified mint/freeze authorities
+- preliminary scoring flag for Radar/Wallet views that do not perform full contract checks
+- optional token-account concentration analysis when Solana RPC supplies largest-account data
+- stable-asset directional-signal suppression
+- score-version persistence in Supabase
 
-## External limitation
-The deterministic RCXT intelligence engine is fully operational. GPT-backed analysis remains on fallback mode until Vercel AI Gateway account billing is enabled.
+## Backend hardening
+- 5-second scanner stays live without writing a database row every refresh
+- manual token scans persist; silent auto-refreshes do not
+- wallet snapshots persist on manual wallet loads
+- live SOL/USD valuation and total wallet value
+- soft per-instance API rate limiting for scan, wallet, radar, and AI routes
+- upstream Solana/DexScreener request timeouts
+- DexScreener retry + short-lived cache layer
+- cached token security checks
+- partial-success Solana security enrichment
+- AI endpoint payload/rate controls
+- health endpoint verifies app, Solana, DexScreener, and Supabase
+- Supabase Edge logger v5 with explicit auth, payload limits, token/wallet log types
+- removed public execution from internal SECURITY DEFINER RLS helper
+
+## Verified persistence
+- silent scan refresh: no history row
+- manual scan: exactly one history row
+- manual wallet load: exactly one wallet snapshot
+- score_version stored with token scans
+
+## Frontend transparency
+- preliminary Radar labels
+- contract verification state
+- largest-account / top-10 concentration shown when available
+- score engine version shown in production UI
+
+## Known external limitation
+Vercel AI Gateway model execution still depends on the Vercel account's billing requirement. RCXT's deterministic analyst fallback remains available.
 
 ## Production URL
 https://rcxt-radar.vercel.app
 
 ## Release policy
-The branch `release/v2.0.0` is the immutable rollback snapshot for this build. Future development should occur on `main` and should not modify the release branch.
+The branch `release/v2.1.0` is the immutable rollback snapshot for this build.
+Future development continues on `main`.
