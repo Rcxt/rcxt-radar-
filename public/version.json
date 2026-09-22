@@ -1,6 +1,6 @@
 {
   "name": "RCXT Radar",
-  "version": "3.2.0",
+  "version": "3.2.1",
   "channel": "production",
   "status": "official",
   "scoreEngine": "4.0.0",
@@ -8,7 +8,7 @@
   "socialEngine": "2.0.0-coming-soon",
   "persistence": "oidc-secured",
   "region": "sfo1",
-  "release": "trench-mode",
+  "release": "trench-mode-risk-hotfix",
   "releasedAt": "2026-09-22",
   "productionUrl": "https://rcxt-radar.vercel.app"
 }
