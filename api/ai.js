@@ -53,22 +53,25 @@ Treat preliminary/unverified contract or concentration data as a limitation.
 Use exactly four short sections: SIGNAL, WHY, INVALIDATION, RISK.
 Never claim probability of profit, guaranteed returns, insider information, or certainty.`
 
-  try{
-    const {text}=await generateText({
-      model:'openai/gpt-5.6-sol',
-      system,
-      prompt:JSON.stringify(compact),
-      maxOutputTokens:500
-    })
-    await logTokenScan(scan,text)
-    return res.status(200).json({success:true,model:'openai/gpt-5.6-sol',analysis:text})
-  }catch(error){
-    const analysis=fallbackAnalysis(scan,social)
-    return res.status(200).json({
-      success:true,
-      model:'deterministic-fallback',
-      analysis,
-      gatewayAvailable:false
-    })
+  const models=['openai/gpt-5.6-sol','openai/gpt-5.6-luna']
+  for(const model of models){
+    try{
+      const {text}=await generateText({
+        model,
+        system,
+        prompt:JSON.stringify(compact),
+        maxOutputTokens:650
+      })
+      await logTokenScan(scan,text)
+      return res.status(200).json({success:true,model,analysis:text,gatewayAvailable:true})
+    }catch{}
   }
+
+  const analysis=fallbackAnalysis(scan,social)
+  return res.status(200).json({
+    success:true,
+    model:'deterministic-fallback-v4',
+    analysis,
+    gatewayAvailable:false
+  })
 }
