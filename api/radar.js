@@ -1,8 +1,13 @@
 import { getRadarCandidates } from '../lib/dexscreener.js'
-import { analyzePair } from '../lib/intelligence.js'
+import { analyzePair, SCORE_VERSION } from '../lib/intelligence.js'
+import { rateLimit, applyRateHeaders } from '../lib/rate-limit.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ success:false, error:'Method not allowed' })
+
+  const limited = rateLimit(req, { key:'radar', limit:45, windowMs:60_000 })
+  applyRateHeaders(res, limited, 45)
+  if (!limited.allowed) return res.status(429).json({ success:false, error:'Too many radar requests. Try again shortly.' })
 
   try {
     const pairs = await getRadarCandidates(18)
@@ -40,8 +45,10 @@ export default async function handler(req, res) {
       }
     }).sort((a,b)=>b.intelligence.score-a.intelligence.score)
 
+    res.setHeader('Cache-Control','public, s-maxage=5, stale-while-revalidate=10')
     return res.status(200).json({
       success:true,
+      modelVersion:SCORE_VERSION,
       generatedAt:new Date().toISOString(),
       count:items.length,
       items,

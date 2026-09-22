@@ -142,7 +142,8 @@ export default function Home() {
     setScanError('')
 
     try {
-      const response = await fetch(`/api/scan?address=${encodeURIComponent(target)}`, {
+      const persist = silent ? '0' : '1'
+      const response = await fetch(`/api/scan?address=${encodeURIComponent(target)}&persist=${persist}`, {
         cache: 'no-store',
       })
       const data = await response.json()
