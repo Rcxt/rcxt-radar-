@@ -55,6 +55,11 @@ export default async function handler(req,res){
     scoreVersion:SCORE_VERSION,
     services,
     refresh:{radarSeconds:10,scannerSeconds:5},
-    ai:{mode:'gateway-with-deterministic-fallback'}
+    ai:{mode:'multi-model-gateway-with-deterministic-fallback'},
+    socialProviders:{
+      reddit:Boolean(process.env.REDDIT_BEARER_TOKEN),
+      x:Boolean(process.env.X_BEARER_TOKEN),
+      instagram:Boolean(process.env.INSTAGRAM_ACCESS_TOKEN && process.env.INSTAGRAM_USER_ID)
+    }
   })
 }
