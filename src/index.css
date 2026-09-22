@@ -1858,3 +1858,84 @@ button{touch-action:manipulation}
 .systemStatus.degraded>span:nth-child(2){color:var(--red)}
 @media(max-width:900px){.marketPulse{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:620px){.marketPulse{grid-template-columns:repeat(2,1fr)}}
+
+
+/* Alert engine + journal */
+.proDetailGrid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:10px;
+}
+.alertRules{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+}
+.alertRules label:not(.ruleToggle){
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.alertRules label>span{
+  color:#647385;
+  font-size:8px;
+  text-transform:uppercase;
+  letter-spacing:.07em;
+}
+.alertRules input[type="number"],
+.alertRules input[inputmode="decimal"]{
+  min-height:42px;
+  border:1px solid #1e2b36;
+  border-radius:9px;
+  background:#090e14;
+  color:#e3eaf1;
+  padding:0 10px;
+  font-size:12px;
+}
+.ruleToggle{
+  grid-column:1/-1;
+  display:flex;
+  align-items:center;
+  gap:9px;
+  min-height:40px;
+  border:1px solid #1e2b36;
+  background:#090e14;
+  border-radius:9px;
+  padding:0 10px;
+}
+.ruleToggle input{accent-color:var(--green)}
+.panelHint{display:block;color:#566475;font-size:8px;line-height:1.5;margin-top:10px}
+.journalPanel textarea{
+  width:100%;
+  min-height:112px;
+  resize:vertical;
+  border:1px solid #1e2b36;
+  border-radius:10px;
+  background:#090e14;
+  color:#dce4ec;
+  padding:11px;
+  font:inherit;
+  font-size:11px;
+  line-height:1.5;
+  outline:none;
+}
+.journalPanel textarea:focus{border-color:#365a70}
+.journalFooter{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-top:8px;
+}
+.journalFooter>span{font-size:8px;color:#536173}
+@media(max-width:700px){
+  .proDetailGrid{grid-template-columns:1fr}
+  .alertRules{grid-template-columns:1fr 1fr}
+  .scanQuickActions{grid-template-columns:repeat(2,1fr)}
+  .scanQuickActions>*:last-child{grid-column:auto}
+}
+@media(max-width:430px){
+  .alertRules{grid-template-columns:1fr}
+  .ruleToggle{grid-column:auto}
+}
