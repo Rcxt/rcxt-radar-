@@ -487,6 +487,7 @@ export default function Home() {
     if (!walletData?.holdings) return
     const rows = [
       ['symbol','name','mint','balance','priceUsd','valueUsd','change24h','liquidityUsd','score','signal'],
+      ['SOL','Solana','native',walletData.solBalance,walletData.solPriceUsd,walletData.solValueUsd,'','','',''],
       ...walletData.holdings.map((item) => [
         item.symbol || '',item.name || '',item.mint,item.balance,item.priceUsd,item.valueUsd,
         item.change24h,item.liquidityUsd,item.intelligence?.score || '',item.intelligence?.signal || ''
@@ -1188,11 +1189,11 @@ export default function Home() {
               </div>
 
               <div className="walletSummary">
+                <MetricCard label="Total Portfolio" value={usd(walletData.portfolioTotalUsd ?? walletData.portfolioTokenValueUsd)} />
+                <MetricCard label="SOL Value" value={walletData.solPriceUsd ? usd(walletData.solValueUsd) : '—'} />
                 <MetricCard label="SOL Balance" value={number(walletData.solBalance, 4)} />
                 <MetricCard label="Token Positions" value={walletData.tokenCount.toLocaleString()} />
-                <MetricCard label="Tracked Token Value" value={usd(walletData.portfolioTokenValueUsd)} />
                 <MetricCard label="Buy Signals" value={walletSignals.buy} tone="positive" />
-                <MetricCard label="Watch" value={walletSignals.watch} />
                 <MetricCard label="Reduce / Sell" value={walletSignals.reduce} tone="negative" />
               </div>
 
