@@ -134,7 +134,7 @@ export default function Home() {
     return () => clearInterval(timer)
   }, [view, loadRadar])
 
-  const loadSocial = useCallback(async ({ targetScan = scan, silent = false } = {}) => {
+  const loadSocial = useCallback(async ({ targetScan, silent = false } = {}) => {
     if (!targetScan?.address) return
     if (!silent) setSocialLoading(true)
     setSocialError('')
@@ -157,7 +157,7 @@ export default function Home() {
     } finally {
       if (!silent) setSocialLoading(false)
     }
-  }, [scan])
+  }, [])
 
   const runScan = useCallback(async ({ address, silent = false } = {}) => {
     const target = String(address ?? tokenAddress).trim()
