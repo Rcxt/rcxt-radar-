@@ -13,7 +13,7 @@
   "challengeEngine": "1.1.0",
   "walletActivityEngine": "1.0.0",
   "socialEngine": "reserved-for-v5",
-  "persistence": "oidc-secured-v15",
+  "persistence": "oidc-secured-v16",
   "region": "sfo1",
   "release": "v4-final-functional-analytics",
   "releasedAt": "2026-09-22",
