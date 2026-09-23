@@ -151,7 +151,7 @@ export default async function handler(req,res){
     refresh:{radarSeconds:10,scannerSeconds:15,chartsSeconds:30,tradeTapeSeconds:30,walletOpenSeconds:15,walletBackgroundSeconds:30},
     build:{
       app:'RCXT Radar',
-      version:'6.0.0-rc.1',
+      version:'6.0.0',
       scoreEngine:SCORE_VERSION,
       trenchEngine:'1.0.0',
       chartEngine:'1.0.0',
@@ -197,11 +197,13 @@ export default async function handler(req,res){
       policy:'Missing optional providers lower corroboration depth; they do not break scans or count as proof of safety.'
     },
     launch:{
-      candidate:true,
-      productionPromoted:false,
+      candidate:process.env.VERCEL_ENV !== 'production',
+      productionPromoted:process.env.VERCEL_ENV === 'production',
       requiredServicesHealthy:coreHealthy,
       previewSmokeHealthy:previewSmoke ? previewSmoke.ok : null,
-      note:'V6 remains a release candidate until production promotion after preview smoke checks.'
+      note:process.env.VERCEL_ENV === 'production'
+        ? 'RCXT Radar V6 is promoted to production.'
+        : 'V6 final build is awaiting production promotion.'
     }
   })
 }
