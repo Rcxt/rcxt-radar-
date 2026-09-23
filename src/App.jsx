@@ -1,5 +1,3 @@
-'use client'
-
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import V4AnalyticsSuite from './components/V4Analytics.jsx'
 import ChallengeTracker from './components/ChallengeTracker.jsx'
