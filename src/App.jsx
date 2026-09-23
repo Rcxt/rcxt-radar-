@@ -56,7 +56,7 @@ export default function Home() {
   const [alertSignalChanges, setAlertSignalChanges] = useState(true)
   const [tokenNote, setTokenNote] = useState('')
   const [scoreHistory, setScoreHistory] = useState([])
-  const [calibration, setCalibration] = useState({ totalSamples: 0, rows: [] })
+  const [calibration, setCalibration] = useState({ totalSamples: 0, rows: [], buckets: [], components: [] })
   const [menuOpen, setMenuOpen] = useState(false)
   const [activeDrawer, setActiveDrawer] = useState('')
   const [radarPreset, setRadarPreset] = useState('balanced')
@@ -167,7 +167,12 @@ export default function Home() {
         const response = await fetch('/api/calibration', { cache: 'no-store' })
         const data = await response.json()
         if (active && response.ok && data?.success) {
-          setCalibration({ totalSamples: data.totalSamples || 0, rows: data.rows || [] })
+          setCalibration({
+            totalSamples: data.totalSamples || 0,
+            rows: data.rows || [],
+            buckets: data.buckets || [],
+            components: data.components || [],
+          })
         }
       } catch {}
     }
@@ -1521,6 +1526,7 @@ export default function Home() {
                   calibration={calibration}
                   modelVersion={scan.intelligence.modelVersion}
                   signal={scan.intelligence.signal}
+                  score={scan.intelligence.score}
                 />
               </article>
 
@@ -2045,46 +2051,67 @@ function ScoreRing({ score, large = false }) {
   )
 }
 
-function CalibrationStrip({ calibration, modelVersion, signal }) {
+function CalibrationStrip({ calibration, modelVersion, signal, score }) {
   const rows = (calibration?.rows || []).filter(
     (row) => row.scoreVersion === modelVersion && row.signal === signal,
   )
   const samples = rows.reduce((sum, row) => sum + Number(row.samples || 0), 0)
 
-  if (samples < 20) {
-    return (
-      <div className="calibrationStrip collecting">
-        <div>
-          <span>MODEL CALIBRATION</span>
-          <strong>Collecting forward outcomes</strong>
-        </div>
-        <small>{samples}/20 minimum signal samples · {calibration?.totalSamples || 0} total labeled outcomes</small>
-      </div>
-    )
-  }
+  const bucketMin = Math.floor(Number(score || 0) / 10) * 10
+  const bucketRows = (calibration?.buckets || []).filter(
+    (row) => row.scoreVersion === modelVersion && Number(row.scoreBucketMin) === bucketMin && row.signal === signal,
+  )
+  const bucketSamples = bucketRows.reduce((sum, row) => sum + Number(row.samples || 0), 0)
+  const componentRows = (calibration?.components || []).filter((row) => row.scoreVersion === modelVersion)
+  const maxComponentSamples = componentRows.reduce(
+    (max, row) => Math.max(max, Number(row.setupSamples || 0), Number(row.executionSamples || 0), Number(row.safetySamples || 0), Number(row.dataQualitySamples || 0)),
+    0,
+  )
 
   return (
-    <div className="calibrationStrip">
+    <div className={samples < 20 ? 'calibrationStrip collecting' : 'calibrationStrip'}>
       <div className="calibrationTitle">
-        <span>MODEL CALIBRATION · {signal}</span>
-        <small>{samples} labeled outcomes</small>
+        <div>
+          <span>MODEL VALIDATION · {modelVersion}</span>
+          <strong>{samples < 20 ? 'Collecting forward outcomes' : signal + ' calibration'}</strong>
+        </div>
+        <small>{calibration?.totalSamples || 0} total labeled outcomes</small>
       </div>
+
       <div className="calibrationRows">
-        {rows.map((row) => (
-          <div key={row.horizon}>
+        {samples < 20 ? (
+          <div>
+            <span>SIGNAL SAMPLE</span>
+            <strong>{samples}/20</strong>
+            <small>Minimum before directional statistics display</small>
+          </div>
+        ) : rows.map((row) => (
+          <div key={'signal-' + row.horizon}>
             <span>{row.horizon}</span>
-            <strong>
-              {row.directionalHitRate == null
-                ? '—'
-                : `${Math.round(row.directionalHitRate * 100)}% direction hit`}
-            </strong>
+            <strong>{row.directionalHitRate == null ? '—' : Math.round(row.directionalHitRate * 100) + '% direction hit'}</strong>
             <small>
-              avg {row.avgReturnPct == null ? '—' : `${row.avgReturnPct >= 0 ? '+' : ''}${row.avgReturnPct.toFixed(1)}%`}
+              avg {row.avgReturnPct == null ? '—' : (row.avgReturnPct >= 0 ? '+' : '') + row.avgReturnPct.toFixed(1) + '%'}
               {' · '}{row.samples} samples
             </small>
           </div>
         ))}
+
+        <div>
+          <span>SCORE BUCKET {bucketMin}–{Math.min(100,bucketMin+9)}</span>
+          <strong>{bucketSamples >= 30 ? bucketSamples + ' samples' : bucketSamples + '/30'}</strong>
+          <small>{bucketSamples >= 30 ? 'Bucket-level forward outcomes available' : 'Collecting before bucket statistics are treated as meaningful'}</small>
+        </div>
+
+        <div>
+          <span>COMPONENT VALIDATION</span>
+          <strong>{maxComponentSamples >= 50 ? 'AVAILABLE' : maxComponentSamples + '/50'}</strong>
+          <small>{maxComponentSamples >= 50 ? 'Setup / execution / safety correlations have enough samples to inspect' : 'Collecting before component correlations are interpreted'}</small>
+        </div>
       </div>
+
+      <small className="calibrationCaution">
+        Historical forward outcomes validate model behavior; they do not guarantee future returns or turn the score into a probability of profit.
+      </small>
     </div>
   )
 }
