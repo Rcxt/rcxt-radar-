@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   beginnerMarketExplanation,
   breakEvenMarketCap,
@@ -106,6 +106,8 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
   const [planThesis,setPlanThesis]=useState('')
   const [planInvalidation,setPlanInvalidation]=useState('')
   const [planSavedAt,setPlanSavedAt]=useState(null)
+  const [planAlerts,setPlanAlerts]=useState(false)
+  const planZoneRef=useRef(null)
 
   useEffect(()=>{
     setEntryMarketCap(scan?.market?.marketCap?String(Math.round(scan.market.marketCap)):'')
@@ -121,10 +123,12 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
         setPlanThesis(saved.thesis||'')
         setPlanInvalidation(saved.invalidation||'')
         setPlanSavedAt(saved.savedAt||null)
+        setPlanAlerts(Boolean(saved.planAlerts))
       }else{
         setPlanThesis('')
         setPlanInvalidation('')
         setPlanSavedAt(null)
+        setPlanAlerts(false)
       }
     }catch{}
   },[scan?.address])
@@ -356,6 +360,37 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
     stopDistance,
     estimatedCosts,
   ])
+
+  useEffect(()=>{
+    if(!scan?.address){
+      planZoneRef.current=null
+      return
+    }
+    const next=livePosition?.available?livePosition.status:null
+    const previous=planZoneRef.current
+    planZoneRef.current=next
+
+    if(!planAlerts||!planSavedAt||!next||next===previous) return
+    if(next==='TARGET ZONE'){
+      notifyPlan(
+        'RCXT Trade Plan · Target Zone',
+        (scan?.token?.symbol||'Token')+' reached the saved TP market-cap zone.'
+      )
+    }
+    if(next==='STOP / INVALIDATION ZONE'){
+      notifyPlan(
+        'RCXT Trade Plan · Invalidation Zone',
+        (scan?.token?.symbol||'Token')+' reached the saved stop/invalidation market-cap zone.'
+      )
+    }
+  },[
+    scan?.address,
+    scan?.token?.symbol,
+    livePosition?.status,
+    livePosition?.available,
+    planAlerts,
+    planSavedAt,
+  ])
   async function copyFullReport(){
     if(!scan) return
     const a=analytics
@@ -381,6 +416,48 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
     try{await navigator.clipboard.writeText(lines.join('\n'))}catch{}
   }
 
+  async function notifyPlan(title,body){
+    if(typeof window==='undefined'||typeof Notification==='undefined') return
+    if(Notification.permission!=='granted') return
+
+    try{
+      if('serviceWorker' in navigator){
+        const registration=await navigator.serviceWorker.ready
+        await registration.showNotification(title,{
+          body,
+          tag:'rcxt-plan-'+scan?.address,
+          renotify:true,
+          data:{url:'/?token='+encodeURIComponent(scan?.address||'')},
+        })
+        return
+      }
+      new Notification(title,{body,tag:'rcxt-plan-'+scan?.address})
+    }catch{}
+  }
+
+  async function togglePlanAlerts(){
+    let next=!planAlerts
+    if(next && typeof Notification!=='undefined' && Notification.permission!=='granted'){
+      try{
+        const permission=await Notification.requestPermission()
+        next=permission==='granted'
+      }catch{
+        next=false
+      }
+    }
+    setPlanAlerts(next)
+
+    if(scan?.address){
+      try{
+        const key='rcxt-trade-plan:'+scan.address
+        const existing=JSON.parse(localStorage.getItem(key)||'null')
+        if(existing){
+          localStorage.setItem(key,JSON.stringify({...existing,planAlerts:next}))
+        }
+      }catch{}
+    }
+  }
+
   function saveTradePlan(){
     if(!scan?.address) return
     const payload={
@@ -393,6 +470,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
       stopDistance:Number(stopDistance||0),
       thesis:planThesis,
       invalidation:planInvalidation,
+      planAlerts,
       savedAt:Date.now(),
     }
     try{
@@ -641,6 +719,9 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
         <div className="v4PanelHead">
           <div><span>SAVED TRADE PLAN</span><h3>Pre-commit your entry, exit, and invalidation</h3></div>
           <div className="tradePlanActions">
+            <button className={planAlerts?'toolButton active':'toolButton'} onClick={togglePlanAlerts}>
+              {planAlerts?'Plan Alerts On':'Plan Alerts Off'}
+            </button>
             <button className="toolButton" onClick={copyTradePlan}>Copy plan</button>
             <button className="toolButton active" onClick={saveTradePlan}>Save plan</button>
           </div>
@@ -682,7 +763,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
 
         <div className="tradePlanFoot">
           <span>{planSavedAt?'Saved '+new Date(planSavedAt).toLocaleString():'Not saved yet'}</span>
-          <small>Stored locally on this device. RCXT does not execute trades.</small>
+          <small>Stored locally on this device. Plan alerts work while RCXT is running; RCXT does not execute trades.</small>
         </div>
       </article>
 
