@@ -2551,3 +2551,13 @@ input,select,textarea{font-size:16px}
   .tradePlanLibraryMeta{text-align:left;justify-items:start}
   .tradePlanDelete{width:42px}
 }
+
+
+/* Trade Plan Library analytics */
+.tradePlanLibraryStats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:9px}
+.tradePlanLibraryStats>div{border:1px solid #1b2832;background:#091016;border-radius:9px;padding:9px}
+.tradePlanLibraryStats span{display:block;font-size:7px;color:#5e7080}
+.tradePlanLibraryStats b{display:block;font-size:11px;margin-top:4px}
+.tradePlanLibraryStats i{font-style:normal}
+.tradePlanStatsNote{display:block;color:#536474;font-size:7px;line-height:1.45;margin-top:8px}
+@media(max-width:480px){.tradePlanLibraryStats{grid-template-columns:1fr 1fr}}
