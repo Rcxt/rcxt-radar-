@@ -1808,6 +1808,7 @@ export default function Home() {
 
           {scan ? (
             <>
+              <ScanVerdict scan={scan} />
               <div className="scanQuickActions">
                 <button className={watchAddresses.has(scan.address) ? 'toolButton active' : 'toolButton'} onClick={() => toggleWatch(scan)}>
                   {watchAddresses.has(scan.address) ? '★ Watching' : '☆ Watch'}
@@ -1852,31 +1853,17 @@ export default function Home() {
                 </details>
               </div>
 
-              <div className="scanHero">
-                <div className="scanIdentity">
-                  <span className="tokenSymbol">{scan.token.symbol}</span>
-                  <h3>{scan.token.name}</h3>
-                  <button
-                    className="addressButton"
-                    onClick={() => navigator.clipboard?.writeText(scan.address)}
-                  >
-                    {shortAddress(scan.address)} · copy
-                  </button>
-                </div>
-
-                <div className="signalHero">
-                  <span>RCXT SIGNAL</span>
-                  <SignalBadge signal={scan.intelligence.signal} large />
-                  <small>
-                    {scan.intelligence.confidence}% data confidence · {scan.intelligence.risk} risk
-                  </small>
-                  <em>{scan.intelligence.preliminary ? 'Preliminary market score' : 'Full contract-verified scan'}</em>
-                </div>
-
-                <ScoreRing score={scan.intelligence.score} large />
-              </div>
-
-              <BeginnerSnapshot scan={scan} />
+              <details className="quickReadDisclosure">
+                <summary>
+                  <div>
+                    <span>WHY THIS RESULT</span>
+                    <strong>Reasons + scenario map</strong>
+                    <small>Open only when you want the deeper explanation.</small>
+                  </div>
+                  <b>OPEN</b>
+                </summary>
+                <BeginnerSnapshot scan={scan} />
+              </details>
 
               <details className="coreMetricsDisclosure">
                 <summary>
@@ -2584,6 +2571,97 @@ function ScoreRing({ score, large = false }) {
         <span>/100</span>
       </div>
     </div>
+  )
+}
+
+
+function ScanVerdict({ scan }) {
+  const intel = scan?.intelligence || {}
+  const signal = String(intel.signal || 'WATCH')
+  const risk = String(intel.risk || 'UNKNOWN')
+  const evidence = intel?.securityEvidence || {}
+  const marketEvidence = evidence?.market || scan?.market?.consensus || {}
+  const executionScore = Number(intel.executionScore)
+  const safetyScore = Number(intel.safetyScore)
+  const priceProviderCount = Number(marketEvidence?.priceProviderCount || 0)
+  const priceConflict = Boolean(marketEvidence?.priceConflict)
+  const hardDanger = Boolean(
+    evidence?.rugged ||
+    Number(evidence?.dangerRiskCount || 0) > 0 ||
+    signal === 'SELL / AVOID' ||
+    signal === 'REDUCE' ||
+    risk === 'EXTREME'
+  )
+  const passes = Boolean(
+    !hardDanger &&
+    ['BUY SETUP', 'LEAN BUY'].includes(signal) &&
+    intel.contractVerified &&
+    !intel.preliminary &&
+    !priceConflict &&
+    Number.isFinite(executionScore) && executionScore >= 55 &&
+    (!Number.isFinite(safetyScore) || safetyScore >= 60)
+  )
+  const verdict = hardDanger ? 'NO' : passes ? 'YES' : 'WAIT'
+  const tone = verdict.toLowerCase()
+  const negatives = Array.isArray(intel.negatives) ? intel.negatives : []
+  const positives = Array.isArray(intel.positives) ? intel.positives : []
+  const missing = Array.isArray(intel?.entryGate?.leanBuyMissing) ? intel.entryGate.leanBuyMissing : []
+  const reason = verdict === 'YES'
+    ? (positives[0] || 'Setup, contract and execution gates currently pass.')
+    : verdict === 'NO'
+      ? (negatives[0] || 'Current RCXT risk controls veto this setup.')
+      : (missing[0] || negatives[0] || 'More confirmation is needed before the setup passes RCXT gates.')
+
+  const checks = [
+    {
+      label:'Contract',
+      value:intel.contractVerified ? 'PASS' : scan?.security?.available ? 'REVIEW' : 'UNKNOWN',
+      state:intel.contractVerified ? 'pass' : 'warn',
+    },
+    {
+      label:'Price sources',
+      value:priceConflict ? 'CONFLICT' : priceProviderCount >= 2 ? 'AGREE' : 'PARTIAL',
+      state:priceConflict ? 'fail' : priceProviderCount >= 2 ? 'pass' : 'warn',
+    },
+    {
+      label:'Execution',
+      value:Number.isFinite(executionScore) ? (executionScore >= 60 ? 'PASS' : executionScore >= 45 ? 'MIXED' : 'WEAK') : 'UNKNOWN',
+      state:Number.isFinite(executionScore) ? (executionScore >= 60 ? 'pass' : executionScore >= 45 ? 'warn' : 'fail') : 'warn',
+    },
+  ]
+
+  return (
+    <article className={`scanVerdict ${tone}`}>
+      <div className="scanVerdictMain">
+        <div className="scanVerdictIdentity">
+          <span>{scan?.token?.symbol || 'TOKEN'}</span>
+          <strong>{scan?.token?.name || 'Token scan'}</strong>
+          <button className="addressButton" onClick={() => navigator.clipboard?.writeText(scan?.address || '')}>
+            {shortAddress(scan?.address)} · copy
+          </button>
+        </div>
+        <div className="scanVerdictAnswer">
+          <small>RCXT SETUP RESULT</small>
+          <b>{verdict}</b>
+          <span>{verdict === 'YES' ? 'Setup passes current gates' : verdict === 'NO' ? 'Risk controls veto this setup' : 'Wait for more confirmation'}</span>
+        </div>
+        <div className="scanVerdictScore">
+          <strong>{intel.score ?? '—'}<small>/100</small></strong>
+          <span>{intel.confidence ?? '—'}% confidence</span>
+          <em>{risk} risk</em>
+        </div>
+      </div>
+      <p className="scanVerdictReason">{reason}</p>
+      <div className="scanVerdictChecks">
+        {checks.map((check) => (
+          <div key={check.label} className={check.state}>
+            <span>{check.label}</span>
+            <b>{check.value}</b>
+          </div>
+        ))}
+      </div>
+      <small className="scanVerdictNote">YES / WAIT / NO summarizes RCXT's current setup gates. It is not a guarantee of price direction or profit.</small>
+    </article>
   )
 }
 
