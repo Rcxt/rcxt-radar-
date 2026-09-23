@@ -1813,6 +1813,17 @@ export default function Home() {
                   {watchAddresses.has(scan.address) ? '★ Watching' : '☆ Watch'}
                 </button>
                 <button className="toolButton" onClick={() => navigator.clipboard?.writeText(scan.address)}>Copy CA</button>
+                <button
+                  className="toolButton bubbleMapButton"
+                  onClick={() => window.open(
+                    `https://v2.bubblemaps.io/map?address=${encodeURIComponent(scan.address)}&chain=solana&partnerId=regular`,
+                    '_blank',
+                    'noopener,noreferrer',
+                  )}
+                  title="Open this token in Bubblemaps V2"
+                >
+                  Bubble Map ↗
+                </button>
                 <details className="scanMoreActions">
                   <summary>More</summary>
                   <div>
