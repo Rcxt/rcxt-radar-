@@ -58,10 +58,12 @@ export function buildProfitLadder({
     if(!deduped.length||Math.abs(rounded-deduped.at(-1))/rounded>0.025) deduped.push(rounded)
   }
 
-  return deduped.slice(0,12).map((targetMarketCap)=>({
-    targetMarketCap,
-    ...projectedPositionValue({investment,entryMarketCap:entry,targetMarketCap,estimatedCostsPercent}),
-  }))
+  return deduped.slice(0,12)
+    .map((targetMarketCap)=>{
+      const projection=projectedPositionValue({investment,entryMarketCap:entry,targetMarketCap,estimatedCostsPercent})
+      return projection ? { targetMarketCap, ...projection } : null
+    })
+    .filter(Boolean)
 }
 
 export function positionPlan({
