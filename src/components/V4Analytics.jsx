@@ -613,68 +613,57 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
           <div><span>PROFIT LIST</span><h3>Instant “what if it hits…” market-cap math</h3></div>
           <button className="toolButton" onClick={copyProfitList}>Copy profit list</button>
         </div>
+
         <div className="quickProfitPresets">
-          {[20,40,100].map(value=>(
-            <button key={value} onClick={()=>setInvestment(String(value))}>{'
-          <label><span>Position ($)</span><input inputMode="decimal" value={investment} onChange={e=>setInvestment(e.target.value)}/></label>
-          <label><span>Entry MC ($)</span><input inputMode="decimal" value={entryMarketCap} onChange={e=>setEntryMarketCap(e.target.value)}/></label>
-          <label><span>Custom target MC</span><input inputMode="decimal" value={customTarget} onChange={e=>setCustomTarget(e.target.value)} placeholder="100000"/></label>
-          <label><span>Est. total costs %</span><input inputMode="decimal" value={estimatedCosts} onChange={e=>setEstimatedCosts(e.target.value)}/></label>
-        </div>
-        {customProjection?(
-          <div className="customProfitResult">
-            <span>Custom target</span><strong>{money(customProjection.netValue)}</strong>
-            <b>{money(customProjection.netProfit)} est. P/L · {customProjection.multiple.toFixed(2)}× MC</b>
-          </div>
-        ):null}
-        <div className="profitTableWrap">
-          <table className="profitTable">
-            <thead><tr><th>Target MC</th><th>MC multiple</th><th>Position value</th><th>Est. P/L</th><th>ROI</th></tr></thead>
-            <tbody>
-              {ladder.map(row=>(
-                <tr key={row.targetMarketCap}>
-                  <td>{money(row.targetMarketCap)}</td><td>{row.multiple.toFixed(2)}×</td><td>{money(row.netValue)}</td>
-                  <td className={row.netProfit>=0?'positiveText':'negativeText'}>{money(row.netProfit)}</td><td>{pct(row.roiPercent,0)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="profitNote">MC-ratio math assumes comparable supply. Real fills differ with slippage, liquidity, fees, taxes, supply changes, and execution.</p>
-      </article>
-    </div>
-  )
-}
-+value+' position'}</button>
+          {[20,40,100].map((value)=>(
+            <button key={value} onClick={()=>setInvestment(String(value))}>
+              {'$'+value+' position'}
+            </button>
           ))}
-          {scan?.market?.marketCap ? <button onClick={()=>setEntryMarketCap(String(Math.round(scan.market.marketCap)))}>Use live MC</button> : null}
+          {scan?.market?.marketCap ? (
+            <button onClick={()=>setEntryMarketCap(String(Math.round(scan.market.marketCap)))}>
+              Use live MC
+            </button>
+          ) : null}
         </div>
+
         <div className="profitInputs">
           <label><span>Position ($)</span><input inputMode="decimal" value={investment} onChange={e=>setInvestment(e.target.value)}/></label>
           <label><span>Entry MC ($)</span><input inputMode="decimal" value={entryMarketCap} onChange={e=>setEntryMarketCap(e.target.value)}/></label>
           <label><span>Custom target MC</span><input inputMode="decimal" value={customTarget} onChange={e=>setCustomTarget(e.target.value)} placeholder="100000"/></label>
           <label><span>Est. total costs %</span><input inputMode="decimal" value={estimatedCosts} onChange={e=>setEstimatedCosts(e.target.value)}/></label>
         </div>
-        {customProjection?(
+
+        {customProjection ? (
           <div className="customProfitResult">
-            <span>Custom target</span><strong>{money(customProjection.netValue)}</strong>
+            <span>Custom target</span>
+            <strong>{money(customProjection.netValue)}</strong>
             <b>{money(customProjection.netProfit)} est. P/L · {customProjection.multiple.toFixed(2)}× MC</b>
           </div>
-        ):null}
+        ) : null}
+
         <div className="profitTableWrap">
           <table className="profitTable">
-            <thead><tr><th>Target MC</th><th>MC multiple</th><th>Position value</th><th>Est. P/L</th><th>ROI</th></tr></thead>
+            <thead>
+              <tr><th>Target MC</th><th>MC multiple</th><th>Position value</th><th>Est. P/L</th><th>ROI</th></tr>
+            </thead>
             <tbody>
-              {ladder.map(row=>(
+              {ladder.map((row)=>(
                 <tr key={row.targetMarketCap}>
-                  <td>{money(row.targetMarketCap)}</td><td>{row.multiple.toFixed(2)}×</td><td>{money(row.netValue)}</td>
-                  <td className={row.netProfit>=0?'positiveText':'negativeText'}>{money(row.netProfit)}</td><td>{pct(row.roiPercent,0)}</td>
+                  <td>{money(row.targetMarketCap)}</td>
+                  <td>{row.multiple.toFixed(2)}×</td>
+                  <td>{money(row.netValue)}</td>
+                  <td className={row.netProfit>=0?'positiveText':'negativeText'}>{money(row.netProfit)}</td>
+                  <td>{pct(row.roiPercent,0)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <p className="profitNote">MC-ratio math assumes comparable supply. Real fills differ with slippage, liquidity, fees, taxes, supply changes, and execution.</p>
+
+        <p className="profitNote">
+          MC-ratio math assumes comparable supply. Real fills differ with slippage, liquidity, fees, taxes, supply changes, and execution.
+        </p>
       </article>
     </div>
   )
