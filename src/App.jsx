@@ -60,6 +60,7 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [activeDrawer, setActiveDrawer] = useState('')
   const [radarPreset, setRadarPreset] = useState('balanced')
+  const [tradePlans, setTradePlans] = useState([])
 
   const loadRadar = useCallback(async () => {
     setRadarLoading(true)
@@ -108,6 +109,34 @@ export default function Home() {
       // Ignore malformed local history.
     }
   }, [loadRadar])
+
+  useEffect(() => {
+    function loadTradePlans() {
+      try {
+        const plans = []
+        for (let index = 0; index < localStorage.length; index += 1) {
+          const key = localStorage.key(index)
+          if (!key?.startsWith('rcxt-trade-plan:')) continue
+          const plan = JSON.parse(localStorage.getItem(key) || 'null')
+          if (plan?.address) plans.push(plan)
+        }
+        plans.sort((a,b) => Number(b.savedAt || 0) - Number(a.savedAt || 0))
+        setTradePlans(plans.slice(0, 100))
+      } catch {
+        setTradePlans([])
+      }
+    }
+
+    loadTradePlans()
+    const handleUpdate = () => loadTradePlans()
+    window.addEventListener('rcxt-trade-plan-updated', handleUpdate)
+    window.addEventListener('storage', handleUpdate)
+
+    return () => {
+      window.removeEventListener('rcxt-trade-plan-updated', handleUpdate)
+      window.removeEventListener('storage', handleUpdate)
+    }
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -530,6 +559,22 @@ export default function Home() {
     setMenuOpen(false)
   }
 
+  function openTradePlan(plan) {
+    if (!plan?.address) return
+    setActiveDrawer('')
+    setView('scanner')
+    setTokenAddress(plan.address)
+    runScan({ address: plan.address })
+  }
+
+  function deleteTradePlan(address) {
+    if (!address) return
+    try {
+      localStorage.removeItem('rcxt-trade-plan:' + address)
+      setTradePlans((current) => current.filter((plan) => plan.address !== address))
+    } catch {}
+  }
+
   function navigateToTool(nextView, elementId) {
     setView(nextView)
     setMenuOpen(false)
@@ -757,6 +802,7 @@ export default function Home() {
                     <button onClick={() => openDrawer('watchlist')}><b>★ Watchlist</b><small>{watchlist.length} saved tokens</small></button>
                     <button onClick={() => openDrawer('hidden')}><b>Hidden Coins</b><small>{hiddenCoins.length} filtered out</small></button>
                     <button onClick={() => openDrawer('history')}><b>Recent Scans</b><small>{history.length} local scans</small></button>
+                    <button onClick={() => openDrawer('plans')}><b>Trade Plans</b><small>{tradePlans.length} draft / open / closed</small></button>
                     <button onClick={() => openDrawer('system')}><b>System Health</b><small>{health?.healthy === false ? 'Needs attention' : 'All systems live'}</small></button>
                     <button onClick={() => navigateToTool('scanner','v4-market-lab')}><b>V4 Market Lab</b><small>Chart · forecast · flow · profit math</small></button>
                     <button onClick={() => navigateToTool('wallet','challenge-tracker')}><b>$5 → $50K</b><small>Wallet equity challenge tracker</small></button>
@@ -852,7 +898,8 @@ export default function Home() {
                 <h3>
                   {activeDrawer === 'watchlist' ? 'Watchlist' :
                    activeDrawer === 'hidden' ? 'Hidden Coins' :
-                   activeDrawer === 'history' ? 'Recent Scans' : 'System Health'}
+                   activeDrawer === 'history' ? 'Recent Scans' :
+                   activeDrawer === 'plans' ? 'Trade Plans' : 'System Health'}
                 </h3>
               </div>
               <button onClick={closeDrawer} aria-label="Close drawer">×</button>
@@ -895,6 +942,41 @@ export default function Home() {
                   </button>
                 )) : <EmptyDrawer text="No recent scans yet. Manual token scans appear here." />}
               </div>
+            ) : null}
+
+            {activeDrawer === 'plans' ? (
+              <>
+                <div className="drawerToolbar">
+                  <span>{tradePlans.length} saved plans</span>
+                  <span>{tradePlans.filter((plan) => plan.status === 'OPEN').length} open</span>
+                </div>
+                <div className="tradePlanLibrary">
+                  {tradePlans.length ? tradePlans.map((plan) => (
+                    <div className="tradePlanLibraryRow" key={plan.address}>
+                      <button className="tradePlanOpen" onClick={() => openTradePlan(plan)}>
+                        <div>
+                          <strong>{plan.token || shortAddress(plan.address, 5)}</strong>
+                          <span>{plan.name || shortAddress(plan.address, 6)}</span>
+                        </div>
+                        <div className="tradePlanLibraryMeta">
+                          <b className={
+                            plan.status === 'OPEN' ? 'open' :
+                            plan.status === 'CLOSED' ? (Number(plan.exitPnl || 0) >= 0 ? 'closedGood' : 'closedBad') :
+                            'draft'
+                          }>{plan.status || 'DRAFT'}</b>
+                          <small>{plan.investment ? usd(plan.investment) : '—'} · Entry {plan.entryMarketCap ? compactUsd(plan.entryMarketCap) : '—'}</small>
+                          {plan.status === 'CLOSED' && plan.exitPnl != null ? (
+                            <small className={Number(plan.exitPnl) >= 0 ? 'positiveText' : 'negativeText'}>
+                              Est. P/L {usd(plan.exitPnl)}
+                            </small>
+                          ) : null}
+                        </div>
+                      </button>
+                      <button className="tradePlanDelete" onClick={() => deleteTradePlan(plan.address)} aria-label={'Delete ' + (plan.token || 'trade plan')}>×</button>
+                    </div>
+                  )) : <EmptyDrawer text="No trade plans yet. Save one from the V4 Market Lab." />}
+                </div>
+              </>
             ) : null}
 
             {activeDrawer === 'system' ? (
