@@ -347,6 +347,7 @@ test('external holder concentration is used only when onchain concentration is u
     top5Percent:null,
     top10Percent:null,
     externalConcentrationAvailable:true,
+    externalConcentrationSource:'RUGCHECK_TOP_HOLDERS',
     externalTop1Percent:18,
     externalTop5Percent:37,
     externalTop10Percent:59,
