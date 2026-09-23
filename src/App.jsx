@@ -2854,38 +2854,3 @@ function formatAge(hours) {
   if (hours < 48) return `${hours.toFixed(1)}h`
   return `${(hours / 24).toFixed(1)}d`
 }
- + Intl.NumberFormat('en', {
-    notation: 'compact',
-    maximumFractionDigits: 2,
-  }).format(Number(value || 0))
-}
-
-function tinyUsd(value) {
-  const amount = Number(value || 0)
-  if (!amount) return '$0'
-  if (amount >= 1) return '$' + amount.toLocaleString(undefined, { maximumFractionDigits: 4 })
-  if (amount >= 0.001) return '$' + amount.toFixed(6)
-  return '$' + amount.toPrecision(4)
-}
-
-function percent(value) {
-  const amount = Number(value || 0)
-  return `${amount >= 0 ? '+' : ''}${amount.toFixed(2)}%`
-}
-
-function shortAddress(value, size = 6) {
-  if (!value) return '—'
-  return `${value.slice(0, size)}…${value.slice(-size)}`
-}
-
-function isPumpFunToken(scan) {
-  const address = String(scan?.address || '')
-  const dex = String(scan?.pair?.dex || '').toLowerCase()
-  return address.endsWith('pump') || dex === 'pumpfun' || dex === 'pumpswap'
-}
-
-function formatAge(hours) {
-  if (hours < 1) return `${Math.round(hours * 60)}m`
-  if (hours < 48) return `${hours.toFixed(1)}h`
-  return `${(hours / 24).toFixed(1)}d`
-}
