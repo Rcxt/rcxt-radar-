@@ -149,3 +149,113 @@ export function beginnerMarketExplanation(scan,chartAnalytics){
 
   return lines
 }
+
+
+export function requiredMarketCapForValue({
+  investment,
+  entryMarketCap,
+  targetPositionValue,
+  estimatedCostsPercent=0,
+}){
+  const principal=Math.max(0,finite(investment))
+  const entry=Math.max(0,finite(entryMarketCap))
+  const targetValue=Math.max(0,finite(targetPositionValue))
+  const costs=Math.max(0,Math.min(95,finite(estimatedCostsPercent)))
+  if(!principal||!entry||!targetValue) return null
+
+  const retention=Math.max(0.01,1-costs/100)
+  const grossNeeded=targetValue/retention
+  const multiple=grossNeeded/principal
+  const requiredMarketCap=entry*multiple
+  return {
+    requiredMarketCap,
+    multiple,
+    grossNeeded,
+    targetPositionValue:targetValue,
+  }
+}
+
+export function breakEvenMarketCap({
+  investment,
+  entryMarketCap,
+  estimatedCostsPercent=0,
+}){
+  const principal=Math.max(0,finite(investment))
+  const entry=Math.max(0,finite(entryMarketCap))
+  const costs=Math.max(0,Math.min(95,finite(estimatedCostsPercent)))
+  if(!principal||!entry) return null
+  const retention=Math.max(0.01,1-costs/100)
+  const multiple=1/retention
+  return {
+    multiple,
+    marketCap:entry*multiple,
+  }
+}
+
+export function buildExecutionChecklist({scan,analytics,tape,positionSize=0}){
+  if(!scan) return []
+  const intel=scan.intelligence||{}
+  const liquidity=Number(scan.market?.liquidityUsd||0)
+  const burden=liquidity>0&&Number(positionSize)>0 ? Number(positionSize)/liquidity*100 : null
+  const chartAvailable=Boolean(analytics?.available)
+
+  const items=[
+    {
+      key:'contract',
+      label:'Contract controls',
+      pass:Boolean(intel.contractVerified),
+      unknown:!scan.security?.available,
+      detail:intel.contractVerified?'Mint/freeze controls passed':'Contract verification incomplete or needs review',
+    },
+    {
+      key:'liquidity',
+      label:'Exit liquidity',
+      pass:liquidity>=15000,
+      unknown:!liquidity,
+      detail:liquidity?('$'+Math.round(liquidity).toLocaleString()+' reported liquidity'):'Liquidity unavailable',
+    },
+    {
+      key:'setup',
+      label:'RCXT setup quality',
+      pass:Number(intel.setupScore||0)>=60,
+      unknown:intel.setupScore==null,
+      detail:'Setup '+(intel.setupScore??'—')+'/100',
+    },
+    {
+      key:'chart',
+      label:'Chart structure',
+      pass:chartAvailable&&['BULLISH','MIXED'].includes(analytics.trend)&&analytics.regime?.structure!=='DOWNTREND',
+      unknown:!chartAvailable,
+      detail:chartAvailable?(analytics.trend+' · '+(analytics.regime?.structure||'unknown')):'Waiting for candles',
+    },
+    {
+      key:'flow',
+      label:'Recent USD flow',
+      pass:Number(tape?.netFlowUsd||0)>=0&&Number(tape?.buyVolumePercent||0)>=48,
+      unknown:!tape,
+      detail:tape?('$'+Math.round(Number(tape.netFlowUsd||0)).toLocaleString()+' net · '+Number(tape.buyVolumePercent||0).toFixed(1)+'% buy volume'):'Waiting for trade tape',
+    },
+    {
+      key:'chase',
+      label:'Not excessively extended',
+      pass:chartAvailable?Number(analytics.momentum?.m15||0)<25:Number(scan.market?.priceChange?.m5||0)<20,
+      unknown:false,
+      detail:chartAvailable?('15m '+Number(analytics.momentum?.m15||0).toFixed(1)+'%'):('5m '+Number(scan.market?.priceChange?.m5||0).toFixed(1)+'%'),
+    },
+    {
+      key:'burden',
+      label:'Position vs liquidity',
+      pass:burden==null?true:burden<=1,
+      unknown:burden==null,
+      detail:burden==null?'Enter account/risk settings to measure':'Planned position is '+burden.toFixed(2)+'% of liquidity',
+    },
+  ]
+
+  const known=items.filter(item=>!item.unknown)
+  return {
+    items,
+    passCount:known.filter(item=>item.pass).length,
+    knownCount:known.length,
+    readinessPercent:known.length?Math.round(known.filter(item=>item.pass).length/known.length*100):0,
+  }
+}
