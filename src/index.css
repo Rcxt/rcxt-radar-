@@ -2493,3 +2493,22 @@ input,select,textarea{font-size:16px}
   .activitySummary{grid-template-columns:1fr 1fr}
   .activityRowActions button,.activityRowActions a{min-height:38px}
 }
+
+
+/* V4 live saved-plan tracker */
+.livePlanTracker{margin-top:12px;border:1px solid #253641;background:linear-gradient(135deg,#0a1218,#091015);border-radius:11px;padding:11px}
+.livePlanHead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.livePlanHead span{display:block;font-size:7px;color:#657889;letter-spacing:.1em}
+.livePlanHead strong{display:block;font-size:12px;margin-top:4px}
+.livePlanHead strong.good{color:var(--green)}.livePlanHead strong.bad{color:var(--red)}.livePlanHead strong.mid{color:var(--amber)}
+.livePlanHead small{font-size:7px;color:#536473;text-align:right;line-height:1.4}
+.livePlanGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:10px}
+.livePlanGrid>div{border:1px solid #1c2a33;background:#080f14;border-radius:9px;padding:9px}
+.livePlanGrid span{display:block;font-size:7px;color:#5e7080}
+.livePlanGrid b{display:block;font-size:11px;margin-top:4px}
+.livePlanGrid b.good{color:var(--green)}.livePlanGrid b.bad{color:var(--red)}
+.livePlanGrid small{display:block;font-size:7px;color:#536271;margin-top:3px}
+@media(max-width:650px){
+  .livePlanHead{flex-direction:column}.livePlanHead small{text-align:left}
+  .livePlanGrid{grid-template-columns:1fr 1fr}
+}
