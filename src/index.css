@@ -3423,3 +3423,127 @@ input,select,textarea{font-size:16px}
 
 
 .heroAfterScan{display:none}
+
+
+/* V5 mobile advanced-data containment hotfix */
+.advancedDisclosure,
+.advancedDisclosureBody,
+.advancedDisclosureBody > *,
+.advancedDisclosureBody .panel,
+.advancedDisclosureBody .v4Suite,
+.advancedDisclosureBody .v4Suite > *,
+.advancedDisclosureBody .xIntelPanel,
+.advancedDisclosureBody .scoreModelPanel,
+.advancedDisclosureBody .analysisGrid,
+.advancedDisclosureBody .proDetailGrid {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.advancedDisclosure {
+  width: 100%;
+  overflow: hidden;
+}
+
+.advancedDisclosureBody {
+  width: 100%;
+  overflow-x: clip;
+}
+
+.advancedDisclosureBody .profitTableWrap,
+.advancedDisclosureBody .holdingsTableWrap,
+.advancedDisclosureBody .v4ChartWrap {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.xIntelHead h3,
+.xIntelHead p,
+.xConnectCard strong,
+.xConnectCard span,
+.xIntelFoot span,
+.advancedDisclosureBody p,
+.advancedDisclosureBody small,
+.advancedDisclosureBody strong {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.xTechnicalDetails {
+  margin-top: 8px;
+  border-top: 1px solid #251f2d;
+  padding-top: 8px;
+}
+.xTechnicalDetails summary {
+  cursor: pointer;
+  color: #75677f;
+  font-size: 7px;
+  font-weight: 800;
+}
+.xTechnicalDetails span {
+  display: block;
+  margin-top: 6px;
+  color: #6e6177;
+  font-size: 7px;
+  line-height: 1.5;
+}
+
+@media(max-width:720px){
+  .advancedDisclosureBody .analysisGrid,
+  .advancedDisclosureBody .proDetailGrid,
+  .advancedDisclosureBody .v4TwoCol,
+  .advancedDisclosureBody .forecastGrid {
+    grid-template-columns: minmax(0,1fr);
+  }
+
+  .advancedDisclosureBody .panel,
+  .advancedDisclosureBody .scoreModelPanel,
+  .advancedDisclosureBody .xIntelPanel {
+    width: 100%;
+  }
+
+  .advancedDisclosureBody .v4PanelHead,
+  .advancedDisclosureBody .tradeTapeHead,
+  .advancedDisclosureBody .whaleWalletHead,
+  .advancedDisclosureBody .marketCapMapHead {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+@media(max-width:480px){
+  .advancedDisclosureBody {
+    padding: 6px;
+    gap: 8px;
+  }
+
+  .advancedDisclosureBody .panel,
+  .advancedDisclosureBody .scoreModelPanel,
+  .advancedDisclosureBody .xIntelPanel {
+    padding: 11px;
+    border-radius: 11px;
+  }
+
+  .xIntelHead h3 {
+    font-size: 15px;
+    line-height: 1.25;
+  }
+
+  .xIntelHead p,
+  .xConnectCard span {
+    font-size: 7px;
+    line-height: 1.45;
+  }
+
+  .xSignalBadge {
+    width: 100%;
+  }
+
+  .v4ChartWrap {
+    padding-right: 44px;
+  }
+
+  .profitTableWrap {
+    -webkit-overflow-scrolling: touch;
+  }
+}

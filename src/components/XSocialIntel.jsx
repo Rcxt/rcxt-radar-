@@ -156,6 +156,9 @@ export default function XSocialIntel({ scan, notificationsEnabled=false, notific
   }, [address, symbol, name, loadSocial])
 
   const x = social?.x || social?.providers?.[0] || null
+  const xReason = String(x?.reason || '')
+  const xProjectSetupError = /attached to a Project|developer App.*Project/i.test(xReason)
+  const xCredentialMissing = /not configured|missing.*bearer|X_BEARER_TOKEN/i.test(xReason)
   const topPosts = Array.isArray(x?.posts) ? x.posts.slice(0, 6) : []
   const narratives = Array.isArray(x?.narratives) ? x.narratives.slice(0, 8) : []
   const catalysts = Array.isArray(x?.catalysts) ? x.catalysts.slice(0, 5) : []
@@ -179,23 +182,50 @@ export default function XSocialIntel({ scan, notificationsEnabled=false, notific
   }
 
   if (social && !social.available) {
+    const offlineTitle = xProjectSetupError
+      ? 'X connection reached — Developer Project setup needed'
+      : xCredentialMissing
+        ? 'X feed reporting is built — connection needed'
+        : 'X feed is temporarily unavailable'
+
+    const offlineBody = xProjectSetupError
+      ? 'RCXT reached the official X API with your bearer token, but X rejected search access because the Developer App is not attached to an X Developer Project.'
+      : xCredentialMissing
+        ? 'RCXT is ready to search the coin name, ticker and contract address through the official X API, but the server does not currently have a usable bearer token.'
+        : 'RCXT could not complete the X search right now. The scanner and on-chain intelligence still work normally.'
+
+    const setupLabel = xProjectSetupError
+      ? 'ATTACH APP TO X PROJECT'
+      : xCredentialMissing
+        ? 'X_BEARER_TOKEN'
+        : 'RETRY X CONNECTION'
+
     return (
       <article className="panel xIntelPanel offline">
         <div className="xIntelHead">
           <div>
             <span>V5 X INTELLIGENCE</span>
-            <h3>X feed reporting is built — connection needed</h3>
-            <p>
-              RCXT is ready to search the coin name, ticker and contract address through the official X API,
-              but the server still needs an X bearer token.
-            </p>
+            <h3>{offlineTitle}</h3>
+            <p>{offlineBody}</p>
           </div>
           <div className="xSignalBadge offline">X OFFLINE</div>
         </div>
         <div className="xConnectCard">
-          <b>REQUIRED SECRET</b>
-          <strong>X_BEARER_TOKEN</strong>
-          <span>{x?.reason || 'X API credentials not configured'}</span>
+          <b>{xProjectSetupError ? 'X DEVELOPER SETUP' : xCredentialMissing ? 'REQUIRED SECRET' : 'CONNECTION STATUS'}</b>
+          <strong>{setupLabel}</strong>
+          <span>
+            {xProjectSetupError
+              ? 'Your token is being recognized. The remaining fix is inside the X Developer Console, not Vercel.'
+              : xCredentialMissing
+                ? 'Add the bearer token as a server-side Vercel environment variable.'
+                : 'Retry the connection. If the problem continues, check the X developer app status.'}
+          </span>
+          {xReason ? (
+            <details className="xTechnicalDetails">
+              <summary>Technical details</summary>
+              <span>{xReason}</span>
+            </details>
+          ) : null}
         </div>
         <div className="xIntelFoot">
           <span>No Reddit. No Instagram. X only.</span>
