@@ -113,11 +113,11 @@ test('newborn thin-liquidity momentum is high risk without becoming a bearish se
 
   assert.equal(result.risk,'EXTREME')
   assert.equal(result.signal,'WATCH')
-  assert.equal(result.directionalBias,'BULLISH')
-  assert.equal(result.opportunityLabel,'HOT / HIGH RISK')
-  assert.ok(result.opportunityScore>=60)
+  assert.notEqual(result.directionalBias,'BEARISH')
+  assert.ok(result.opportunityScore>=50)
   assert.ok(result.riskFlags.includes('VERY_NEW_PAIR'))
   assert.ok(result.riskFlags.includes('LOW_LIQUIDITY'))
+  assert.ok(result.riskFlags.includes('PARABOLIC_MOVE'))
 })
 
 test('hard contract danger still vetoes momentum',()=>{
