@@ -657,6 +657,32 @@ export default function Home() {
     downloadCsv('rcxt-wallet.csv', rows)
   }
 
+  function exportTradePlansCsv() {
+    if (!tradePlans.length) return
+    const rows = [
+      ['token','name','address','status','positionUsd','entryMarketCap','tpPercent','scaleOutPercent','stopPercent','enteredAt','closedAt','exitMarketCap','estimatedExitValue','estimatedPnl','thesis','invalidation'],
+      ...tradePlans.map((plan) => [
+        plan.token || '',
+        plan.name || '',
+        plan.address || '',
+        plan.status || 'DRAFT',
+        plan.investment ?? '',
+        plan.entryMarketCap ?? '',
+        plan.takeProfitPercent ?? '',
+        plan.scaleOutPercent ?? '',
+        plan.stopDistance ?? '',
+        plan.enteredAt ? new Date(plan.enteredAt).toISOString() : '',
+        plan.closedAt ? new Date(plan.closedAt).toISOString() : '',
+        plan.exitMarketCap ?? '',
+        plan.exitValue ?? '',
+        plan.exitPnl ?? '',
+        plan.thesis || '',
+        plan.invalidation || '',
+      ]),
+    ]
+    downloadCsv('rcxt-trade-plans.csv', rows)
+  }
+
   const hiddenAddresses = useMemo(
     () => new Set(hiddenCoins.map((coin) => coin.address)),
     [hiddenCoins],
@@ -747,6 +773,30 @@ export default function Home() {
       { buy: 0, watch: 0, reduce: 0 },
     )
   }, [walletData])
+
+  const tradePlanStats = useMemo(() => {
+    const open = tradePlans.filter((plan) => plan.status === 'OPEN')
+    const closed = tradePlans.filter((plan) => plan.status === 'CLOSED')
+    const draft = tradePlans.filter((plan) => !plan.status || plan.status === 'DRAFT')
+    const outcomes = closed
+      .map((plan) => Number(plan.exitPnl))
+      .filter((value) => Number.isFinite(value))
+
+    const totalPnl = outcomes.reduce((sum, value) => sum + value, 0)
+    const positive = outcomes.filter((value) => value > 0).length
+    const negative = outcomes.filter((value) => value < 0).length
+
+    return {
+      open: open.length,
+      closed: closed.length,
+      draft: draft.length,
+      positive,
+      negative,
+      totalPnl,
+      averagePnl: outcomes.length ? totalPnl / outcomes.length : null,
+      outcomeCount: outcomes.length,
+    }
+  }, [tradePlans])
 
   return (
     <main className="appShell">
@@ -948,8 +998,17 @@ export default function Home() {
               <>
                 <div className="drawerToolbar">
                   <span>{tradePlans.length} saved plans</span>
-                  <span>{tradePlans.filter((plan) => plan.status === 'OPEN').length} open</span>
+                  <button onClick={exportTradePlansCsv} disabled={!tradePlans.length}>Export CSV</button>
                 </div>
+                <div className="tradePlanLibraryStats">
+                  <div><span>Open</span><b>{tradePlanStats.open}</b></div>
+                  <div><span>Closed</span><b>{tradePlanStats.closed}</b></div>
+                  <div><span>Positive / Negative</span><b><i className="positiveText">{tradePlanStats.positive}</i> / <i className="negativeText">{tradePlanStats.negative}</i></b></div>
+                  <div><span>Est. total P/L</span><b className={tradePlanStats.totalPnl >= 0 ? 'positiveText' : 'negativeText'}>{usd(tradePlanStats.totalPnl)}</b></div>
+                  <div><span>Avg closed P/L</span><b>{tradePlanStats.averagePnl == null ? '—' : usd(tradePlanStats.averagePnl)}</b></div>
+                  <div><span>Drafts</span><b>{tradePlanStats.draft}</b></div>
+                </div>
+                <small className="tradePlanStatsNote">Journal P/L is estimated from saved market-cap math, not exchange-verified realized P/L.</small>
                 <div className="tradePlanLibrary">
                   {tradePlans.length ? tradePlans.map((plan) => (
                     <div className="tradePlanLibraryRow" key={plan.address}>
