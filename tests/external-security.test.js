@@ -143,6 +143,7 @@ test('normalizes Jupiter token evidence',()=>{
     liquidity:220000,
     mcap:1700000,
     audit:{
+      isSus:false,
       mintAuthorityDisabled:true,
       freezeAuthorityDisabled:true,
     },
@@ -150,9 +151,19 @@ test('normalizes Jupiter token evidence',()=>{
 
   assert.equal(normalized.available,true)
   assert.equal(normalized.isVerified,true)
+  assert.equal(normalized.suspicious,false)
   assert.equal(normalized.organicScore,84)
   assert.equal(normalized.mintAuthorityDisabled,true)
   assert.equal(normalized.freezeAuthorityDisabled,true)
+})
+
+test('Jupiter isSus must be true before RCXT treats it as suspicious',()=>{
+  const address='TokenMint111111111111111111111111111111111'
+  const safe=normalizeJupiterToken([{id:address,audit:{isSus:false}}],address)
+  const suspicious=normalizeJupiterToken([{id:address,audit:{isSus:true}}],address)
+
+  assert.equal(safe.suspicious,false)
+  assert.equal(suspicious.suspicious,true)
 })
 
 
