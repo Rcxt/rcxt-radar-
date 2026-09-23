@@ -1300,7 +1300,7 @@ export default function Home() {
 
                 <div className="commandComingSoon xReady">
                   <div>
-                    <span>V5 PREVIEW</span>
+                    <span>V6 LIVE</span>
                     <strong>X Intelligence</strong>
                     <small>Name · ticker · contract search + AI feed report</small>
                   </div>
@@ -1309,7 +1309,7 @@ export default function Home() {
 
                 <div className="commandFooter">
                   <button onClick={resetRadarWorkspace}>Reset radar workspace</button>
-                  <span>v5.1 RC · clarity + alerts + X</span>
+                  <span>v6.0 · multi-source intelligence + Bubble Map</span>
                 </div>
               </div>
             ) : null}
@@ -2526,8 +2526,8 @@ export default function Home() {
 
       <footer className="footer">
         <div>
-          <b>RCXT RADAR · v5.1.0 RC</b>
-          <span>Score engine v5.0.0 · Solana · DexScreener · Supabase · Vercel</span>
+          <b>RCXT RADAR · v6.0.0</b>
+          <span>Score engine v6.0.0 · Solana · DexScreener · GeckoTerminal · RugCheck · GoPlus</span>
         </div>
         <p>
           Signals are software-generated market intelligence, not guarantees or personalized financial advice.
