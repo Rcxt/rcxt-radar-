@@ -28,7 +28,7 @@ const GROUPS=[
     items:[
       ['radarChanges','Radar signal changes','Alerts from tokens moving around the opportunity radar.'],
       ['xMomentum','X momentum spikes','Reserved for V5 X acceleration / narrative alerts.'],
-      ['repeatBuyAlerts','Repeat buys','Allow another alert for the same token inside the cooldown window.'],
+      ['repeatBuyAlerts','Repeat wallet alerts','Bypass the same-token cooldown for separate wallet buys.'],
     ],
   },
 ]
@@ -54,6 +54,14 @@ export default function NotificationCenter({
   onMarketCapTarget,
 }){
   const current=normalizeNotificationPrefs(prefs)
+  const presetName=Object.entries(NOTIFICATION_PRESETS).find(([,preset])=>{
+    const normalized=normalizeNotificationPrefs(preset)
+    return Object.keys(normalized).every((key)=>normalized[key]===current[key])
+  })?.[0] || 'CUSTOM'
+  const enabledCount=[
+    'newBuy','rugRisk','highRiskBuy','hotMomentumBuy','signalChanges',
+    'scoreCrossing','marketCapCrossing','radarChanges','xMomentum','repeatBuyAlerts'
+  ].filter((key)=>Boolean(current[key])).length
 
   function patch(next){
     onChange?.(normalizeNotificationPrefs({...current,...next}))
@@ -69,7 +77,7 @@ export default function NotificationCenter({
         <div>
           <span>V5 ALERT CONTROL</span>
           <h4>Key alerts, not notification spam</h4>
-          <p>RCXT groups repeat buys, replaces duplicate notifications, and keeps critical contract/rug warnings separate from ordinary market noise.</p>
+          <p>RCXT groups repeat buys, replaces duplicate notifications, and keeps critical contract/rug warnings separate from ordinary market noise. {enabledCount} alert types are on.</p>
         </div>
         <button
           className={liveMonitor?.enabled?'monitorMiniToggle active':'monitorMiniToggle inactive'}
@@ -82,10 +90,10 @@ export default function NotificationCenter({
       </div>
 
       <div className="notificationPresets">
-        <button onClick={()=>applyPreset('KEY')}>KEY ONLY<small>recommended</small></button>
-        <button onClick={()=>applyPreset('ACTIVE')}>ACTIVE TRADER<small>more signals</small></button>
-        <button onClick={()=>applyPreset('EVERYTHING')}>EVERYTHING<small>busy</small></button>
-        <button onClick={()=>applyPreset('SILENT')}>SILENT<small>monitor only</small></button>
+        <button className={presetName==='KEY'?'active':''} onClick={()=>applyPreset('KEY')}>KEY ONLY<small>recommended</small></button>
+        <button className={presetName==='ACTIVE'?'active':''} onClick={()=>applyPreset('ACTIVE')}>ACTIVE TRADER<small>more signals</small></button>
+        <button className={presetName==='EVERYTHING'?'active':''} onClick={()=>applyPreset('EVERYTHING')}>ALL ALERTS<small>busy</small></button>
+        <button className={presetName==='SILENT'?'active':''} onClick={()=>applyPreset('SILENT')}>SILENT<small>monitor only</small></button>
       </div>
 
       <div className="notificationSpamControl">

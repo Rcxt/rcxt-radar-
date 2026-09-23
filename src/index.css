@@ -3266,8 +3266,13 @@ input,select,textarea{font-size:16px}
   font-weight:900;
   letter-spacing:.04em;
 }
-.notificationPresets button:first-child{border-color:#2f5f49;color:var(--green);background:#0b1812}
-.notificationPresets button:last-child{border-color:#4c3438;color:#d27c84}
+.notificationPresets button.active{
+  border-color:#2f5f49;
+  color:var(--green);
+  background:#0b1812;
+  box-shadow:0 0 0 1px rgba(77,226,146,.04),0 0 16px rgba(77,226,146,.06);
+}
+.notificationPresets button:last-child:not(.active){border-color:#4c3438;color:#d27c84}
 .notificationPresets small{display:block;margin-top:3px;color:#526371;font-size:6px;font-weight:600}
 
 .notificationSpamControl{

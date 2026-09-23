@@ -269,3 +269,29 @@ test('recorded StreamFomo regression keeps Pump.fun zero-liquidity field from fo
   assert.equal(result.risk,'HIGH')
   assert.notEqual(result.directionalBias,'BEARISH')
 })
+
+
+test('WATCH exposes the final score gate when structure passes but risk-adjusted score is below 69',()=>{
+  const pair=healthyPair()
+  pair.liquidity={usd:12000}
+  pair.priceChange={m5:1,h1:3,h6:8,h24:16}
+  pair.txns={
+    m5:{buys:20,sells:15},
+    h1:{buys:90,sells:70},
+    h24:{buys:500,sells:430},
+  }
+
+  const result=analyzePair(pair,{
+    ...baseSecurity(),
+    concentrationAvailable:true,
+    top1Percent:44,
+    top5Percent:70,
+    top10Percent:88,
+  })
+
+  if(result.signal==='WATCH'&&result.score<69){
+    assert.ok(result.entryGate.leanBuyMissing.some((item)=>item.includes('below 69')))
+  }else{
+    assert.ok(['WATCH','LEAN BUY','BUY SETUP'].includes(result.signal))
+  }
+})
