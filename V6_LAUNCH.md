@@ -13,6 +13,7 @@ Release candidate: **6.0.0-rc.1**
 - [ ] Price-source conflict regression prevents BUY SETUP promotion.
 - [ ] Rugged / structural-danger regressions remain hard vetoes.
 - [ ] Mobile Advanced Data renders source/consensus rows without horizontal overflow.
+- [ ] Scanner Bubble Map button opens the current Solana CA directly in Bubblemaps V2.
 - [ ] Scan persistence succeeds and records `6.0.0-rc.1` plus evidence payload.
 - [ ] Production `main` remains unchanged until all checks above are complete.
 
@@ -25,6 +26,9 @@ Required for launch:
 - RugCheck
 - GoPlus attempted with graceful fallback
 - Supabase persistence
+
+Visual investigation (not part of the numeric score):
+- Bubblemaps V2 direct token map for holder clusters and transfer links
 
 Optional enhancements:
 - Jupiter API key
