@@ -142,7 +142,11 @@ export default function WalletActivity({walletAddress='',onOpenToken}){
       {valid&&data ? (
         <>
           <div className="activitySummary">
-            <div><span>Parsed events</span><b>{data.count||0}</b></div>
+            <div><span>Parsed events</span><b>{data.count||0}</b><small>{data.summary?.classificationCoveragePercent ?? 0}% classified</small></div>
+            <div><span>BUY / SELL</span><b><i className="good">{data.summary?.buyCount||0}</i> / <i className="bad">{data.summary?.sellCount||0}</i></b><small>{data.summary?.swapCount||0} swaps</small></div>
+            <div><span>SOL spent on buys</span><b>{number(data.summary?.solSpentOnBuys||0,4)} SOL</b></div>
+            <div><span>SOL from sells</span><b>{number(data.summary?.solReceivedOnSells||0,4)} SOL</b></div>
+            <div><span>Unique traded mints</span><b>{data.summary?.uniqueTradedMints||0}</b></div>
             <div><span>Likely recent buys</span><b className={(data.newBuys?.length||0)>0?'good':''}>{data.newBuys?.length||0}</b></div>
             <div><span>Refresh</span><b>30s</b><small>{lastRefresh?'updated '+new Date(lastRefresh).toLocaleTimeString():'—'}</small></div>
             <button className="toolButton" onClick={scoreRecentBuys} disabled={!data.newBuys?.length}>Score recent buys</button>
