@@ -984,7 +984,11 @@ export default function Home() {
       if (query && !`${item.symbol} ${item.name} ${item.address}`.toLowerCase().includes(query)) return false
       if (signalFilter !== 'ALL' && item.intelligence?.signal !== signalFilter) return false
       if (Number(item.intelligence?.score || 0) < Number(minScore || 0)) return false
-      if (Number(item.liquidityUsd || 0) < Number(minLiquidity || 0)) return false
+      if (Number(minLiquidity || 0) > 0) {
+        const liquidityKnown=item.intelligence?.liquidityReported !== false && item.liquidityUsd != null
+        if (liquidityKnown && Number(item.liquidityUsd) < Number(minLiquidity)) return false
+        if (!liquidityKnown && !['trench','new','discovery'].includes(radarPreset)) return false
+      }
       return true
     })
 
@@ -998,7 +1002,11 @@ export default function Home() {
         return aAge - bAge
       },
       volume: (a,b) => Number(b.volume24h || 0) - Number(a.volume24h || 0),
-      liquidity: (a,b) => Number(b.liquidityUsd || 0) - Number(a.liquidityUsd || 0),
+      liquidity: (a,b) => {
+        const aLiq=a.liquidityUsd == null ? -1 : Number(a.liquidityUsd)
+        const bLiq=b.liquidityUsd == null ? -1 : Number(b.liquidityUsd)
+        return bLiq-aLiq
+      },
       momentum: (a,b) => Number(b.change1h || 0) - Number(a.change1h || 0),
       marketCap: (a,b) => Number(b.marketCap || 0) - Number(a.marketCap || 0),
     }
@@ -1032,11 +1040,15 @@ export default function Home() {
     const highRiskValue = holdings
       .filter((item) => ['HIGH','EXTREME'].includes(item.intelligence?.risk))
       .reduce((sum,item)=>sum+Number(item.valueUsd||0),0)
+    const liquidityKnown=(item)=>item?.intelligence?.liquidityReported !== false && item?.liquidityUsd != null
     const liquidValue = holdings
-      .filter((item) => Number(item.liquidityUsd || 0) >= 10000)
+      .filter((item) => liquidityKnown(item) && Number(item.liquidityUsd) >= 10000)
       .reduce((sum, item) => sum + Number(item.valueUsd || 0), 0)
     const lowLiquidityValue = holdings
-      .filter((item) => Number(item.valueUsd || 0) > 0 && Number(item.liquidityUsd || 0) < 5000)
+      .filter((item) => Number(item.valueUsd || 0) > 0 && liquidityKnown(item) && Number(item.liquidityUsd) < 5000)
+      .reduce((sum,item)=>sum+Number(item.valueUsd||0),0)
+    const unknownLiquidityValue = holdings
+      .filter((item) => Number(item.valueUsd || 0) > 0 && !liquidityKnown(item))
       .reduce((sum,item)=>sum+Number(item.valueUsd||0),0)
     const scoredValue = holdings
       .filter((item)=>Number(item.valueUsd||0)>0 && Number.isFinite(Number(item.intelligence?.score)))
@@ -1050,9 +1062,11 @@ export default function Home() {
       : null
     const highRiskValuePercent = total > 0 ? (highRiskValue / total) * 100 : 0
     const lowLiquidityValuePercent = total > 0 ? (lowLiquidityValue / total) * 100 : 0
+    const unknownLiquidityValuePercent = total > 0 ? (unknownLiquidityValue / total) * 100 : 0
     const portfolioRisk =
       concentration >= 65 || highRiskValuePercent >= 60 || lowLiquidityValuePercent >= 60 ? 'HIGH' :
-      concentration >= 40 || highRiskValuePercent >= 30 || lowLiquidityValuePercent >= 35 ? 'MODERATE' :
+      unknownLiquidityValuePercent >= 50 ? 'DATA LIMITED' :
+      concentration >= 40 || highRiskValuePercent >= 30 || lowLiquidityValuePercent >= 35 || unknownLiquidityValuePercent >= 25 ? 'MODERATE' :
       total > 0 ? 'LOWER' : 'UNKNOWN'
 
     return {
@@ -1060,6 +1074,7 @@ export default function Home() {
       highRisk,
       highRiskValuePercent,
       lowLiquidityValuePercent,
+      unknownLiquidityValuePercent,
       weightedScore,
       portfolioRisk,
       liquidPercent: total > 0 ? (liquidValue / total) * 100 : 0,
@@ -2205,6 +2220,7 @@ export default function Home() {
                 <MetricCard label="High-Risk Positions" value={portfolioStats.highRisk} tone={portfolioStats.highRisk ? 'negative' : 'positive'} />
                 <MetricCard label="High-Risk Value" value={`${portfolioStats.highRiskValuePercent.toFixed(0)}%`} tone={portfolioStats.highRiskValuePercent >= 30 ? 'negative' : 'positive'} />
                 <MetricCard label="Low-Liq Value" value={`${portfolioStats.lowLiquidityValuePercent.toFixed(0)}%`} tone={portfolioStats.lowLiquidityValuePercent >= 35 ? 'negative' : ''} />
+                <MetricCard label="Unknown-Liq Value" value={`${portfolioStats.unknownLiquidityValuePercent.toFixed(0)}%`} tone={portfolioStats.unknownLiquidityValuePercent >= 50 ? 'negative' : ''} />
                 <MetricCard label="Weighted Score" value={portfolioStats.weightedScore == null ? '—' : portfolioStats.weightedScore.toFixed(0)} />
                 <MetricCard label="Portfolio Risk" value={portfolioStats.portfolioRisk} tone={portfolioStats.portfolioRisk === 'HIGH' ? 'negative' : portfolioStats.portfolioRisk === 'LOWER' ? 'positive' : ''} />
                 <MetricCard label="Value in $10K+ Liq" value={`${portfolioStats.liquidPercent.toFixed(0)}%`} />

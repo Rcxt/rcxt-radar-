@@ -24,7 +24,8 @@ export default async function handler(req, res) {
       const tx1h = buys1h + sells1h
       const buyPct5m = tx5m ? (buys5m / tx5m) * 100 : 50
       const buyPct1h = tx1h ? (buys1h / tx1h) * 100 : 50
-      const liquidityUsd = Number(pair?.liquidity?.usd || 0)
+      const liquidityReported = intelligence?.liquidityReported !== false
+      const liquidityUsd = liquidityReported ? Number(pair?.liquidity?.usd || 0) : null
       const volume5m = Number(pair?.volume?.m5 || 0)
       const change5m = Number(pair?.priceChange?.m5 || 0)
       const change1h = Number(pair?.priceChange?.h1 || 0)
@@ -46,7 +47,7 @@ export default async function handler(req, res) {
         tx5m >= 10 ? 56 :
         tx5m >= 4 ? 38 : 12
 
-      const liquidityScore =
+      const liquidityScore = !liquidityReported ? 45 :
         liquidityUsd >= 50000 ? 100 :
         liquidityUsd >= 20000 ? 84 :
         liquidityUsd >= 8000 ? 68 :
@@ -63,7 +64,7 @@ export default async function handler(req, res) {
       if (buyPct1h >= 50 && buyPct1h <= 70) trenchScore += 4
       if (buyPct5m < 35 && tx5m >= 10) trenchScore -= 18
       if (buyPct1h < 38 && tx1h >= 20) trenchScore -= 24
-      if (liquidityUsd < 3000) trenchScore -= 18
+      if (liquidityReported && liquidityUsd < 3000) trenchScore -= 18
       if (change5m > 35 || change1h > 120) trenchScore -= 14
       if (change5m < -15) trenchScore -= 12
       if (change5m < -20) trenchScore = Math.min(trenchScore, 55)
@@ -76,7 +77,7 @@ export default async function handler(req, res) {
 
       const trenchState =
         (change5m < -35 || change1h < -45) ? 'DUMPING' :
-        liquidityUsd < 3000 ? 'THIN' :
+        (liquidityReported && liquidityUsd < 3000) ? 'THIN' :
         (buyPct5m < 35 && tx5m >= 10) ? 'SELLERS' :
         (buyPct1h < 38 && tx1h >= 20 && buyPct5m >= 50) ? 'REVERSAL' :
         (buyPct1h < 38 && tx1h >= 20) ? 'SELLERS' :
@@ -99,6 +100,8 @@ export default async function handler(req, res) {
         marketCap: Number(pair?.marketCap || 0),
         fdv: Number(pair?.fdv || 0),
         liquidityUsd,
+        liquidityReported,
+        liquiditySource:intelligence?.liquiditySource || null,
         volume5m,
         volume1h: Number(pair?.volume?.h1 || 0),
         volume6h: Number(pair?.volume?.h6 || 0),

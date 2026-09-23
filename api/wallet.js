@@ -44,6 +44,8 @@ export default async function handler(req,res){
       if (priceUsd > 0) pricedTokenCount += 1
       portfolioTokenValueUsd+=valueUsd
 
+      const intelligence=pair?analyzePair(pair,null):null
+      const liquidityReported=intelligence?.liquidityReported !== false
       return {
         mint:holding.mint,
         balance:holding.balance,
@@ -52,11 +54,13 @@ export default async function handler(req,res){
         priceUsd,
         valueUsd,
         marketCap:Number(pair?.marketCap||0),
-        liquidityUsd:Number(pair?.liquidity?.usd||0),
+        liquidityUsd:pair && liquidityReported ? Number(pair?.liquidity?.usd||0) : null,
+        liquidityReported:pair ? liquidityReported : false,
+        liquiditySource:intelligence?.liquiditySource||null,
         change24h:Number(pair?.priceChange?.h24||0),
         volume24h:Number(pair?.volume?.h24||0),
         pairUrl:pair?.url||null,
-        intelligence:pair?analyzePair(pair,null):null
+        intelligence
       }
     }).sort((a,b)=>b.valueUsd-a.valueUsd)
 
