@@ -1,6 +1,6 @@
 # RCXT Radar V6 Launch Checklist
 
-Release candidate: **6.0.0-rc.1**
+Release: **6.0.0**
 
 ## Hard launch gates
 
@@ -14,7 +14,7 @@ Release candidate: **6.0.0-rc.1**
 - [ ] Rugged / structural-danger regressions remain hard vetoes.
 - [ ] Mobile Advanced Data renders source/consensus rows without horizontal overflow.
 - [ ] Scanner Bubble Map button opens the current Solana CA directly in Bubblemaps V2.
-- [ ] Scan persistence succeeds and records `6.0.0-rc.1` plus evidence payload.
+- [ ] Scan persistence succeeds and records `6.0.0` plus evidence payload.
 - [ ] Production `main` remains unchanged until all checks above are complete.
 
 ## Core provider behavior
@@ -42,7 +42,7 @@ Optional providers must never become boot dependencies.
 
 When all hard gates pass:
 
-1. Update release notes from RC to V6 final.
+1. Confirm release identity is V6 final.
 2. Merge the V6 PR into `main`.
 3. Confirm the new Vercel production deployment is READY.
 4. Run `/api/health` on production.
