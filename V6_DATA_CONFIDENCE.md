@@ -1,67 +1,134 @@
 # RCXT Radar V6 — Data Confidence Layer
 
-V6 changes the scoring philosophy from "one feed plus heuristics" to "facts + corroboration + explicit uncertainty."
+V6 changes the scoring philosophy from **one market feed + heuristics** to **facts + independent corroboration + explicit uncertainty**.
 
-## Provider hierarchy
+## Launch provider stack
+
+### Always-on / no paid dependency
 
 1. **Solana RPC — primary on-chain truth**
    - Mint authority
    - Freeze authority
    - Supply
    - Largest token accounts
-   - Resolved owner concentration when RPC data is available
+   - Resolved owner concentration
+   - Public RPC remains the final fallback
 
-2. **RugCheck — independent security corroboration**
+2. **DexScreener — primary fast market feed**
+   - Price
+   - Market cap / FDV
+   - Liquidity
+   - Volume
+   - Transactions / buy-sell flow
+   - Pair age and DEX identity
+
+3. **GeckoTerminal — independent market cross-check**
+   - Price
+   - Liquidity/reserve
+   - FDV / market cap when available
+   - 24h volume and change
+   - Cached aggressively so the public API is not spammed
+
+4. **RugCheck — independent Solana security evidence**
    - Rugged/security flags
    - Top-holder percentages
    - Insider-marked holder share
    - LP lock/liquidity metadata
    - Jupiter verification metadata
-   - Used as evidence, not as a blind aggregate vendor score
 
-3. **Jupiter Tokens V2 — optional organic/verification evidence**
-   - Organic activity score
-   - Verification state
-   - Holder count / liquidity / market cap metadata
-   - Audit authority fields when supplied
-   - Free API key recommended; no paid plan is required by this implementation
+5. **GoPlus Solana Token Security (Beta) — second security cross-check**
+   - Mintable/freezable status when supplied
+   - Mutable metadata
+   - Blacklist / transfer-pause capabilities
+   - Default frozen account state
+   - Holder concentration and creator share when supplied
+   - Fails soft if the beta API is unavailable or rate-limited
 
-## Scoring rules
+### Optional keyed upgrades
+
+6. **Jupiter Tokens + Price V3**
+   - Organic Score
+   - Verification and suspicious-token signal
+   - Holder / market metadata
+   - Independently filtered price source
+   - A Jupiter price omission is treated as unavailable evidence, not automatic proof of danger
+
+7. **Helius**
+   - DAS fungible-token metadata
+   - Independent token price when available
+   - Supply / decimals / token program corroboration
+   - Automatic Solana RPC fallback when a key is configured
+
+8. **Birdeye**
+   - Token overview price/liquidity/volume cross-check
+   - Solana token-security fields when the account plan exposes them
+   - Token-2022 transfer-fee signal
+   - Mutable metadata, freeze/mint authority corroboration
+   - Creator and top-holder concentration
+   - Any unavailable endpoint fails soft instead of breaking RCXT
+
+## V6 score rules
 
 - Concrete on-chain facts outrank vendor aggregate scores.
 - Missing data never counts as proof of safety.
-- A provider disagreement lowers model confidence.
-- Explicit external structural danger can cap the total score.
+- Price sources are compared against the median rather than blindly averaged.
+- A material live price disagreement blocks promotion into a buy setup and caps confidence until feeds converge.
+- Authority disagreements lower confidence and disable the “contract verified” state.
 - Rugged evidence is a hard veto.
-- External concentration is only a fallback when stronger on-chain owner/account concentration is unavailable.
-- Organic activity can strengthen or weaken setup quality, but it does not independently prove a rug or guarantee price direction.
-- RCXT score, opportunity score, safety score, execution score and confidence are separate axes. None is a probability of profit.
+- Blacklist, default-frozen and transfer-pause capabilities are structural-danger evidence.
+- Jupiter suspicious status is strong caution evidence but is **not** mislabeled as a confirmed rug.
+- External holder concentration is used only when stronger on-chain owner/account concentration is unavailable.
+- Token-2022 transfer fees reduce execution quality.
+- Mutable metadata and high creator concentration reduce safety.
+- Organic activity can strengthen or weaken setup quality; it cannot guarantee direction.
+- RCXT score, setup, execution, safety, data quality and confidence remain separate axes. None is a probability of profit.
 
-## New scan output
+## Market consensus
 
-The token scan now carries:
-- merged `security` evidence,
-- `intelligence.securityEvidence.providerCount`,
-- `evidenceScore`,
-- provider conflicts,
-- rugged status,
-- external danger count,
-- insider percentage,
-- Jupiter organic score,
-- Jupiter verification,
-- authority corroboration state.
+V6 can compare:
+
+- DexScreener
+- GeckoTerminal
+- Jupiter Price V3
+- Helius DAS price
+- Birdeye token overview
+
+The scanner records:
+
+- price source count,
+- external price source count,
+- median price,
+- maximum source deviation,
+- price agreement/conflict,
+- liquidity-source conflict,
+- market-evidence quality.
+
+Market consensus is persisted into Supabase with each manual scan for future calibration.
 
 ## Environment variables
 
-- `RUGCHECK_API_KEY` — optional.
-- `JUPITER_API_KEY` — optional; free key preferred.
-- `JUPITER_KEYLESS_ENABLED=0` — keyless Jupiter access remains off unless intentionally enabled.
+Core:
+- `SOLANA_RPC_URL`
+- `GOPLUS_ENABLED=1`
 
-## Planned next data upgrades
+Optional:
+- `RUGCHECK_API_KEY`
+- `GOPLUS_ACCESS_TOKEN`
+- `JUPITER_API_KEY`
+- `JUPITER_KEYLESS_ENABLED=0`
+- `HELIUS_API_KEY`
+- `BIRDEYE_API_KEY`
 
-These are intentionally not required for the first V6 preview:
-- Helius as a stronger production RPC / wallet-activity source when a free key is available.
-- GoPlus Solana Token Security as a third security cross-check after its Solana Beta behavior is validated against real tokens.
-- Historical calibration in Supabase to measure how score components correlate with later liquidity, drawdown and survival outcomes.
+None of the optional provider keys is required for the app to boot or scan.
 
-The first V6 preview should prove that provider disagreement and missing data are handled correctly before adding more vendors.
+## Calibration path
+
+V6 stores security consensus and market consensus inside `token_scans.payload`. Existing forward-outcome labeling can therefore answer questions such as:
+
+- Did low Organic Score predict worse follow-through?
+- How often did price-source conflicts precede bad entries?
+- Which holder-concentration thresholds best predict drawdown?
+- Do creator concentration or mutable metadata deserve stronger weights?
+- How much does multi-provider agreement improve score reliability?
+
+Weights should move based on those measured outcomes, not intuition alone.
