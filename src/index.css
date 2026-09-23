@@ -2582,3 +2582,26 @@ input,select,textarea{font-size:16px}
   .stressGrid{grid-template-columns:1fr 1fr}
 }
 @media(max-width:420px){.stressGrid{grid-template-columns:1fr}}
+
+
+/* V4 rug / manipulation guard */
+.rugGuardPanel{margin-top:10px}
+.rugGuardStatus{text-align:right;border:1px solid #2a3944;border-radius:9px;padding:8px 10px;background:#091016}
+.rugGuardStatus strong{display:block;font-size:9px}
+.rugGuardStatus small{display:block;font-size:7px;color:#596a7a;margin-top:3px}
+.rugGuardStatus.severe-red-flags,.rugGuardStatus.critical-flag{border-color:#5a3439;background:#160c0e;color:var(--red)}
+.rugGuardStatus.high-caution,.rugGuardStatus.caution{border-color:#59492a;background:#151107;color:var(--amber)}
+.rugGuardStatus.no-major-flags{border-color:#2f5942;background:#0b1510;color:var(--green)}
+.rugGuardGrid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:11px}
+.rugGuardRow{display:grid;grid-template-columns:8px 1fr auto;gap:8px;align-items:start;border:1px solid #1d2a34;background:#091016;border-radius:9px;padding:9px}
+.rugGuardRow .rugDot{width:7px;height:7px;border-radius:50%;margin-top:3px;background:#5f7080}
+.rugGuardRow strong{display:block;font-size:9px}.rugGuardRow small{display:block;font-size:7px;line-height:1.45;color:#617282;margin-top:3px}
+.rugGuardRow>b{font-size:6px;letter-spacing:.08em;color:#728391}
+.rugGuardRow.pass .rugDot{background:var(--green)}.rugGuardRow.pass>b{color:var(--green)}
+.rugGuardRow.watch .rugDot,.rugGuardRow.warning .rugDot{background:var(--amber)}.rugGuardRow.watch>b,.rugGuardRow.warning>b{color:var(--amber)}
+.rugGuardRow.critical{border-color:#42272c;background:#130b0d}.rugGuardRow.critical .rugDot{background:var(--red);box-shadow:0 0 8px rgba(255,86,98,.25)}.rugGuardRow.critical>b{color:var(--red)}
+.rugGuardRow.unknown{border-style:dashed}.rugGuardPanel>p{font-size:7px;color:#566676;line-height:1.45;margin:9px 0 0}
+@media(max-width:650px){
+  .rugGuardGrid{grid-template-columns:1fr}
+  .rugGuardStatus{text-align:left}
+}
