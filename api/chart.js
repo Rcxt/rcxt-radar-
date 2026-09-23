@@ -49,6 +49,16 @@ async function fetchCandles(pairAddress,interval){
   return {candles,meta:data?.meta||null,config}
 }
 
+
+function getQuery(req, name, fallback = '') {
+  try {
+    const url = new URL(req.url || '/', 'https://rcxt.local')
+    return url.searchParams.get(name) ?? fallback
+  } catch {
+    return fallback
+  }
+}
+
 export default async function handler(req,res){
   if(req.method!=='GET') return res.status(405).json({success:false,error:'Method not allowed'})
 
@@ -56,8 +66,8 @@ export default async function handler(req,res){
   applyRateHeaders(res,limited,40)
   if(!limited.allowed) return res.status(429).json({success:false,error:'Too many chart requests. Try again shortly.'})
 
-  const pairAddress=String(req.query?.pair||'').trim()
-  const interval=String(req.query?.interval||'5m')
+  const pairAddress=String(getQuery(req, 'pair')).trim()
+  const interval=String(getQuery(req, 'interval', '5m'))
   if(!/^[1-9A-HJ-NP-Za-km-z]{32,50}$/.test(pairAddress)){
     return res.status(400).json({success:false,error:'Valid Solana pair address required.'})
   }

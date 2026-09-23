@@ -20,6 +20,16 @@ function setCached(key,value){
   if(cache.size>100) cache.delete(cache.keys().next().value)
 }
 
+
+function getQuery(req, name, fallback = '') {
+  try {
+    const url = new URL(req.url || '/', 'https://rcxt.local')
+    return url.searchParams.get(name) ?? fallback
+  } catch {
+    return fallback
+  }
+}
+
 export default async function handler(req,res){
   if(req.method!=='GET') return res.status(405).json({success:false,error:'Method not allowed'})
 
@@ -27,7 +37,7 @@ export default async function handler(req,res){
   applyRateHeaders(res,limited,30)
   if(!limited.allowed) return res.status(429).json({success:false,error:'Too many trade-tape requests.'})
 
-  const pair=String(req.query?.pair||'').trim()
+  const pair=String(getQuery(req, 'pair')).trim()
   if(!/^[1-9A-HJ-NP-Za-km-z]{32,50}$/.test(pair)){
     return res.status(400).json({success:false,error:'Valid Solana pair address required.'})
   }

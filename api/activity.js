@@ -32,6 +32,16 @@ async function rpc(body,timeout=5500){
   return response.json()
 }
 
+
+function getQuery(req, name, fallback = '') {
+  try {
+    const url = new URL(req.url || '/', 'https://rcxt.local')
+    return url.searchParams.get(name) ?? fallback
+  } catch {
+    return fallback
+  }
+}
+
 export default async function handler(req,res){
   if(req.method!=='GET') return res.status(405).json({success:false,error:'Method not allowed'})
 
@@ -39,8 +49,8 @@ export default async function handler(req,res){
   applyRateHeaders(res,limited,18)
   if(!limited.allowed) return res.status(429).json({success:false,error:'Too many wallet activity requests.'})
 
-  const address=String(req.query?.address||'').trim()
-  const limit=Math.max(5,Math.min(20,Number(req.query?.limit||12)))
+  const address=String(getQuery(req, 'address')).trim()
+  const limit=Math.max(5,Math.min(20,Number(getQuery(req, 'limit', '12'))))
   if(!addressPattern.test(address)) return res.status(400).json({success:false,error:'Invalid Solana wallet address.'})
 
   const key=address+':'+limit
