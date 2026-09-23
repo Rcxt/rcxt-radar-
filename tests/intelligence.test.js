@@ -231,3 +231,41 @@ test('v5 confidence is capped when critical market fields are missing',()=>{
   assert.ok(result.confidence<=72)
   assert.equal(result.liquidityReported,false)
 })
+
+
+test('recorded StreamFomo regression keeps Pump.fun zero-liquidity field from forcing SELL / AVOID',()=>{
+  const pair={
+    dexId:'pumpfun',
+    baseToken:{symbol:'SOMO',name:'StreamFomo'},
+    liquidity:{usd:0},
+    marketCap:4675.78,
+    fdv:4675.78,
+    volume:{m5:2200,h1:9500,h6:11000,h24:10361.77},
+    priceChange:{m5:18,h1:42,h6:180,h24:350},
+    txns:{
+      m5:{buys:42,sells:20},
+      h1:{buys:170,sells:92},
+      h24:{buys:180,sells:96},
+    },
+    pairCreatedAt:Date.now()-10*60*1000,
+  }
+
+  const result=analyzePair(pair,{
+    ...baseSecurity(),
+    concentrationAvailable:false,
+    top1Percent:null,
+    top5Percent:null,
+    top10Percent:null,
+  })
+
+  assert.equal(result.liquidityReported,false)
+  assert.equal(result.liquiditySource,'PUMPFUN_BONDING_CURVE_UNREPORTED')
+  assert.ok(result.riskFlags.includes('LIQUIDITY_DATA_UNAVAILABLE'))
+  assert.ok(result.riskFlags.includes('PARABOLIC_MOVE'))
+  assert.ok(result.riskFlags.includes('VERY_NEW_PAIR'))
+  assert.ok(!result.riskFlags.includes('LOW_LIQUIDITY'))
+  assert.ok(!result.riskFlags.includes('LOW_LIQUIDITY_RATIO'))
+  assert.equal(result.signal,'WATCH')
+  assert.equal(result.risk,'HIGH')
+  assert.notEqual(result.directionalBias,'BEARISH')
+})
