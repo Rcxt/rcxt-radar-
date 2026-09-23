@@ -218,7 +218,7 @@ export default function ChallengeTracker({walletAddress='',walletData=null}){
       </div>
 
       <div className="challengeProgress">
-        <div><span>Log-scale progress</span><b>{stats.progress.toFixed(1)}%</b></div>
+        <div><span>Log-scale progress</span><b>{fixed(stats.progress,1,'0.0')}%</b></div>
         <i><em style={{width:stats.progress+'%'}}/></i>
       </div>
 
