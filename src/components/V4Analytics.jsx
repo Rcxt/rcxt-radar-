@@ -107,6 +107,12 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
   const [planInvalidation,setPlanInvalidation]=useState('')
   const [planSavedAt,setPlanSavedAt]=useState(null)
   const [planAlerts,setPlanAlerts]=useState(false)
+  const [planStatus,setPlanStatus]=useState('DRAFT')
+  const [planEnteredAt,setPlanEnteredAt]=useState(null)
+  const [planClosedAt,setPlanClosedAt]=useState(null)
+  const [planExitMarketCap,setPlanExitMarketCap]=useState(null)
+  const [planExitValue,setPlanExitValue]=useState(null)
+  const [planExitPnl,setPlanExitPnl]=useState(null)
   const planZoneRef=useRef(null)
 
   useEffect(()=>{
@@ -124,11 +130,23 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
         setPlanInvalidation(saved.invalidation||'')
         setPlanSavedAt(saved.savedAt||null)
         setPlanAlerts(Boolean(saved.planAlerts))
+        setPlanStatus(saved.status||'DRAFT')
+        setPlanEnteredAt(saved.enteredAt||null)
+        setPlanClosedAt(saved.closedAt||null)
+        setPlanExitMarketCap(saved.exitMarketCap??null)
+        setPlanExitValue(saved.exitValue??null)
+        setPlanExitPnl(saved.exitPnl??null)
       }else{
         setPlanThesis('')
         setPlanInvalidation('')
         setPlanSavedAt(null)
         setPlanAlerts(false)
+        setPlanStatus('DRAFT')
+        setPlanEnteredAt(null)
+        setPlanClosedAt(null)
+        setPlanExitMarketCap(null)
+        setPlanExitValue(null)
+        setPlanExitPnl(null)
       }
     }catch{}
   },[scan?.address])
@@ -458,11 +476,11 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
     }
   }
 
-  function saveTradePlan(){
-    if(!scan?.address) return
-    const payload={
+  function planPayload(overrides={}){
+    return {
       token:scan?.token?.symbol||'TOKEN',
-      address:scan.address,
+      name:scan?.token?.name||'',
+      address:scan?.address||'',
       investment:Number(investment||0),
       entryMarketCap:Number(entryMarketCap||0),
       takeProfitPercent:Number(takeProfitPercent||0),
@@ -471,12 +489,98 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
       thesis:planThesis,
       invalidation:planInvalidation,
       planAlerts,
+      status:planStatus,
+      enteredAt:planEnteredAt,
+      closedAt:planClosedAt,
+      exitMarketCap:planExitMarketCap,
+      exitValue:planExitValue,
+      exitPnl:planExitPnl,
       savedAt:Date.now(),
+      ...overrides,
     }
+  }
+
+  function persistTradePlan(overrides={}){
+    if(!scan?.address) return null
+    const payload=planPayload(overrides)
     try{
       localStorage.setItem('rcxt-trade-plan:'+scan.address,JSON.stringify(payload))
       setPlanSavedAt(payload.savedAt)
-    }catch{}
+      window.dispatchEvent(new CustomEvent('rcxt-trade-plan-updated',{detail:payload}))
+      return payload
+    }catch{
+      return null
+    }
+  }
+
+  function saveTradePlan(){
+    persistTradePlan()
+  }
+
+  function markPlanEntered(){
+    if(!scan?.address||!Number(investment||0)||!Number(entryMarketCap||0)) return
+    const enteredAt=Date.now()
+    setPlanStatus('OPEN')
+    setPlanEnteredAt(enteredAt)
+    setPlanClosedAt(null)
+    setPlanExitMarketCap(null)
+    setPlanExitValue(null)
+    setPlanExitPnl(null)
+    persistTradePlan({
+      status:'OPEN',
+      enteredAt,
+      closedAt:null,
+      exitMarketCap:null,
+      exitValue:null,
+      exitPnl:null,
+    })
+  }
+
+  function closePlanAtCurrent(){
+    const currentMc=Number(scan?.market?.marketCap||0)
+    const principal=Number(investment||0)
+    const entry=Number(entryMarketCap||0)
+    if(!scan?.address||!currentMc||!principal||!entry) return
+
+    const result=projectedPositionValue({
+      investment:principal,
+      entryMarketCap:entry,
+      targetMarketCap:currentMc,
+      estimatedCostsPercent:estimatedCosts,
+    })
+    const closedAt=Date.now()
+    const exitValue=result?.netValue??null
+    const exitPnl=result?.netProfit??null
+
+    setPlanStatus('CLOSED')
+    setPlanClosedAt(closedAt)
+    setPlanExitMarketCap(currentMc)
+    setPlanExitValue(exitValue)
+    setPlanExitPnl(exitPnl)
+    persistTradePlan({
+      status:'CLOSED',
+      closedAt,
+      exitMarketCap:currentMc,
+      exitValue,
+      exitPnl,
+    })
+  }
+
+  function resetPlanToDraft(){
+    setPlanStatus('DRAFT')
+    setPlanEnteredAt(null)
+    setPlanClosedAt(null)
+    setPlanExitMarketCap(null)
+    setPlanExitValue(null)
+    setPlanExitPnl(null)
+    persistTradePlan({
+      status:'DRAFT',
+      enteredAt:null,
+      closedAt:null,
+      exitMarketCap:null,
+      exitValue:null,
+      exitPnl:null,
+    })
   }
 
   async function copyTradePlan(){
@@ -758,6 +862,34 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
               <div><span>Stop market cap</span><b>{money(livePosition.stopMarketCap)}</b><small>{livePosition.stopDistanceFromCurrent==null?'—':pct(livePosition.stopDistanceFromCurrent)} from current</small></div>
               <div><span>Remaining R:R</span><b>{livePosition.remainingRiskReward==null?'—':livePosition.remainingRiskReward.toFixed(2)+'×'}</b><small>to plan target vs stop</small></div>
             </div>
+          </div>
+        ) : null}
+
+        <div className="tradeJournalBar">
+          <div>
+            <span>JOURNAL STATUS</span>
+            <strong className={
+              planStatus==='OPEN'?'good':
+              planStatus==='CLOSED'?(Number(planExitPnl||0)>=0?'good':'bad'):'mid'
+            }>{planStatus}</strong>
+            <small>
+              {planStatus==='OPEN'&&planEnteredAt?'Entered '+new Date(planEnteredAt).toLocaleString():
+               planStatus==='CLOSED'&&planClosedAt?'Closed '+new Date(planClosedAt).toLocaleString():
+               'Saving a plan does not mean you entered the trade.'}
+            </small>
+          </div>
+          <div className="tradeJournalActions">
+            {planStatus!=='OPEN'?<button onClick={markPlanEntered}>Mark entered</button>:null}
+            {planStatus==='OPEN'?<button className="closeTradeButton" onClick={closePlanAtCurrent}>Close @ current MC</button>:null}
+            {planStatus!=='DRAFT'?<button onClick={resetPlanToDraft}>Reset to draft</button>:null}
+          </div>
+        </div>
+
+        {planStatus==='CLOSED' ? (
+          <div className="closedTradeSummary">
+            <div><span>Exit MC</span><b>{money(planExitMarketCap)}</b></div>
+            <div><span>Est. exit value</span><b>{money(planExitValue)}</b></div>
+            <div><span>Est. P/L</span><b className={Number(planExitPnl||0)>=0?'good':'bad'}>{money(planExitPnl)}</b></div>
           </div>
         ) : null}
 
