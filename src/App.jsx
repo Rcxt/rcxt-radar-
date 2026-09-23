@@ -747,13 +747,39 @@ export default function Home() {
     const largest = priced[0]
     const concentration = total > 0 && largest ? (Number(largest.valueUsd || 0) / total) * 100 : 0
     const highRisk = holdings.filter((item) => ['HIGH','EXTREME'].includes(item.intelligence?.risk)).length
+    const highRiskValue = holdings
+      .filter((item) => ['HIGH','EXTREME'].includes(item.intelligence?.risk))
+      .reduce((sum,item)=>sum+Number(item.valueUsd||0),0)
     const liquidValue = holdings
       .filter((item) => Number(item.liquidityUsd || 0) >= 10000)
       .reduce((sum, item) => sum + Number(item.valueUsd || 0), 0)
+    const lowLiquidityValue = holdings
+      .filter((item) => Number(item.valueUsd || 0) > 0 && Number(item.liquidityUsd || 0) < 5000)
+      .reduce((sum,item)=>sum+Number(item.valueUsd||0),0)
+    const scoredValue = holdings
+      .filter((item)=>Number(item.valueUsd||0)>0 && Number.isFinite(Number(item.intelligence?.score)))
+      .reduce((sum,item)=>sum+Number(item.valueUsd||0),0)
+    const weightedScore = scoredValue > 0
+      ? holdings.reduce((sum,item)=>{
+          const value=Number(item.valueUsd||0)
+          const score=Number(item.intelligence?.score)
+          return Number.isFinite(score)?sum+value*score:sum
+        },0)/scoredValue
+      : null
+    const highRiskValuePercent = total > 0 ? (highRiskValue / total) * 100 : 0
+    const lowLiquidityValuePercent = total > 0 ? (lowLiquidityValue / total) * 100 : 0
+    const portfolioRisk =
+      concentration >= 65 || highRiskValuePercent >= 60 || lowLiquidityValuePercent >= 60 ? 'HIGH' :
+      concentration >= 40 || highRiskValuePercent >= 30 || lowLiquidityValuePercent >= 35 ? 'MODERATE' :
+      total > 0 ? 'LOWER' : 'UNKNOWN'
 
     return {
       concentration,
       highRisk,
+      highRiskValuePercent,
+      lowLiquidityValuePercent,
+      weightedScore,
+      portfolioRisk,
       liquidPercent: total > 0 ? (liquidValue / total) * 100 : 0,
       largestSymbol: largest?.symbol || '—',
     }
@@ -1802,6 +1828,10 @@ export default function Home() {
                 <MetricCard label="Largest Position" value={portfolioStats.largestSymbol} />
                 <MetricCard label="Top Concentration" value={`${portfolioStats.concentration.toFixed(1)}%`} tone={portfolioStats.concentration > 50 ? 'negative' : ''} />
                 <MetricCard label="High-Risk Positions" value={portfolioStats.highRisk} tone={portfolioStats.highRisk ? 'negative' : 'positive'} />
+                <MetricCard label="High-Risk Value" value={`${portfolioStats.highRiskValuePercent.toFixed(0)}%`} tone={portfolioStats.highRiskValuePercent >= 30 ? 'negative' : 'positive'} />
+                <MetricCard label="Low-Liq Value" value={`${portfolioStats.lowLiquidityValuePercent.toFixed(0)}%`} tone={portfolioStats.lowLiquidityValuePercent >= 35 ? 'negative' : ''} />
+                <MetricCard label="Weighted Score" value={portfolioStats.weightedScore == null ? '—' : portfolioStats.weightedScore.toFixed(0)} />
+                <MetricCard label="Portfolio Risk" value={portfolioStats.portfolioRisk} tone={portfolioStats.portfolioRisk === 'HIGH' ? 'negative' : portfolioStats.portfolioRisk === 'LOWER' ? 'positive' : ''} />
                 <MetricCard label="Value in $10K+ Liq" value={`${portfolioStats.liquidPercent.toFixed(0)}%`} />
                 <button className="toolButton walletExport" onClick={exportWalletCsv}>Export wallet CSV</button>
               </div>
