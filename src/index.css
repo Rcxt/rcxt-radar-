@@ -2360,3 +2360,16 @@ input,select,textarea{font-size:16px}
   .reverseTargetBox{grid-template-columns:1fr}
   .reverseTargetBox label{grid-column:auto}
 }
+
+
+/* V4 Challenge performance */
+.challengePerformance{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}
+.challengePerformance>div{border:1px solid #1d2a35;background:#091016;border-radius:10px;padding:11px;min-width:0}
+.challengePerformance span{display:block;font-size:7px;color:#5d6d7f}
+.challengePerformance b{display:block;font-size:12px;margin-top:4px;overflow-wrap:anywhere}
+.challengePerformance small{display:block;font-size:7px;color:#5b6a7a;margin-top:4px;line-height:1.4}
+.challengeRiskNotice{display:flex;gap:10px;align-items:flex-start;border:1px solid #4a2b31;background:#1a0d10;border-radius:10px;padding:10px 12px;margin-top:10px}
+.challengeRiskNotice strong{font-size:9px;color:#e27a84;white-space:nowrap}
+.challengeRiskNotice span{font-size:8px;color:#8d6f74;line-height:1.5}
+@media(max-width:760px){.challengePerformance{grid-template-columns:1fr 1fr}}
+@media(max-width:480px){.challengePerformance{grid-template-columns:1fr}.challengeRiskNotice{flex-direction:column}}
