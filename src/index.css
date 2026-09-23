@@ -2324,3 +2324,39 @@ input,select,textarea{font-size:16px}
   .decisionColumns{grid-template-columns:1fr}
   .quickProfitPresets{display:grid;grid-template-columns:1fr 1fr}
 }
+
+
+/* V4 Execution Lab */
+.executionLabPanel{overflow:hidden}
+.executionTop{display:grid;grid-template-columns:.85fr 1.15fr;gap:10px;margin-top:12px}
+.readinessGauge,.reverseTargetBox{border:1px solid #1d2a35;background:#091016;border-radius:12px;padding:13px}
+.readinessGauge>span{display:block;font-size:7px;color:#627285;letter-spacing:.1em}
+.readinessGauge>strong{display:block;font-size:30px;margin:6px 0 1px}
+.readinessGauge>small{display:block;font-size:8px;color:#647587}
+.readinessGauge>i{display:block;height:5px;background:#17212a;border-radius:999px;overflow:hidden;margin-top:12px}
+.readinessGauge>i>em{display:block;height:100%;background:linear-gradient(90deg,#8a6f25,var(--green));border-radius:inherit}
+.reverseTargetBox{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:8px;align-items:end}
+.reverseTargetBox label span,.reverseTargetBox>div>span{display:block;font-size:7px;color:#617184;margin-bottom:5px}
+.reverseTargetBox input{width:100%;min-height:42px;border:1px solid #263640;background:#070d12;color:#e0e6ec;border-radius:8px;padding:0 10px;font-size:16px}
+.reverseTargetBox strong{display:block;font-size:12px}.reverseTargetBox small{display:block;font-size:7px;color:#59697a;margin-top:4px;line-height:1.35}
+.executionChecklist{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:10px}
+.executionChecklist>div{display:flex;align-items:flex-start;gap:9px;border:1px solid #1d2933;background:#090f15;border-radius:10px;padding:10px}
+.executionChecklist .checkMark{display:grid;place-items:center;width:24px;height:24px;border-radius:7px;flex:0 0 auto;font-size:10px;font-weight:900;background:#161e25;color:#768695}
+.executionChecklist .pass{border-color:#234535}.executionChecklist .pass .checkMark{background:#0d2118;color:var(--green)}
+.executionChecklist .fail{border-color:#472b31}.executionChecklist .fail .checkMark{background:#241014;color:#e2737e}
+.executionChecklist .unknown{border-style:dashed}
+.executionChecklist strong{display:block;font-size:9px}.executionChecklist small{display:block;font-size:7px;color:#617183;margin-top:3px;line-height:1.45}
+.entryMap{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:10px}
+.entryMap>div{border:1px solid #1b2832;background:#080e13;border-radius:9px;padding:10px}
+.entryMap span{display:block;font-size:7px;color:#5d6d7e}.entryMap b{display:block;font-size:11px;margin-top:4px}.entryMap small{display:block;font-size:7px;color:#657586;margin-top:3px}
+@media(max-width:760px){
+  .executionTop{grid-template-columns:1fr}
+  .reverseTargetBox{grid-template-columns:1fr 1fr}
+  .reverseTargetBox label{grid-column:1/-1}
+  .entryMap{grid-template-columns:1fr 1fr}
+}
+@media(max-width:480px){
+  .executionChecklist{grid-template-columns:1fr}
+  .reverseTargetBox{grid-template-columns:1fr}
+  .reverseTargetBox label{grid-column:auto}
+}
