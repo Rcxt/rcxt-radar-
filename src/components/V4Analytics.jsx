@@ -157,6 +157,13 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
   },[walletEquity])
 
   useEffect(()=>{
+    const pairAge=Number(scan?.intelligence?.ageHours)
+    if(scan?.address&&Number.isFinite(pairAge)&&pairAge<0.75){
+      setIntervalValue('1m')
+    }
+  },[scan?.address])
+
+  useEffect(()=>{
     let active=true
     const pair=scan?.pair?.pairAddress
     if(!pair){setChart(null);return}
@@ -216,6 +223,14 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
 
   const beginner=useMemo(()=>beginnerMarketExplanation(scan,chart?.analytics),[scan,chart?.analytics])
   const analytics=chart?.analytics
+  const candleCount=Array.isArray(chart?.candles)?chart.candles.length:0
+  const pairAgeHours=Number(scan?.intelligence?.ageHours)
+  const limitedHistory=Boolean(
+    chart && (
+      (Number.isFinite(pairAgeHours) && pairAgeHours < 1) ||
+      candleCount < 10
+    )
+  )
 
   const reverseTarget=useMemo(()=>requiredMarketCapForValue({
     investment,
@@ -634,6 +649,17 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
 
         {loading&&!chart?<div className="v4Loading">Loading real on-chain candles…</div>:null}
         {error?<div className="v4Error">{error}</div>:null}
+        {limitedHistory?(
+          <div className="chartHistoryNotice">
+            <b>LIMITED HISTORY</b>
+            <span>
+              {Number.isFinite(pairAgeHours)&&pairAgeHours<1
+                ? 'This pair is only '+Math.max(1,Math.round(pairAgeHours*60))+' minutes old. '
+                : ''}
+              RCXT currently has {candleCount} chart candles. 1m is usually the clearest view until more history builds.
+            </span>
+          </div>
+        ):null}
         {chart?<CandleChart candles={chart.candles}/>:null}
 
         {analytics?.available?(

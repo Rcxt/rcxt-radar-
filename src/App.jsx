@@ -220,6 +220,7 @@ export default function Home() {
         if (silent && previous?.address === data.scan.address) {
           maybeNotifySignalChange(previous, data.scan)
           maybeNotifyRuleCrossings(previous, data.scan)
+          maybeNotifyRiskEscalation(previous, data.scan)
         }
         return data.scan
       })
@@ -297,11 +298,11 @@ export default function Home() {
       if (permission === 'granted') {
         localStorage.setItem(NOTIFY_KEY, 'enabled')
         setNotificationsEnabled(true)
-        setNotificationStatus('Notifications enabled.')
+        setNotificationStatus('Buy detection, rug-risk, and signal alerts enabled while RCXT is active.')
         const registration = await navigator.serviceWorker?.ready
         if (registration?.showNotification) {
           registration.showNotification('RCXT Radar', {
-            body: 'Signal alerts are enabled on this device.',
+            body: 'New-buy, rug-risk, score, market-cap, and signal alerts are enabled while RCXT is active.',
             icon: '/icon.svg',
             badge: '/icon.svg',
           })
@@ -395,6 +396,45 @@ export default function Home() {
         })
       }).catch(() => {})
     }
+  }
+
+  function maybeNotifyRiskEscalation(previous, next) {
+    if (!notificationsEnabled || typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+
+    const dangerFlags = [
+      'MINT_AUTHORITY_ACTIVE',
+      'FREEZE_AUTHORITY_ACTIVE',
+      'EXTREME_OWNER_CONCENTRATION',
+      'EXTREME_ACCOUNT_CONCENTRATION',
+    ]
+    const beforeFlags = new Set(previous?.intelligence?.riskFlags || [])
+    const afterFlags = (next?.intelligence?.riskFlags || []).filter((flag) => dangerFlags.includes(flag))
+    const newDanger = afterFlags.filter((flag) => !beforeFlags.has(flag))
+    const riskRank = { LOWER: 0, MODERATE: 1, HIGH: 2, EXTREME: 3 }
+    const beforeRank = riskRank[previous?.intelligence?.risk] ?? 0
+    const afterRank = riskRank[next?.intelligence?.risk] ?? 0
+    const severeEscalation = afterRank >= 2 && afterRank > beforeRank
+
+    if (!newDanger.length && !severeEscalation) return
+
+    const rugLike = newDanger.length > 0
+    const title = rugLike
+      ? `RCXT RUG RISK: ${next.token?.symbol || 'Token'}`
+      : `RCXT risk increased: ${next.token?.symbol || 'Token'}`
+    const detail = rugLike
+      ? newDanger.slice(0, 2).map((flag) => flag.replaceAll('_', ' ').toLowerCase()).join(' · ')
+      : `${next.intelligence?.risk} risk · ${next.intelligence?.signal}`
+
+    navigator.serviceWorker?.ready.then((registration) => {
+      registration.showNotification(title, {
+        body: `Score ${next.intelligence?.score ?? '—'}/100 · ${detail}`,
+        icon: '/icon.svg',
+        badge: '/icon.svg',
+        tag: `risk-${next.address}`,
+        renotify: true,
+        data: { url: `/?token=${encodeURIComponent(next.address)}` },
+      })
+    }).catch(() => {})
   }
 
   function saveAlertRules(next = {}) {
@@ -1453,27 +1493,32 @@ export default function Home() {
                   {watchAddresses.has(scan.address) ? '★ Watching' : '☆ Watch'}
                 </button>
                 <button className="toolButton" onClick={() => navigator.clipboard?.writeText(scan.address)}>Copy CA</button>
-                <button className="toolButton" onClick={shareCurrentToken}>Share</button>
-                <button
-                  className={hiddenAddresses.has(scan.address) ? 'toolButton active' : 'toolButton dangerSoft'}
-                  onClick={() => {
-                    if (hiddenAddresses.has(scan.address)) {
-                      restoreCoin(scan.address)
-                      setNotificationStatus(`${scan.token?.symbol || 'Token'} restored to Radar.`)
-                    } else {
-                      hideCoin({ address:scan.address, symbol:scan.token?.symbol, name:scan.token?.name })
-                      setNotificationStatus(`${scan.token?.symbol || 'Token'} hidden from Radar.`)
-                    }
-                  }}
-                >
-                  {hiddenAddresses.has(scan.address) ? 'Restore Coin' : 'Hide Coin'}
-                </button>
-                {scan.pair?.url ? <a className="toolLink" href={scan.pair.url} target="_blank" rel="noreferrer">DexScreener ↗</a> : null}
-                {isPumpFunToken(scan) ? (
-                  <a className="toolLink pumpLink" href={`https://pump.fun/coin/${scan.address}`} target="_blank" rel="noreferrer">
-                    Pump.fun ↗
-                  </a>
-                ) : null}
+                <details className="scanMoreActions">
+                  <summary>More</summary>
+                  <div>
+                    <button className="toolButton" onClick={shareCurrentToken}>Share</button>
+                    <button
+                      className={hiddenAddresses.has(scan.address) ? 'toolButton active' : 'toolButton dangerSoft'}
+                      onClick={() => {
+                        if (hiddenAddresses.has(scan.address)) {
+                          restoreCoin(scan.address)
+                          setNotificationStatus(`${scan.token?.symbol || 'Token'} restored to Radar.`)
+                        } else {
+                          hideCoin({ address:scan.address, symbol:scan.token?.symbol, name:scan.token?.name })
+                          setNotificationStatus(`${scan.token?.symbol || 'Token'} hidden from Radar.`)
+                        }
+                      }}
+                    >
+                      {hiddenAddresses.has(scan.address) ? 'Restore Coin' : 'Hide Coin'}
+                    </button>
+                    {scan.pair?.url ? <a className="toolLink" href={scan.pair.url} target="_blank" rel="noreferrer">DexScreener ↗</a> : null}
+                    {isPumpFunToken(scan) ? (
+                      <a className="toolLink pumpLink" href={`https://pump.fun/coin/${scan.address}`} target="_blank" rel="noreferrer">
+                        Pump.fun ↗
+                      </a>
+                    ) : null}
+                  </div>
+                </details>
               </div>
 
               <div className="scanHero">
@@ -1895,7 +1940,7 @@ export default function Home() {
           {walletError ? <ErrorBox text={walletError} /> : null}
 
           <ChallengeTracker walletAddress={wallet} walletData={walletData} />
-          <WalletActivity walletAddress={wallet} onOpenToken={openRadarToken} />
+          <WalletActivity walletAddress={wallet} onOpenToken={openRadarToken} notificationsEnabled={notificationsEnabled} />
 
           {walletData ? (
             <>
@@ -2089,6 +2134,21 @@ function BeginnerSnapshot({ scan }) {
     EXTREME: 'Extreme risk',
   }[intel.risk] || 'Risk unknown'
 
+  const entryBlockers = []
+  if (intel.signal === 'WATCH') {
+    if (intel.ageHours != null && intel.ageHours < 0.25) entryBlockers.push('Pair is under 15 minutes old')
+    if (Number(intel.buyPercent1h ?? 50) < 46) entryBlockers.push('1h buy pressure is below 46%')
+    if (Number(intel.buyPercent1h ?? 50) > 80) entryBlockers.push('1h flow is unusually one-sided')
+    if (Number(scan?.market?.priceChange?.h1 || 0) < -5) entryBlockers.push('1h price momentum is too weak')
+    if (Number(scan?.market?.priceChange?.h6 || 0) < -8) entryBlockers.push('6h structure is too weak')
+    if (Number(scan?.market?.priceChange?.h24 || 0) > 150) entryBlockers.push('24h move is too extended')
+    if (!intel.contractVerified) entryBlockers.push('Contract checks are not fully verified')
+    if (Number(intel.setupScore || 0) < 64) entryBlockers.push('Setup score is below the entry threshold')
+    if (Number(intel.executionScore || 0) < 52) entryBlockers.push('Execution quality is below the entry threshold')
+  } else if (intel.signal === 'REDUCE' || intel.signal === 'SELL / AVOID') {
+    entryBlockers.push(...(negatives.length ? negatives : ['Current risk controls veto an entry']))
+  }
+
   return (
     <article className="beginnerSnapshot">
       <div className="beginnerSnapshotHead">
@@ -2111,6 +2171,13 @@ function BeginnerSnapshot({ scan }) {
         <div><span>LIQUIDITY</span><strong>{compactUsd(scan?.market?.liquidityUsd)}</strong><small>{intel.liquidityToCapPercent ?? '—'}% of market cap</small></div>
         <div><span>PAIR AGE</span><strong>{intel.ageHours == null ? 'Unknown' : formatAge(intel.ageHours)}</strong><small>{intel.marketState || 'Live market'}</small></div>
       </div>
+      {entryBlockers.length ? (
+        <div className="beginnerBlocker">
+          <b>{intel.signal === 'WATCH' ? 'WHY NOT A BUY YET' : 'WHY RCXT IS CAUTIOUS'}</b>
+          <span>{entryBlockers.slice(0, 3).join(' · ')}</span>
+        </div>
+      ) : null}
+
       {!concentrationAvailable ? (
         <div className="beginnerDataNotice">
           <b>Holder data incomplete</b>

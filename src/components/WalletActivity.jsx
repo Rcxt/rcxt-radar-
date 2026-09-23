@@ -36,7 +36,7 @@ function typeTone(type){
   return ''
 }
 
-export default function WalletActivity({walletAddress='',onOpenToken}){
+export default function WalletActivity({walletAddress='',onOpenToken,notificationsEnabled=false}){
   const [data,setData]=useState(null)
   const [loading,setLoading]=useState(false)
   const [error,setError]=useState('')
@@ -44,12 +44,75 @@ export default function WalletActivity({walletAddress='',onOpenToken}){
   const [autoScore,setAutoScore]=useState(false)
   const [lastRefresh,setLastRefresh]=useState(null)
   const scoringRef=useRef(new Set())
+  const seenBuyRef=useRef(new Set())
+  const initializedBuyMonitorRef=useRef(false)
+
+  function canNotify(){
+    return Boolean(
+      notificationsEnabled &&
+      typeof Notification !== 'undefined' &&
+      Notification.permission === 'granted'
+    )
+  }
+
+  async function showAlert(title,body,{tag,url}={}){
+    if(!canNotify()) return
+    try{
+      const registration=await navigator.serviceWorker?.ready
+      if(!registration?.showNotification) return
+      await registration.showNotification(title,{
+        body,
+        icon:'/icon.svg',
+        badge:'/icon.svg',
+        tag:tag||'rcxt-wallet-alert',
+        renotify:true,
+        data:{url:url||'/'},
+      })
+    }catch{}
+  }
+
+  function readStoredSet(key){
+    try{
+      const value=JSON.parse(localStorage.getItem(key)||'[]')
+      return new Set(Array.isArray(value)?value:[])
+    }catch{
+      return new Set()
+    }
+  }
+
+  function writeStoredSet(key,set,max=80){
+    try{
+      localStorage.setItem(key,JSON.stringify([...set].slice(-max)))
+    }catch{}
+  }
+
+  function rugAssessment(scan){
+    const flags=Array.isArray(scan?.intelligence?.riskFlags)?scan.intelligence.riskFlags:[]
+    const rugFlags=flags.filter(flag=>[
+      'MINT_AUTHORITY_ACTIVE',
+      'FREEZE_AUTHORITY_ACTIVE',
+      'EXTREME_OWNER_CONCENTRATION',
+      'EXTREME_ACCOUNT_CONCENTRATION',
+    ].includes(flag))
+    const severe=scan?.intelligence?.risk==='EXTREME'||scan?.intelligence?.signal==='SELL / AVOID'
+    return {rugFlags,severe}
+  }
+
+  function shortFlag(flag){
+    return String(flag||'')
+      .replaceAll('_',' ')
+      .toLowerCase()
+      .replace(/^./,char=>char.toUpperCase())
+  }
 
   const address=String(walletAddress||'').trim()
   const valid=/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)
 
   useEffect(()=>{
-    setAutoScore(localStorage.getItem('rcxt-activity-auto-score-v1')==='enabled')
+    const saved=localStorage.getItem('rcxt-activity-auto-score-v1')
+    const enabled=saved===null ? true : saved==='enabled'
+    setAutoScore(enabled)
+    if(saved===null) localStorage.setItem('rcxt-activity-auto-score-v1','enabled')
   },[])
 
   async function loadActivity({silent=false}={}){
@@ -62,6 +125,38 @@ export default function WalletActivity({walletAddress='',onOpenToken}){
       if(!response.ok||!json?.success) throw new Error(json?.error||'Wallet activity unavailable')
       setData(json)
       setLastRefresh(Date.now())
+
+      const buys=Array.isArray(json?.newBuys)?json.newBuys:[]
+      const nextSeen=new Set(buys.map(item=>item?.signature).filter(Boolean))
+      const alreadyNotified=readStoredSet('rcxt-buy-alerted-v1')
+      const now=Date.now()
+
+      const freshBuys=buys.filter(buy=>{
+        const signature=buy?.signature
+        if(!signature||alreadyNotified.has(signature)) return false
+        const time=new Date(buy?.blockTime||0).getTime()
+        const recent=time>0 && now-time<=3*60*1000
+        if(!initializedBuyMonitorRef.current) return recent
+        return !seenBuyRef.current.has(signature)
+      })
+
+      seenBuyRef.current=nextSeen
+      initializedBuyMonitorRef.current=true
+
+      for(const buy of freshBuys.slice(0,3)){
+        alreadyNotified.add(buy.signature)
+        const mint=buy?.token?.address
+        if(mint){
+          scoreMint(mint,{buy,notifyOnComplete:true,force:true})
+        }else{
+          showAlert(
+            'RCXT detected a new token buy',
+            buy?.solSpent ? number(buy.solSpent,4)+' SOL spent · token scan unavailable' : 'Token inflow detected · scan unavailable',
+            {tag:'buy-'+buy.signature}
+          )
+        }
+      }
+      writeStoredSet('rcxt-buy-alerted-v1',alreadyNotified)
     }catch(err){
       setError(err?.message||'Wallet activity unavailable')
     }finally{
@@ -75,26 +170,86 @@ export default function WalletActivity({walletAddress='',onOpenToken}){
       return
     }
     loadActivity()
-    const timer=setInterval(()=>loadActivity({silent:true}),30000)
+    const timer=setInterval(()=>loadActivity({silent:true}),15000)
     return()=>clearInterval(timer)
   },[address])
 
-  async function scoreMint(mint){
+  useEffect(()=>{
+    seenBuyRef.current=new Set()
+    initializedBuyMonitorRef.current=false
+  },[address])
+
+  async function scoreMint(mint,{buy=null,notifyOnComplete=false,force=false}={}){
     if(!mint||scoringRef.current.has(mint)) return
+    const existing=scores[mint]
+    if(!force&&existing?.updatedAt&&Date.now()-existing.updatedAt<60000) return
+
     scoringRef.current.add(mint)
-    setScores(current=>({...current,[mint]:{loading:true}}))
+    setScores(current=>({...current,[mint]:{...(current[mint]||{}),loading:true}}))
     try{
       const response=await fetch('/api/scan?address='+encodeURIComponent(mint)+'&persist=0',{cache:'no-store'})
       const json=await response.json()
       if(!response.ok||!json?.success) throw new Error(json?.error||'Score unavailable')
-      setScores(current=>({...current,[mint]:{
+
+      const next={
         loading:false,
         score:json.scan?.intelligence?.score,
         signal:json.scan?.intelligence?.signal,
         risk:json.scan?.intelligence?.risk,
-      }}))
+        riskFlags:json.scan?.intelligence?.riskFlags||[],
+        updatedAt:Date.now(),
+      }
+      setScores(current=>({...current,[mint]:next}))
+
+      const symbol=json.scan?.token?.symbol||buy?.token?.symbol||short(mint)
+      const assessment=rugAssessment(json.scan)
+      const riskFingerprint=[
+        json.scan?.intelligence?.risk,
+        json.scan?.intelligence?.signal,
+        ...assessment.rugFlags,
+      ].join('|')
+      const storedRisks=readStoredSet('rcxt-risk-alerted-v1')
+      const riskKey=mint+':'+riskFingerprint
+      const url='/?token='+encodeURIComponent(mint)
+
+      if(assessment.rugFlags.length){
+        if(!storedRisks.has(riskKey)){
+          storedRisks.add(riskKey)
+          writeStoredSet('rcxt-risk-alerted-v1',storedRisks,120)
+          await showAlert(
+            'RCXT RUG RISK: '+symbol,
+            'Score '+next.score+'/100 · '+next.signal+' · '+assessment.rugFlags.slice(0,2).map(shortFlag).join(' · '),
+            {tag:'rug-'+mint,url}
+          )
+        }
+      }else if(assessment.severe){
+        if(!storedRisks.has(riskKey)){
+          storedRisks.add(riskKey)
+          writeStoredSet('rcxt-risk-alerted-v1',storedRisks,120)
+          await showAlert(
+            'RCXT high-risk alert: '+symbol,
+            'Score '+next.score+'/100 · '+next.signal+' · '+next.risk+' risk',
+            {tag:'risk-'+mint,url}
+          )
+        }
+      }else if(notifyOnComplete){
+        const spent=buy?.solSpent?number(buy.solSpent,4)+' SOL · ':''
+        await showAlert(
+          'RCXT buy detected: '+symbol,
+          spent+'Score '+next.score+'/100 · '+next.signal+' · '+next.risk+' risk',
+          {tag:'buy-score-'+(buy?.signature||mint),url}
+        )
+      }
     }catch(err){
-      setScores(current=>({...current,[mint]:{loading:false,error:err?.message||'Score unavailable'}}))
+      setScores(current=>({...current,[mint]:{loading:false,error:err?.message||'Score unavailable',updatedAt:Date.now()}}))
+      if(notifyOnComplete){
+        const symbol=buy?.token?.symbol||short(mint)
+        await showAlert(
+          'RCXT buy detected: '+symbol,
+          'New buy detected, but the first risk scan could not complete. RCXT will retry.',
+          {tag:'buy-pending-'+(buy?.signature||mint),url:'/?token='+encodeURIComponent(mint)}
+        )
+      }
     }finally{
       scoringRef.current.delete(mint)
     }
@@ -124,7 +279,7 @@ export default function WalletActivity({walletAddress='',onOpenToken}){
         <div>
           <span>WALLET ACTIVITY INTELLIGENCE</span>
           <h3>Recent on-chain token activity</h3>
-          <p>Trade classification is conservative: token flow plus SOL/stablecoin flow must agree before RCXT calls an event a BUY or SELL.</p>
+          <p>RCXT checks this wallet about every 15 seconds while the app is active. New buys are auto-scored, and enabled notifications warn you about the buy plus serious contract/concentration risk.</p>
         </div>
         <div className="walletActivityActions">
           <button className={autoScore?'toolButton active':'toolButton'} onClick={toggleAutoScore}>
@@ -148,7 +303,7 @@ export default function WalletActivity({walletAddress='',onOpenToken}){
             <div><span>SOL from sells</span><b>{number(data.summary?.solReceivedOnSells||0,4)} SOL</b></div>
             <div><span>Unique traded mints</span><b>{data.summary?.uniqueTradedMints||0}</b></div>
             <div><span>Likely recent buys</span><b className={(data.newBuys?.length||0)>0?'good':''}>{data.newBuys?.length||0}</b></div>
-            <div><span>Refresh</span><b>30s</b><small>{lastRefresh?'updated '+new Date(lastRefresh).toLocaleTimeString():'—'}</small></div>
+            <div><span>Refresh</span><b>15s</b><small>{lastRefresh?'updated '+new Date(lastRefresh).toLocaleTimeString():'—'}</small></div>
             <button className="toolButton" onClick={scoreRecentBuys} disabled={!data.newBuys?.length}>Score recent buys</button>
           </div>
 

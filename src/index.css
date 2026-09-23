@@ -2706,3 +2706,104 @@ input,select,textarea{font-size:16px}
   .contentStack{padding-bottom:calc(118px + env(safe-area-inset-bottom))!important}
   .advancedDisclosureBody{padding:9px}
 }
+
+
+/* RCXT scanner usability + alert polish */
+.scanQuickActions{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  flex-wrap:wrap;
+}
+.scanMoreActions{position:relative}
+.scanMoreActions>summary{
+  list-style:none;
+  min-height:46px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border:1px solid #2a3b47;
+  background:#0b141b;
+  color:#93a4b3;
+  border-radius:9px;
+  padding:0 12px;
+  font-size:8px;
+  font-weight:900;
+  cursor:pointer;
+}
+.scanMoreActions>summary::-webkit-details-marker{display:none}
+.scanMoreActions[open]>summary{border-color:#36556a;color:#d8e1e8}
+.scanMoreActions>div{
+  position:absolute;
+  z-index:40;
+  top:52px;
+  right:0;
+  width:min(250px,78vw);
+  display:grid;
+  gap:7px;
+  padding:9px;
+  border:1px solid #263642;
+  background:rgba(8,13,18,.98);
+  border-radius:12px;
+  box-shadow:0 18px 55px rgba(0,0,0,.45);
+  -webkit-backdrop-filter:blur(20px);
+  backdrop-filter:blur(20px);
+}
+.scanMoreActions>div .toolButton,.scanMoreActions>div .toolLink{width:100%;justify-content:center}
+.beginnerBlocker{
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  margin-top:10px;
+  padding:10px 11px;
+  border:1px solid #3f3826;
+  background:#131108;
+  border-radius:10px;
+}
+.beginnerBlocker b{
+  flex:0 0 auto;
+  color:var(--amber);
+  font-size:8px;
+  letter-spacing:.07em;
+}
+.beginnerBlocker span{
+  color:#978a69;
+  font-size:8px;
+  line-height:1.45;
+}
+.chartHistoryNotice{
+  display:flex;
+  align-items:flex-start;
+  gap:9px;
+  margin:10px 0;
+  padding:9px 10px;
+  border:1px solid #4a4026;
+  background:#151108;
+  border-radius:9px;
+}
+.chartHistoryNotice b{
+  flex:0 0 auto;
+  color:var(--amber);
+  font-size:7px;
+  letter-spacing:.09em;
+}
+.chartHistoryNotice span{
+  color:#978b70;
+  font-size:8px;
+  line-height:1.45;
+}
+
+@media(max-width:820px){
+  .scanBar{
+    position:relative!important;
+    top:auto!important;
+    z-index:auto!important;
+  }
+}
+@media(max-width:480px){
+  .scanQuickActions{display:grid;grid-template-columns:1fr 1fr auto}
+  .scanQuickActions>.toolButton{width:100%;justify-content:center}
+  .scanMoreActions>summary{min-width:70px;width:100%}
+  .scanMoreActions>div{right:0}
+  .beginnerBlocker,.chartHistoryNotice{flex-direction:column;gap:5px}
+}

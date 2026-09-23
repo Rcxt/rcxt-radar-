@@ -6,8 +6,20 @@ import {
   WRAPPED_SOL_MINT,
 } from '../lib/wallet-activity.js'
 
-const RPC=process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com'
-const CACHE_TTL=20_000
+const DEFAULT_RPC='https://api.mainnet-beta.solana.com'
+const CACHE_TTL=8_000
+
+function rpcEndpoints(){
+  return [...new Set([
+    ...(process.env.SOLANA_RPC_URLS||'').split(','),
+    process.env.SOLANA_RPC_URL||'',
+    DEFAULT_RPC,
+  ].map(value=>String(value||'').trim()).filter(Boolean))]
+}
+
+function wait(ms){
+  return new Promise(resolve=>setTimeout(resolve,ms))
+}
 const cache=new Map()
 const addressPattern=/^[1-9A-HJ-NP-Za-km-z]{32,44}$/
 
@@ -22,14 +34,26 @@ function setCache(key,value){
 }
 
 async function rpc(body,timeout=5500){
-  const response=await fetch(RPC,{
-    method:'POST',
-    headers:{'content-type':'application/json'},
-    body:JSON.stringify(body),
-    signal:AbortSignal.timeout(timeout),
-  })
-  if(!response.ok) throw new Error('Solana RPC HTTP '+response.status)
-  return response.json()
+  let lastError
+  for(const endpoint of rpcEndpoints()){
+    for(let attempt=0;attempt<2;attempt++){
+      try{
+        const response=await fetch(endpoint,{
+          method:'POST',
+          headers:{'content-type':'application/json'},
+          body:JSON.stringify(body),
+          signal:AbortSignal.timeout(timeout),
+        })
+        if(response.ok) return response.json()
+        lastError=new Error('Solana RPC HTTP '+response.status)
+        if(response.status!==429&&response.status<500) break
+      }catch(error){
+        lastError=error
+      }
+      if(attempt===0) await wait(160)
+    }
+  }
+  throw lastError||new Error('Wallet activity RPC unavailable')
 }
 
 
@@ -57,7 +81,7 @@ export default async function handler(req,res){
   const hit=cached(key)
   if(hit){
     res.setHeader('X-RCXT-Cache','HIT')
-    res.setHeader('Cache-Control','private, max-age=10, stale-while-revalidate=20')
+    res.setHeader('Cache-Control','private, max-age=5, stale-while-revalidate=8')
     return res.status(200).json(hit)
   }
 
@@ -177,7 +201,7 @@ export default async function handler(req,res){
 
     setCache(key,result)
     res.setHeader('X-RCXT-Cache','MISS')
-    res.setHeader('Cache-Control','private, max-age=10, stale-while-revalidate=20')
+    res.setHeader('Cache-Control','private, max-age=5, stale-while-revalidate=8')
     return res.status(200).json(result)
   }catch(error){
     return res.status(502).json({success:false,error:error?.message||'Wallet activity unavailable.'})
