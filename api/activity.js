@@ -125,11 +125,41 @@ export default async function handler(req,res){
         amountReceived:event.changes.find(change=>change.mint===event.primaryMint&&change.delta>0)?.delta||null,
       }))
 
+    const countType=(type)=>enriched.filter(event=>event.type===type).length
+    const buyEvents=enriched.filter(event=>event.type==='BUY')
+    const sellEvents=enriched.filter(event=>event.type==='SELL')
+    const classified=enriched.filter(event=>['BUY','SELL','SWAP','RECEIVE','SEND'].includes(event.type))
+    const tradedMints=new Set(
+      enriched
+        .filter(event=>['BUY','SELL','SWAP'].includes(event.type))
+        .flatMap(event=>event.changes.map(change=>change.mint))
+        .filter(mint=>!STABLE_MINTS.has(mint)&&mint!==WRAPPED_SOL_MINT)
+    )
+
+    const summary={
+      buyCount:countType('BUY'),
+      sellCount:countType('SELL'),
+      swapCount:countType('SWAP'),
+      receiveCount:countType('RECEIVE'),
+      sendCount:countType('SEND'),
+      uniqueTradedMints:tradedMints.size,
+      solSpentOnBuys:Number(
+        buyEvents.reduce((sum,event)=>sum+(event.solDelta<0?Math.abs(event.solDelta):0),0).toFixed(6)
+      ),
+      solReceivedOnSells:Number(
+        sellEvents.reduce((sum,event)=>sum+(event.solDelta>0?event.solDelta:0),0).toFixed(6)
+      ),
+      classificationCoveragePercent:enriched.length
+        ? Number((classified.length/enriched.length*100).toFixed(1))
+        : 0,
+    }
+
     const result={
       success:true,
       address,
       count:enriched.length,
       generatedAt:new Date().toISOString(),
+      summary,
       events:enriched,
       newBuys,
       classificationNote:'BUY/SELL require token balance change plus SOL/stablecoin flow. Transfers remain RECEIVE/SEND when trade evidence is insufficient.',
