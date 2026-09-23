@@ -36,8 +36,8 @@ function baseSecurity(){
   }
 }
 
-test('score engine version is 6.0.0-beta.1',()=>{
-  assert.equal(SCORE_VERSION,'6.0.0-beta.1')
+test('score engine version is 6.0.0-rc.1',()=>{
+  assert.equal(SCORE_VERSION,'6.0.0-rc.1')
 })
 
 test('resolved owner concentration is preferred when available',()=>{
@@ -396,4 +396,134 @@ test('very low Jupiter organic activity trims setup and execution without a hard
   assert.ok(lowOrganic.executionScore<baseline.executionScore)
   assert.ok(lowOrganic.riskFlags.includes('LOW_ORGANIC_ACTIVITY'))
   assert.notEqual(lowOrganic.signal,'SELL / AVOID')
+})
+
+
+test('market price conflict blocks buy promotion and caps confidence',()=>{
+  const result=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    external:{
+      providerCount:3,
+      dangerRiskCount:0,
+      warningRiskCount:0,
+      hardRiskFlags:[],
+      softRiskFlags:[],
+      dataConflicts:[],
+      rugged:false,
+      evidenceScore:88,
+      authority:{corroboratedSafe:true},
+      market:{
+        priceProviderCount:3,
+        externalPriceProviderCount:2,
+        medianPriceUsd:0.001,
+        maxDeviationPercent:18,
+        priceConflict:true,
+        priceAgreement:false,
+        evidenceScore:50,
+      },
+    },
+  })
+
+  assert.ok(result.score<=68)
+  assert.ok(result.confidence<=55)
+  assert.ok(result.riskFlags.includes('PRICE_SOURCE_CONFLICT'))
+  assert.equal(result.securityEvidence.market.priceConflict,true)
+  assert.notEqual(result.signal,'BUY SETUP')
+})
+
+test('three-source price agreement improves data quality without changing safety facts',()=>{
+  const baseline=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    external:{
+      providerCount:2,
+      dangerRiskCount:0,
+      warningRiskCount:0,
+      hardRiskFlags:[],
+      softRiskFlags:[],
+      dataConflicts:[],
+      rugged:false,
+      evidenceScore:80,
+      authority:{corroboratedSafe:true},
+    },
+  })
+  const corroborated=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    external:{
+      providerCount:3,
+      dangerRiskCount:0,
+      warningRiskCount:0,
+      hardRiskFlags:[],
+      softRiskFlags:[],
+      dataConflicts:[],
+      rugged:false,
+      evidenceScore:92,
+      authority:{corroboratedSafe:true},
+      market:{
+        priceProviderCount:4,
+        externalPriceProviderCount:3,
+        medianPriceUsd:0.001,
+        maxDeviationPercent:2.5,
+        priceConflict:false,
+        priceAgreement:true,
+        evidenceScore:94,
+      },
+    },
+  })
+
+  assert.ok(corroborated.dataQualityScore>=baseline.dataQualityScore)
+  assert.equal(corroborated.securityEvidence.market.priceAgreement,true)
+})
+
+test('Jupiter suspicious flag is cautionary but not mislabeled as a rug',()=>{
+  const result=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    external:{
+      providerCount:3,
+      dangerRiskCount:0,
+      warningRiskCount:1,
+      hardRiskFlags:['JUPITER_SUSPICIOUS'],
+      softRiskFlags:[],
+      dataConflicts:[],
+      rugged:false,
+      evidenceScore:70,
+      jupiterSuspicious:true,
+      authority:{corroboratedSafe:true},
+    },
+  })
+
+  assert.ok(result.riskFlags.includes('JUPITER_SUSPICIOUS'))
+  assert.equal(result.securityEvidence.rugged,false)
+  assert.ok(result.score<=52)
+})
+
+test('transfer-fee evidence reduces execution quality',()=>{
+  const baseline=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    external:{
+      providerCount:2,
+      dangerRiskCount:0,
+      warningRiskCount:0,
+      hardRiskFlags:[],
+      softRiskFlags:[],
+      dataConflicts:[],
+      rugged:false,
+      evidenceScore:80,
+    },
+  })
+  const taxed=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    external:{
+      providerCount:3,
+      dangerRiskCount:0,
+      warningRiskCount:1,
+      hardRiskFlags:[],
+      softRiskFlags:['BIRDEYE_TRANSFER_FEE'],
+      dataConflicts:[],
+      rugged:false,
+      evidenceScore:80,
+    },
+  })
+
+  assert.ok(taxed.executionScore<baseline.executionScore)
+  assert.ok(taxed.riskFlags.includes('TRANSFER_FEE_ENABLED'))
 })
