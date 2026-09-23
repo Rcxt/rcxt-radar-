@@ -12,7 +12,7 @@
   "calibrationEngine": "2.0.0",
   "challengeEngine": "1.1.0",
   "walletActivityEngine": "1.2.0",
-  "backgroundMonitorEngine": "1.1.0",
+  "backgroundMonitorEngine": "1.2.0",
   "marketCapMapEngine": "1.0.0",
   "socialEngine": "5.0.0-x",
   "socialSources": [
@@ -24,6 +24,6 @@
   "release": "v5.1-clarity-alerts-rc1",
   "releasedAt": null,
   "productionUrl": "https://rcxt-radar.vercel.app",
-  "note": "V5.1 adds X-only social intelligence, score engine 5.0 provenance/entry gates, simplified scanner delivery, configurable alert presets, server-synced notification preferences, and anti-spam cooldowns.",
-  "notificationEngine": "2.0.0"
+  "note": "V5.1 adds X-only social intelligence, score engine 5.0 provenance/entry gates, simplified scanner delivery, configurable alert presets, server-synced preferences, duplicate-path suppression, and per-token notification cooldowns.",
+  "notificationEngine": "2.1.0"
 }

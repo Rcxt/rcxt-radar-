@@ -46,6 +46,13 @@ export default function WalletActivity({walletAddress='',onOpenToken,notificatio
   const seenBuyRef=useRef(new Set())
   const initializedBuyMonitorRef=useRef(false)
   const prefs=normalizeNotificationPrefs(notificationPrefs||serverMonitor?.preferences||{})
+  const prefsRef=useRef(prefs)
+  const serverMonitorEnabledRef=useRef(Boolean(serverMonitor?.enabled))
+
+  useEffect(()=>{
+    prefsRef.current=prefs
+    serverMonitorEnabledRef.current=Boolean(serverMonitor?.enabled)
+  },[prefs,serverMonitor?.enabled])
 
   function canNotify(){
     return Boolean(
@@ -56,7 +63,7 @@ export default function WalletActivity({walletAddress='',onOpenToken,notificatio
   }
 
   async function showAlert(title,body,{tag,url,critical=false}={}){
-    if(!canNotify()||serverMonitor?.enabled) return
+    if(!canNotify()||serverMonitorEnabledRef.current) return
     try{
       const registration=await navigator.serviceWorker?.ready
       if(!registration?.showNotification) return
@@ -148,8 +155,8 @@ export default function WalletActivity({walletAddress='',onOpenToken,notificatio
         alreadyNotified.add(buy.signature)
         const mint=buy?.token?.address
         if(mint){
-          scoreMint(mint,{buy,notifyOnComplete:!serverMonitor?.enabled,force:true})
-        }else if(prefs.newBuy&&!serverMonitor?.enabled){
+          scoreMint(mint,{buy,notifyOnComplete:!serverMonitorEnabledRef.current,force:true})
+        }else if(prefsRef.current.newBuy&&!serverMonitorEnabledRef.current){
           showAlert(
             'RCXT detected a new token buy',
             buy?.solSpent ? number(buy.solSpent,4)+' SOL spent · token scan unavailable' : 'Token inflow detected · scan unavailable',
@@ -214,8 +221,9 @@ export default function WalletActivity({walletAddress='',onOpenToken,notificatio
       const riskKey=mint+':'+riskFingerprint
       const url='/?token='+encodeURIComponent(mint)
 
+      const activePrefs=prefsRef.current
       const hotButRisky=Number(next.opportunityScore||0)>=60&&['HIGH','EXTREME'].includes(next.risk)
-      if(assessment.rugFlags.length&&prefs.rugRisk){
+      if(assessment.rugFlags.length&&activePrefs.rugRisk){
         if(!storedRisks.has(riskKey)){
           storedRisks.add(riskKey)
           writeStoredSet('rcxt-risk-alerted-v1',storedRisks,120)
@@ -225,13 +233,13 @@ export default function WalletActivity({walletAddress='',onOpenToken,notificatio
             {tag:'rug-'+mint,url,critical:true}
           )
         }
-      }else if(hotButRisky&&prefs.hotMomentumBuy){
+      }else if(hotButRisky&&activePrefs.hotMomentumBuy){
         await showAlert(
           'RCXT HOT / HIGH RISK: '+symbol,
           'Opportunity '+next.opportunityScore+'/100 · RCXT '+next.score+'/100 · '+next.risk+' risk',
           {tag:'hot-'+mint,url}
         )
-      }else if(assessment.severe&&prefs.highRiskBuy){
+      }else if(assessment.severe&&activePrefs.highRiskBuy){
         if(!storedRisks.has(riskKey)){
           storedRisks.add(riskKey)
           writeStoredSet('rcxt-risk-alerted-v1',storedRisks,120)
@@ -241,7 +249,7 @@ export default function WalletActivity({walletAddress='',onOpenToken,notificatio
             {tag:'risk-'+mint,url}
           )
         }
-      }else if(notifyOnComplete&&prefs.newBuy){
+      }else if(notifyOnComplete&&activePrefs.newBuy){
         const spent=buy?.solSpent?number(buy.solSpent,4)+' SOL · ':''
         await showAlert(
           'RCXT buy detected: '+symbol,
@@ -251,7 +259,7 @@ export default function WalletActivity({walletAddress='',onOpenToken,notificatio
       }
     }catch(err){
       setScores(current=>({...current,[mint]:{loading:false,error:err?.message||'Score unavailable',updatedAt:Date.now()}}))
-      if(notifyOnComplete&&prefs.newBuy&&!serverMonitor?.enabled){
+      if(notifyOnComplete&&prefsRef.current.newBuy&&!serverMonitorEnabledRef.current){
         const symbol=buy?.token?.symbol||short(mint)
         await showAlert(
           'RCXT buy detected: '+symbol,

@@ -79,7 +79,6 @@ export default function Home() {
   const [health, setHealth] = useState(null)
   const [alertScore, setAlertScore] = useState(75)
   const [alertMarketCap, setAlertMarketCap] = useState('')
-  const [alertSignalChanges, setAlertSignalChanges] = useState(true)
   const [tokenNote, setTokenNote] = useState('')
   const [scoreHistory, setScoreHistory] = useState([])
   const [calibration, setCalibration] = useState({ totalSamples: 0, rows: [], buckets: [], components: [] })
@@ -139,7 +138,14 @@ export default function Home() {
       const savedRules = JSON.parse(localStorage.getItem(RULES_KEY) || '{}')
       if (Number.isFinite(Number(savedRules.score))) setAlertScore(Number(savedRules.score))
       if (savedRules.marketCap != null) setAlertMarketCap(String(savedRules.marketCap))
-      if (typeof savedRules.signalChanges === 'boolean') setAlertSignalChanges(savedRules.signalChanges)
+      if (
+        !localStorage.getItem(NOTIFY_PREFS_KEY) &&
+        typeof savedRules.signalChanges === 'boolean'
+      ) {
+        const migratedPrefs=normalizeNotificationPrefs({...DEFAULT_NOTIFICATION_PREFS,signalChanges:savedRules.signalChanges})
+        setNotificationPrefs(migratedPrefs)
+        try{localStorage.setItem(NOTIFY_PREFS_KEY,JSON.stringify(migratedPrefs))}catch{}
+      }
     } catch {
       // Ignore malformed local history.
     }
@@ -302,7 +308,7 @@ export default function Home() {
     } finally {
       if (!silent) setScanLoading(false)
     }
-  }, [tokenAddress, notificationsEnabled, alertScore, alertMarketCap, alertSignalChanges, notificationPrefs])
+  }, [tokenAddress, notificationsEnabled, alertScore, alertMarketCap, notificationPrefs])
 
   useEffect(() => {
     const deepLinkedToken = new URLSearchParams(window.location.search).get('token')
@@ -668,7 +674,7 @@ export default function Home() {
     const rules = {
       score: next.score ?? alertScore,
       marketCap: next.marketCap ?? alertMarketCap,
-      signalChanges: next.signalChanges ?? alertSignalChanges,
+      signalChanges: next.signalChanges ?? notificationPrefs.signalChanges,
     }
     localStorage.setItem(RULES_KEY, JSON.stringify(rules))
   }
@@ -1781,7 +1787,7 @@ export default function Home() {
                   <span>RCXT SIGNAL</span>
                   <SignalBadge signal={scan.intelligence.signal} large />
                   <small>
-                    {scan.intelligence.confidence}% confidence · {scan.intelligence.risk} risk
+                    {scan.intelligence.confidence}% data confidence · {scan.intelligence.risk} risk
                   </small>
                   <em>{scan.intelligence.preliminary ? 'Preliminary market score' : 'Full contract-verified scan'}</em>
                 </div>
@@ -1974,8 +1980,13 @@ export default function Home() {
                     ) : null}
                     <SecurityRow
                       label="Liquidity / cap"
-                      good={scan.intelligence.liquidityToCapPercent >= 8}
-                      value={`${scan.intelligence.liquidityToCapPercent}%`}
+                      good={scan.intelligence.liquidityToCapPercent != null && scan.intelligence.liquidityToCapPercent >= 8}
+                      unknown={scan.intelligence.liquidityToCapPercent == null}
+                      value={
+                        scan.intelligence.liquidityToCapPercent == null
+                          ? 'Unavailable'
+                          : `${scan.intelligence.liquidityToCapPercent}%`
+                      }
                     />
                     <SecurityRow
                       label="Pair age"
@@ -2058,7 +2069,6 @@ export default function Home() {
                         type="checkbox"
                         checked={notificationPrefs.signalChanges}
                         onChange={(event) => {
-                          setAlertSignalChanges(event.target.checked)
                           saveAlertRules({ signalChanges: event.target.checked })
                           saveNotificationPreferences({...notificationPrefs,signalChanges:event.target.checked})
                         }}
