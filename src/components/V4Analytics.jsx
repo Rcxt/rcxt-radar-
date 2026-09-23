@@ -312,6 +312,9 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
     if(tapeFlags.includes('MICROTRADE_NOISE')){strength-=1;warnings.push('Recent activity is dominated by micro-trade noise')}
     if(tapeFlags.includes('REPEAT_WALLET_CHURN')){strength-=1;warnings.push('Repeated wallets dominate recent transaction activity')}
     if(tapeFlags.includes('WALLET_VOLUME_CONCENTRATION')){strength-=1;warnings.push('One wallet controls a large share of recent USD volume')}
+    if(tapeFlags.includes('MULTI_WHALE_ACCUMULATION')){strength+=1;positives.push('Multiple large sampled wallets are net accumulating')}
+    if(tapeFlags.includes('MULTI_WHALE_DISTRIBUTION')){strength-=2;warnings.push('Multiple large sampled wallets are net distributing')}
+    if(tapeFlags.includes('WHALE_FLOW_CONCENTRATED')){strength-=1;warnings.push('Whale-sized flow is concentrated in very few wallets')}
     if(Number(scan?.market?.liquidityUsd||0)<5000){strength-=2;warnings.push('Liquidity is very thin')}
     if(scan?.intelligence?.risk==='EXTREME'){strength-=2;warnings.push('RCXT structural risk is extreme')}
     if(rugGuard?.critical>=2){strength-=2;warnings.push('Rug / Manipulation Guard has multiple critical flags')}
