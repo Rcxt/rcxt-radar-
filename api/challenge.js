@@ -52,6 +52,36 @@ export default async function handler(req,res){
       ? ((latest.totalValueUsd/highWater)-1)*100
       : 0
 
+    let rollingPeak=0
+    let maxDrawdown=0
+    for(const value of values){
+      rollingPeak=Math.max(rollingPeak,value)
+      if(rollingPeak>0) maxDrawdown=Math.min(maxDrawdown,((value/rollingPeak)-1)*100)
+    }
+
+    const changeSinceStart=first&&latest&&first.totalValueUsd>0
+      ? ((latest.totalValueUsd/first.totalValueUsd)-1)*100
+      : null
+
+    const cutoff24h=Date.now()-24*60*60*1000
+    const row24h=[...rows].reverse().find((row)=>new Date(row.createdAt).getTime()<=cutoff24h)
+    const change24h=row24h&&latest&&row24h.totalValueUsd>0
+      ? ((latest.totalValueUsd/row24h.totalValueUsd)-1)*100
+      : null
+
+    const returns=[]
+    for(let i=1;i<values.length;i+=1){
+      if(values[i-1]>0) returns.push(((values[i]/values[i-1])-1)*100)
+    }
+    const meanReturn=returns.length?returns.reduce((sum,value)=>sum+value,0)/returns.length:0
+    const variance=returns.length>1
+      ? returns.reduce((sum,value)=>sum+(value-meanReturn)**2,0)/(returns.length-1)
+      : 0
+    const equityVolatility=Math.sqrt(Math.max(0,variance))
+    const recoveryPercent=latest&&latest.totalValueUsd>0&&highWater>latest.totalValueUsd
+      ? ((highWater/latest.totalValueUsd)-1)*100
+      : 0
+
     return res.status(200).json({
       success:true,
       address,
@@ -59,6 +89,11 @@ export default async function handler(req,res){
       highWater,
       lowWater,
       drawdown:Number(drawdown.toFixed(2)),
+      maxDrawdown:Number(maxDrawdown.toFixed(2)),
+      changeSinceStart:changeSinceStart==null?null:Number(changeSinceStart.toFixed(2)),
+      change24h:change24h==null?null:Number(change24h.toFixed(2)),
+      equityVolatility:Number(equityVolatility.toFixed(2)),
+      recoveryPercent:Number(recoveryPercent.toFixed(2)),
       first,
       latest,
       rows,
