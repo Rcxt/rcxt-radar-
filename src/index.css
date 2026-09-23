@@ -3650,3 +3650,7 @@ body { overflow: visible; overscroll-behavior-y: auto; }
 .sectionCrash>span{display:block;color:var(--amber);font-size:7px;font-weight:900;letter-spacing:.1em}
 .sectionCrash>strong{display:block;margin-top:5px;font-size:12px}
 .sectionCrash>p{margin:6px 0 10px;color:#8e836b;font-size:8px;line-height:1.45}
+
+.fatalDetails{margin-top:12px;border-top:1px solid #1b2933;padding-top:10px}
+.fatalDetails summary{cursor:pointer;color:#617587;font-size:8px}
+.fatalDetails code{display:block;margin-top:8px;color:#8d9bab;font-size:8px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
