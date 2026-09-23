@@ -4,6 +4,15 @@ import { getMintSecurity, looksLikeSolanaAddress } from '../lib/solana.js'
 import { logTokenScan } from '../lib/supabase-log.js'
 import { rateLimit, applyRateHeaders } from '../lib/rate-limit.js'
 
+function getQuery(req, name, fallback = '') {
+  try {
+    const url = new URL(req.url || '/', 'https://rcxt.local')
+    return url.searchParams.get(name) ?? fallback
+  } catch {
+    return fallback
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ success:false, error:'Method not allowed' })
 
@@ -11,10 +20,10 @@ export default async function handler(req, res) {
   applyRateHeaders(res, limited, 90)
   if (!limited.allowed) return res.status(429).json({ success:false, error:'Too many scan requests. Try again shortly.' })
 
-  const address=String(req.query?.address || '').trim()
+  const address=String(getQuery(req, 'address')).trim()
   if (!looksLikeSolanaAddress(address)) return res.status(400).json({ success:false, error:'Enter a valid Solana token address.' })
 
-  const shouldPersist = String(req.query?.persist ?? '1') !== '0'
+  const shouldPersist = String(getQuery(req, 'persist', '1')) !== '0'
 
   try {
     const [pair,mintSecurity]=await Promise.all([getBestPair(address),getMintSecurity(address)])
