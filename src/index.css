@@ -2423,3 +2423,16 @@ input,select,textarea{font-size:16px}
   .snapshotDeltaGrid{grid-template-columns:1fr 1fr}
   .snapshotDeltaGrid>div:last-child{grid-column:1/-1}
 }
+
+
+/* V4 data provenance */
+.provenancePanel{margin-top:10px}
+.provenanceGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.provenanceGrid>div{border:1px solid #1d2b35;background:#091016;border-radius:10px;padding:11px}
+.provenanceGrid b{display:inline-flex;border:1px solid #2c3c48;border-radius:999px;padding:4px 6px;font-size:6px;letter-spacing:.1em;color:#7d8fa0}
+.provenanceGrid>div:nth-child(1) b{color:var(--green);border-color:#315444}
+.provenanceGrid>div:nth-child(2) b{color:#76a9d9;border-color:#31506c}
+.provenanceGrid>div:nth-child(3) b{color:var(--amber);border-color:#594b2d}
+.provenanceGrid strong{display:block;font-size:10px;margin-top:8px}
+.provenanceGrid p{font-size:8px;line-height:1.5;color:#68798a;margin:5px 0 0}
+@media(max-width:650px){.provenanceGrid{grid-template-columns:1fr}}
