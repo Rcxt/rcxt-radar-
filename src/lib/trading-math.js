@@ -323,6 +323,9 @@ export function buildEntryQuality({scan,analytics,tape}){
     if(flags.includes('MICROTRADE_NOISE')){score-=6;warnings.push('Trade activity contains heavy micro-trade noise')}
     if(flags.includes('REPEAT_WALLET_CHURN')){score-=7;warnings.push('Repeated-wallet churn reduces flow quality')}
     if(flags.includes('WALLET_VOLUME_CONCENTRATION')){score-=7;warnings.push('Recent USD volume is concentrated in one wallet')}
+    if(flags.includes('MULTI_WHALE_ACCUMULATION')){score+=6;reasons.push('Multiple large sampled wallets show net accumulation')}
+    if(flags.includes('MULTI_WHALE_DISTRIBUTION')){score-=12;warnings.push('Multiple large sampled wallets show net distribution')}
+    if(flags.includes('WHALE_FLOW_CONCENTRATED')){score-=8;warnings.push('Whale-sized flow is concentrated in too few wallets')}
   }
 
   const risk=String(scan?.intelligence?.risk||'')
@@ -462,6 +465,8 @@ export function buildRugRiskChecklist({scan,tape}){
       'WALLET_ACTIVITY_CONCENTRATION',
       'WALLET_VOLUME_CONCENTRATION',
       'TRADE_SIZE_SKEW',
+      'WHALE_FLOW_CONCENTRATED',
+      'MULTI_WHALE_DISTRIBUTION',
     ].filter(flag=>tapeFlags.includes(flag))
 
     add(
