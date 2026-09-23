@@ -63,8 +63,28 @@ export default async function handler(req,res){
       dataQualityReturnCorrelation:row.data_quality_return_corr==null?null:Number(row.data_quality_return_corr),
     }))
 
+    const rawRows=(data.rawSummary||[]).map(row=>({
+      scoreVersion:row.score_version,
+      signal:row.signal,
+      horizon:row.horizon,
+      samples:Number(row.samples||0),
+      avgReturnPct:row.avg_return_pct==null?null:Number(row.avg_return_pct),
+      directionalHitRate:row.directional_hit_rate==null?null:Number(row.directional_hit_rate),
+      avgDelayMinutes:row.avg_delay_minutes==null?null:Number(row.avg_delay_minutes),
+    }))
+
     const totalSamples=rows.reduce((sum,row)=>sum+row.samples,0)
-    return res.status(200).json({success:true,totalSamples,rows,buckets,components})
+    const rawTotalSamples=rawRows.reduce((sum,row)=>sum+row.samples,0)
+    return res.status(200).json({
+      success:true,
+      samplePolicy:data.samplePolicy||'clean-complete-components-with-timing-window',
+      totalSamples,
+      rawTotalSamples,
+      rows,
+      rawRows,
+      buckets,
+      components
+    })
   }catch(error){
     return res.status(502).json({success:false,error:error?.message||'Calibration service unavailable.'})
   }
