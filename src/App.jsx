@@ -1300,7 +1300,7 @@ export default function Home() {
 
                 <div className="commandComingSoon xReady">
                   <div>
-                    <span>V5 PREVIEW</span>
+                    <span>V6 LIVE</span>
                     <strong>X Intelligence</strong>
                     <small>Name · ticker · contract search + AI feed report</small>
                   </div>
@@ -1309,7 +1309,7 @@ export default function Home() {
 
                 <div className="commandFooter">
                   <button onClick={resetRadarWorkspace}>Reset radar workspace</button>
-                  <span>v5.1 RC · clarity + alerts + X</span>
+                  <span>v6.0 · multi-source intelligence + Bubble Map</span>
                 </div>
               </div>
             ) : null}
@@ -1813,6 +1813,17 @@ export default function Home() {
                   {watchAddresses.has(scan.address) ? '★ Watching' : '☆ Watch'}
                 </button>
                 <button className="toolButton" onClick={() => navigator.clipboard?.writeText(scan.address)}>Copy CA</button>
+                <button
+                  className="toolButton bubbleMapButton"
+                  onClick={() => window.open(
+                    `https://v2.bubblemaps.io/map?address=${encodeURIComponent(scan.address)}&chain=solana&partnerId=regular`,
+                    '_blank',
+                    'noopener,noreferrer',
+                  )}
+                  title="Open this token in Bubblemaps V2"
+                >
+                  Bubble Map ↗
+                </button>
                 <details className="scanMoreActions">
                   <summary>More</summary>
                   <div>
@@ -1983,6 +1994,129 @@ export default function Home() {
                             : 'Partial'
                       }
                     />
+                    {scan.intelligence?.securityEvidence?.token2022?.detected ? (
+                      <>
+                        <SecurityRow
+                          label="Token-2022 controls"
+                          good={
+                            !scan.intelligence.securityEvidence.token2022.permanentDelegateActive &&
+                            !scan.intelligence.securityEvidence.token2022.defaultAccountFrozen &&
+                            !scan.intelligence.securityEvidence.token2022.nonTransferable &&
+                            !scan.intelligence.securityEvidence.token2022.paused
+                          }
+                          value={
+                            scan.intelligence.securityEvidence.token2022.nonTransferable
+                              ? 'Non-transferable'
+                              : scan.intelligence.securityEvidence.token2022.paused
+                                ? 'Paused'
+                                : scan.intelligence.securityEvidence.token2022.permanentDelegateActive
+                                  ? 'Permanent delegate'
+                                  : scan.intelligence.securityEvidence.token2022.defaultAccountFrozen
+                                    ? 'Defaults frozen'
+                                    : scan.intelligence.securityEvidence.token2022.transferHookActive
+                                      ? 'Transfer hook'
+                                      : 'No hard extension veto'
+                          }
+                        />
+                        {scan.intelligence.securityEvidence.token2022.transferFeeEnabled ? (
+                          <SecurityRow
+                            label="Transfer fee"
+                            good={Number(scan.intelligence.securityEvidence.token2022.transferFeeBasisPoints || 0) < 500}
+                            unknown={scan.intelligence.securityEvidence.token2022.transferFeeBasisPoints == null}
+                            value={
+                              scan.intelligence.securityEvidence.token2022.transferFeeBasisPoints == null
+                                ? 'Enabled'
+                                : `${(Number(scan.intelligence.securityEvidence.token2022.transferFeeBasisPoints) / 100).toFixed(2)}%`
+                            }
+                          />
+                        ) : null}
+                      </>
+                    ) : null}
+                    <SecurityRow
+                      label="Security sources"
+                      good={Number(scan.intelligence?.securityEvidence?.providerCount || 0) >= 2}
+                      unknown={!scan.intelligence?.securityEvidence?.providerCount}
+                      value={
+                        scan.intelligence?.securityEvidence?.providerCount
+                          ? `${scan.intelligence.securityEvidence.providerCount} source${scan.intelligence.securityEvidence.providerCount === 1 ? '' : 's'}`
+                          : 'Unavailable'
+                      }
+                    />
+                    <SecurityRow
+                      label="Security consensus"
+                      good={
+                        Number(scan.intelligence?.securityEvidence?.providerCount || 0) >= 2 &&
+                        !(scan.intelligence?.securityEvidence?.conflicts || []).length
+                      }
+                      unknown={Number(scan.intelligence?.securityEvidence?.providerCount || 0) < 2}
+                      value={
+                        (scan.intelligence?.securityEvidence?.conflicts || []).length
+                          ? `${scan.intelligence.securityEvidence.conflicts.length} conflict${scan.intelligence.securityEvidence.conflicts.length === 1 ? '' : 's'}`
+                          : Number(scan.intelligence?.securityEvidence?.providerCount || 0) >= 2
+                            ? 'Sources agree'
+                            : 'Needs corroboration'
+                      }
+                    />
+                    <SecurityRow
+                      label="Evidence quality"
+                      good={Number(scan.intelligence?.securityEvidence?.evidenceScore || 0) >= 70}
+                      unknown={scan.intelligence?.securityEvidence?.evidenceScore == null}
+                      value={
+                        scan.intelligence?.securityEvidence?.evidenceScore == null
+                          ? 'Unavailable'
+                          : `${Math.round(Number(scan.intelligence.securityEvidence.evidenceScore))}/100`
+                      }
+                    />
+                    <SecurityRow
+                      label="Market sources"
+                      good={Number(scan.intelligence?.securityEvidence?.market?.priceProviderCount || 0) >= 3}
+                      unknown={!scan.intelligence?.securityEvidence?.market?.priceProviderCount}
+                      value={
+                        scan.intelligence?.securityEvidence?.market?.priceProviderCount
+                          ? `${scan.intelligence.securityEvidence.market.priceProviderCount} price source${scan.intelligence.securityEvidence.market.priceProviderCount === 1 ? '' : 's'}`
+                          : 'Dex only'
+                      }
+                    />
+                    <SecurityRow
+                      label="Price consensus"
+                      good={
+                        Number(scan.intelligence?.securityEvidence?.market?.priceProviderCount || 0) >= 2 &&
+                        !scan.intelligence?.securityEvidence?.market?.priceConflict
+                      }
+                      unknown={Number(scan.intelligence?.securityEvidence?.market?.priceProviderCount || 0) < 2}
+                      value={
+                        scan.intelligence?.securityEvidence?.market?.priceConflict
+                          ? `${Number(scan.intelligence?.securityEvidence?.market?.maxDeviationPercent || 0).toFixed(1)}% source spread`
+                          : scan.intelligence?.securityEvidence?.market?.priceAgreement
+                            ? 'Strong agreement'
+                            : Number(scan.intelligence?.securityEvidence?.market?.priceProviderCount || 0) >= 2
+                              ? 'Within tolerance'
+                              : 'Needs corroboration'
+                      }
+                    />
+                    {scan.security?.external?.rugcheck?.available ? (
+                      <SecurityRow
+                        label="RugCheck"
+                        good={
+                          !scan.intelligence?.securityEvidence?.rugged &&
+                          Number(scan.intelligence?.securityEvidence?.dangerRiskCount || 0) === 0
+                        }
+                        value={
+                          scan.intelligence?.securityEvidence?.rugged
+                            ? 'Rugged flag'
+                            : Number(scan.intelligence?.securityEvidence?.dangerRiskCount || 0) > 0
+                              ? `${scan.intelligence.securityEvidence.dangerRiskCount} danger finding${scan.intelligence.securityEvidence.dangerRiskCount === 1 ? '' : 's'}`
+                              : 'No danger flags'
+                        }
+                      />
+                    ) : null}
+                    {scan.intelligence?.securityEvidence?.jupiterOrganicScore != null ? (
+                      <SecurityRow
+                        label="Jupiter organic"
+                        good={Number(scan.intelligence.securityEvidence.jupiterOrganicScore) >= 55}
+                        value={`${Math.round(Number(scan.intelligence.securityEvidence.jupiterOrganicScore))}/100`}
+                      />
+                    ) : null}
                     <SecurityRow
                       label="Concentration source"
                       good={scan.intelligence?.concentration?.available}
@@ -1992,31 +2126,41 @@ export default function Home() {
                           ? 'Resolved owners'
                           : scan.intelligence?.concentration?.method === 'TOKEN_ACCOUNTS'
                             ? 'Token accounts'
-                            : 'Unavailable'
+                            : scan.intelligence?.concentration?.method === 'RUGCHECK_TOP_HOLDERS'
+                              ? 'RugCheck holders'
+                              : scan.intelligence?.concentration?.method === 'GOPLUS_TOP_HOLDERS'
+                                ? 'GoPlus holders'
+                                : scan.intelligence?.concentration?.method === 'BIRDEYE_TOP_HOLDERS'
+                                  ? 'Birdeye holders'
+                                  : 'Unavailable'
                       }
                     />
                     <SecurityRow
                       label={
                         scan.intelligence?.concentration?.method === 'RESOLVED_TOKEN_ACCOUNT_OWNERS'
                           ? 'Largest resolved owner'
-                          : 'Largest token account'
+                          : ['RUGCHECK_TOP_HOLDERS','GOPLUS_TOP_HOLDERS','BIRDEYE_TOP_HOLDERS'].includes(scan.intelligence?.concentration?.method)
+                            ? 'Largest external holder'
+                            : 'Largest token account'
                       }
                       good={
                         scan.intelligence?.concentration?.available &&
                         Number(scan.intelligence?.concentration?.top1Percent || 100) < 45
                       }
-                      unknown={!scan.intelligence?.concentration?.available}
+                      unknown={!scan.intelligence?.concentration?.available || scan.intelligence?.concentration?.top1Percent == null}
                       value={
-                        scan.intelligence?.concentration?.available
-                          ? `${Number(scan.intelligence.concentration.top1Percent).toFixed(1)}%`
-                          : 'Unavailable'
+                        scan.intelligence?.concentration?.top1Percent == null
+                          ? 'Unavailable'
+                          : `${Number(scan.intelligence.concentration.top1Percent).toFixed(1)}%`
                       }
                     />
                     <SecurityRow
                       label={
                         scan.intelligence?.concentration?.method === 'RESOLVED_TOKEN_ACCOUNT_OWNERS'
                           ? 'Top 10 resolved owners'
-                          : 'Top 10 token accounts'
+                          : ['RUGCHECK_TOP_HOLDERS','GOPLUS_TOP_HOLDERS','BIRDEYE_TOP_HOLDERS'].includes(scan.intelligence?.concentration?.method)
+                            ? 'Top 10 external holders'
+                            : 'Top 10 token accounts'
                       }
                       good={
                         scan.intelligence?.concentration?.available &&
@@ -2382,8 +2526,8 @@ export default function Home() {
 
       <footer className="footer">
         <div>
-          <b>RCXT RADAR · v5.1.0 RC</b>
-          <span>Score engine v5.0.0 · Solana · DexScreener · Supabase · Vercel</span>
+          <b>RCXT RADAR · v6.0.0</b>
+          <span>Score engine v6.0.0 · Solana · DexScreener · GeckoTerminal · RugCheck · GoPlus</span>
         </div>
         <p>
           Signals are software-generated market intelligence, not guarantees or personalized financial advice.

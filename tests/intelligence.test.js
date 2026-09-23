@@ -36,8 +36,8 @@ function baseSecurity(){
   }
 }
 
-test('score engine version is 5.0.0',()=>{
-  assert.equal(SCORE_VERSION,'5.0.0')
+test('score engine version is 6.0.0',()=>{
+  assert.equal(SCORE_VERSION,'6.0.0')
 })
 
 test('resolved owner concentration is preferred when available',()=>{
@@ -294,4 +294,291 @@ test('WATCH exposes the final score gate when structure passes but risk-adjusted
   }else{
     assert.ok(['WATCH','LEAN BUY','BUY SETUP'].includes(result.signal))
   }
+})
+
+
+test('rugged external evidence vetoes an otherwise healthy setup',()=>{
+  const result=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    external:{
+      providerCount:1,
+      dangerRiskCount:1,
+      hardRiskFlags:['RUGCHECK_RUGGED'],
+      dataConflicts:[],
+      rugged:true,
+      evidenceScore:20,
+    },
+  })
+
+  assert.ok(result.score<=12)
+  assert.equal(result.signal,'SELL / AVOID')
+  assert.equal(result.risk,'EXTREME')
+  assert.ok(result.riskFlags.includes('EXTERNAL_RUGGED'))
+  assert.equal(result.securityEvidence.rugged,true)
+})
+
+test('authority disagreement lowers confidence and prevents contract verification',()=>{
+  const result=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    external:{
+      providerCount:2,
+      dangerRiskCount:0,
+      hardRiskFlags:[],
+      dataConflicts:['MINT_AUTHORITY_CONFLICT'],
+      rugged:false,
+      evidenceScore:50,
+      authority:{corroboratedSafe:false},
+    },
+  })
+
+  assert.equal(result.contractVerified,false)
+  assert.ok(result.confidence<=58)
+  assert.ok(result.riskFlags.includes('SECURITY_DATA_CONFLICT'))
+  assert.ok(result.score<=55)
+  assert.deepEqual(result.securityEvidence.conflicts,['MINT_AUTHORITY_CONFLICT'])
+})
+
+test('external holder concentration is used only when onchain concentration is unavailable',()=>{
+  const result=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    concentrationAvailable:false,
+    ownerConcentrationAvailable:false,
+    top1Percent:null,
+    top5Percent:null,
+    top10Percent:null,
+    externalConcentrationAvailable:true,
+    externalConcentrationSource:'RUGCHECK_TOP_HOLDERS',
+    externalTop1Percent:18,
+    externalTop5Percent:37,
+    externalTop10Percent:59,
+    external:{
+      providerCount:1,
+      dangerRiskCount:0,
+      hardRiskFlags:[],
+      dataConflicts:[],
+      rugged:false,
+      evidenceScore:62,
+    },
+  })
+
+  assert.equal(result.concentration.available,true)
+  assert.equal(result.concentration.method,'RUGCHECK_TOP_HOLDERS')
+  assert.equal(result.concentration.top1Percent,18)
+  assert.equal(result.concentration.top10Percent,59)
+})
+
+test('very low Jupiter organic activity trims setup and execution without a hard structural veto',()=>{
+  const baseline=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    external:{
+      providerCount:1,
+      dangerRiskCount:0,
+      hardRiskFlags:[],
+      dataConflicts:[],
+      rugged:false,
+      evidenceScore:65,
+      jupiterOrganicScore:80,
+    },
+  })
+  const lowOrganic=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    external:{
+      providerCount:1,
+      dangerRiskCount:0,
+      hardRiskFlags:[],
+      dataConflicts:[],
+      rugged:false,
+      evidenceScore:65,
+      jupiterOrganicScore:8,
+    },
+  })
+
+  assert.ok(lowOrganic.setupScore<baseline.setupScore)
+  assert.ok(lowOrganic.executionScore<baseline.executionScore)
+  assert.ok(lowOrganic.riskFlags.includes('LOW_ORGANIC_ACTIVITY'))
+  assert.notEqual(lowOrganic.signal,'SELL / AVOID')
+})
+
+
+test('market price conflict blocks buy promotion and caps confidence',()=>{
+  const result=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    external:{
+      providerCount:3,
+      dangerRiskCount:0,
+      warningRiskCount:0,
+      hardRiskFlags:[],
+      softRiskFlags:[],
+      dataConflicts:[],
+      rugged:false,
+      evidenceScore:88,
+      authority:{corroboratedSafe:true},
+      market:{
+        priceProviderCount:3,
+        externalPriceProviderCount:2,
+        medianPriceUsd:0.001,
+        maxDeviationPercent:18,
+        priceConflict:true,
+        priceAgreement:false,
+        evidenceScore:50,
+      },
+    },
+  })
+
+  assert.ok(result.score<=68)
+  assert.ok(result.confidence<=55)
+  assert.ok(result.riskFlags.includes('PRICE_SOURCE_CONFLICT'))
+  assert.equal(result.securityEvidence.market.priceConflict,true)
+  assert.notEqual(result.signal,'BUY SETUP')
+})
+
+test('three-source price agreement improves data quality without changing safety facts',()=>{
+  const baseline=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    external:{
+      providerCount:2,
+      dangerRiskCount:0,
+      warningRiskCount:0,
+      hardRiskFlags:[],
+      softRiskFlags:[],
+      dataConflicts:[],
+      rugged:false,
+      evidenceScore:80,
+      authority:{corroboratedSafe:true},
+    },
+  })
+  const corroborated=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    external:{
+      providerCount:3,
+      dangerRiskCount:0,
+      warningRiskCount:0,
+      hardRiskFlags:[],
+      softRiskFlags:[],
+      dataConflicts:[],
+      rugged:false,
+      evidenceScore:92,
+      authority:{corroboratedSafe:true},
+      market:{
+        priceProviderCount:4,
+        externalPriceProviderCount:3,
+        medianPriceUsd:0.001,
+        maxDeviationPercent:2.5,
+        priceConflict:false,
+        priceAgreement:true,
+        evidenceScore:94,
+      },
+    },
+  })
+
+  assert.ok(corroborated.dataQualityScore>=baseline.dataQualityScore)
+  assert.equal(corroborated.securityEvidence.market.priceAgreement,true)
+})
+
+test('Jupiter suspicious flag is cautionary but not mislabeled as a rug',()=>{
+  const result=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    external:{
+      providerCount:3,
+      dangerRiskCount:0,
+      warningRiskCount:1,
+      hardRiskFlags:['JUPITER_SUSPICIOUS'],
+      softRiskFlags:[],
+      dataConflicts:[],
+      rugged:false,
+      evidenceScore:70,
+      jupiterSuspicious:true,
+      authority:{corroboratedSafe:true},
+    },
+  })
+
+  assert.ok(result.riskFlags.includes('JUPITER_SUSPICIOUS'))
+  assert.equal(result.securityEvidence.rugged,false)
+  assert.ok(result.score<=52)
+})
+
+test('transfer-fee evidence reduces execution quality',()=>{
+  const baseline=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    external:{
+      providerCount:2,
+      dangerRiskCount:0,
+      warningRiskCount:0,
+      hardRiskFlags:[],
+      softRiskFlags:[],
+      dataConflicts:[],
+      rugged:false,
+      evidenceScore:80,
+    },
+  })
+  const taxed=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    external:{
+      providerCount:3,
+      dangerRiskCount:0,
+      warningRiskCount:1,
+      hardRiskFlags:[],
+      softRiskFlags:['BIRDEYE_TRANSFER_FEE'],
+      dataConflicts:[],
+      rugged:false,
+      evidenceScore:80,
+    },
+  })
+
+  assert.ok(taxed.executionScore<baseline.executionScore)
+  assert.ok(taxed.riskFlags.includes('TRANSFER_FEE_ENABLED'))
+})
+
+
+test('permanent delegate is structural danger for meme-token execution',()=>{
+  const result=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    token2022:true,
+    permanentDelegate:'11111111111111111111111111111111',
+    external:{providerCount:0,dataConflicts:[],hardRiskFlags:[],softRiskFlags:[]},
+  })
+
+  assert.ok(result.riskFlags.includes('PERMANENT_DELEGATE_ACTIVE'))
+  assert.ok(result.score<=30)
+  assert.equal(result.signal,'SELL / AVOID')
+  assert.equal(result.contractVerified,false)
+})
+
+test('Token-2022 transfer fee reduces execution without being called a rug',()=>{
+  const baseline=analyzePair(healthyPair(),baseSecurity())
+  const result=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    token2022:true,
+    transferFeeEnabled:true,
+    transferFeeBasisPoints:750,
+  })
+
+  assert.ok(result.executionScore<baseline.executionScore)
+  assert.ok(result.riskFlags.includes('TOKEN2022_TRANSFER_FEE'))
+  assert.equal(result.securityEvidence.token2022.transferFeeBasisPoints,750)
+  assert.ok(!result.riskFlags.includes('EXTERNAL_RUGGED'))
+})
+
+test('non-transferable Token-2022 mint is a hard execution veto',()=>{
+  const result=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    token2022:true,
+    nonTransferable:true,
+  })
+
+  assert.ok(result.score<=8)
+  assert.ok(result.riskFlags.includes('NON_TRANSFERABLE_TOKEN'))
+  assert.equal(result.signal,'SELL / AVOID')
+})
+
+test('transfer hook is caution evidence and caps aggressive promotion',()=>{
+  const result=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    token2022:true,
+    transferHookProgramId:'Vote111111111111111111111111111111111111111',
+  })
+
+  assert.ok(result.riskFlags.includes('TRANSFER_HOOK_ACTIVE'))
+  assert.ok(result.score<=60)
+  assert.notEqual(result.signal,'BUY SETUP')
 })

@@ -1,6 +1,8 @@
 import { getBestPair } from '../lib/dexscreener.js'
 import { analyzePair } from '../lib/intelligence.js'
 import { getMintSecurity, looksLikeSolanaAddress } from '../lib/solana.js'
+import { getExternalSecurity, mergeSecurityEvidence } from '../lib/external-security.js'
+import { buildMarketConsensus, getMarketConsensus } from '../lib/market-consensus.js'
 import { logTokenScan } from '../lib/supabase-log.js'
 import { rateLimit, applyRateHeaders } from '../lib/rate-limit.js'
 
@@ -26,9 +28,16 @@ export default async function handler(req, res) {
   const shouldPersist = String(getQuery(req, 'persist', '1')) !== '0'
 
   try {
-    const [pair,mintSecurity]=await Promise.all([getBestPair(address),getMintSecurity(address)])
+    const [pair,onchainSecurity,externalSecurity,externalMarket]=await Promise.all([
+      getBestPair(address),
+      getMintSecurity(address),
+      getExternalSecurity(address),
+      getMarketConsensus(address,null),
+    ])
     if (!pair) return res.status(404).json({ success:false, error:'No active DexScreener market found for this token.' })
 
+    const marketEvidence=buildMarketConsensus(pair,externalMarket?.providers || {})
+    const mintSecurity=mergeSecurityEvidence(onchainSecurity,externalSecurity,marketEvidence)
     const intelligence=analyzePair(pair,mintSecurity)
     const rawLiquidity=pair?.liquidity?.usd
     const pumpFunMarket=String(pair?.dexId||'').toLowerCase()==='pumpfun'
@@ -48,7 +57,8 @@ export default async function handler(req, res) {
         liquidityReported,
         liquiditySource:intelligence.liquiditySource||null,
         volume:{m5:Number(pair?.volume?.m5||0),h1:Number(pair?.volume?.h1||0),h6:Number(pair?.volume?.h6||0),h24:Number(pair?.volume?.h24||0)},
-        priceChange:{m5:Number(pair?.priceChange?.m5||0),h1:Number(pair?.priceChange?.h1||0),h6:Number(pair?.priceChange?.h6||0),h24:Number(pair?.priceChange?.h24||0)}
+        priceChange:{m5:Number(pair?.priceChange?.m5||0),h1:Number(pair?.priceChange?.h1||0),h6:Number(pair?.priceChange?.h6||0),h24:Number(pair?.priceChange?.h24||0)},
+        consensus:marketEvidence
       },
       trading:{
         buys,sells,
