@@ -238,6 +238,11 @@ Rollback branch: `release/v4.0.0`
 - Rug / Manipulation Guard consumes these anomalies as evidence
 
 ### Score Calibration v2
+- clean-sample headline metrics require complete Setup / Execution / Safety / Data Quality scores
+- 1h / 6h / 24h outcomes must fall inside controlled timing windows
+- raw legacy statistics remain available separately for debugging
+- database constraints enforce 0–100 score/component/confidence ranges
+- calibration-specific partial indexes accelerate complete-model-version queries
 - Setup / Execution / Safety / Data Quality stored as first-class scan columns
 - market state and risk-flag count stored per scan
 - forward outcomes grouped by score-engine version
@@ -277,7 +282,7 @@ Rollback branch: `release/v4.0.0`
 - regression tests for whale-flow effects
 - production build runs tests before Vite compilation
 - GitHub CI validates every main/release push
-- Supabase writes remain OIDC-authenticated (logger v16)
+- Supabase writes remain OIDC-authenticated (logger v17)
 - GeckoTerminal chart/tape health monitored separately
 - /api/health reports exact live Git SHA, region, deployment URL, and engine versions
 
