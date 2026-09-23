@@ -111,7 +111,11 @@ export default async function handler(req,res){
       optional:{
         jupiter:Boolean(process.env.JUPITER_API_KEY) || String(process.env.JUPITER_KEYLESS_ENABLED || '0') === '1',
         helius:Boolean(process.env.HELIUS_API_KEY),
-        birdeye:Boolean(process.env.BIRDEYE_API_KEY),
+        birdeye:{
+          configured:Boolean(process.env.BIRDEYE_API_KEY),
+          marketEnabled:Boolean(process.env.BIRDEYE_API_KEY) && String(process.env.BIRDEYE_MARKET_ENABLED || '0') === '1',
+          securityEnabled:Boolean(process.env.BIRDEYE_API_KEY) && String(process.env.BIRDEYE_SECURITY_ENABLED || '0') === '1',
+        },
       },
       policy:'Missing optional providers lower corroboration depth; they do not break scans or count as proof of safety.'
     },
