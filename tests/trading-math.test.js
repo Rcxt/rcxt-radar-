@@ -117,3 +117,64 @@ test('entry quality improves with healthy structure and flow',()=>{
   assert.ok(result.score>=70)
   assert.ok(result.reasons.length>0)
 })
+
+
+test('entry quality penalizes multi-whale distribution and concentration',()=>{
+  const result=buildEntryQuality({
+    scan:{
+      market:{liquidityUsd:60000},
+      intelligence:{risk:'MEDIUM'},
+    },
+    analytics:{
+      available:true,
+      levels:{
+        structureRiskReward:1.5,
+        downsideToSupportPercent:-8,
+        upsideToResistancePercent:20,
+      },
+      indicators:{
+        vwapDistancePercent:2,
+        atrPercent:5,
+      },
+      momentum:{m15:5},
+    },
+    tape:{
+      netFlowUsd:-5000,
+      buyVolumePercent:38,
+      flags:['MULTI_WHALE_DISTRIBUTION','WHALE_FLOW_CONCENTRATED'],
+    },
+  })
+  assert.ok(result.available)
+  assert.ok(result.score<60)
+  assert.ok(result.warnings.some(value=>value.toLowerCase().includes('distribution')))
+})
+
+test('entry quality can recognize diversified whale accumulation as supporting context',()=>{
+  const result=buildEntryQuality({
+    scan:{
+      market:{liquidityUsd:90000},
+      intelligence:{risk:'LOW'},
+    },
+    analytics:{
+      available:true,
+      levels:{
+        structureRiskReward:2.2,
+        downsideToSupportPercent:-7,
+        upsideToResistancePercent:24,
+      },
+      indicators:{
+        vwapDistancePercent:3,
+        atrPercent:5,
+      },
+      momentum:{m15:8},
+    },
+    tape:{
+      netFlowUsd:7000,
+      buyVolumePercent:61,
+      flags:['MULTI_WHALE_ACCUMULATION'],
+    },
+  })
+  assert.ok(result.available)
+  assert.ok(result.score>=75)
+  assert.ok(result.reasons.some(value=>value.toLowerCase().includes('large sampled wallets')))
+})
