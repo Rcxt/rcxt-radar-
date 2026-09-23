@@ -33,6 +33,11 @@ function pct(value,digits=1){
   return Number.isFinite(n)?(n>=0?'+':'')+n.toFixed(digits)+'%':'—'
 }
 
+function fixed(value,digits=1,fallback='—'){
+  const n=Number(value)
+  return Number.isFinite(n)?n.toFixed(digits):fallback
+}
+
 function CandleChart({candles}){
   const data=(candles||[]).slice(-72)
   if(data.length<2) return <div className="v4ChartEmpty">Not enough candle history yet.</div>
@@ -703,7 +708,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
     const lines=[
       (scan?.token?.symbol||'TOKEN')+' profit list',
       'Position: '+money(Number(investment||0))+' | Entry MC: '+money(Number(entryMarketCap||0)),
-      ...ladder.map(row=>money(row.targetMarketCap)+' MC → '+money(row.netValue)+' value ('+money(row.netProfit)+' P/L, '+row.multiple.toFixed(2)+'x)')
+      ...ladder.map(row=>money(row.targetMarketCap)+' MC → '+money(row.netValue)+' value ('+money(row.netProfit)+' P/L, '+fixed(row.multiple,2)+'x)')
     ]
     try{await navigator.clipboard.writeText(lines.join('\n'))}catch{}
   }
@@ -752,7 +757,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
               <div><span>Market phase</span><b>{analytics.regime?.phase||'—'}</b><small>{analytics.indicators?.bollingerWidthPercent==null?'—':analytics.indicators.bollingerWidthPercent+'%'} band width</small></div>
               <div><span>VWAP position</span><b className={Number(analytics.indicators?.vwapDistancePercent||0)>=0?'good':'bad'}>{analytics.indicators?.vwapDistancePercent==null?'—':pct(analytics.indicators.vwapDistancePercent)}</b><small>vs recent volume-weighted value</small></div>
               <div><span>Entry Quality</span><b>{entryQuality?.available?entryQuality.score+'/100':'—'}</b><small>{entryQuality?.available?entryQuality.label:'needs more evidence'}</small></div>
-              <div><span>Structure R:R</span><b>{analytics.levels?.structureRiskReward?analytics.levels.structureRiskReward.toFixed(2)+'×':'—'}</b><small>nearest support → resistance</small></div>
+              <div><span>Structure R:R</span><b>{analytics.levels?.structureRiskReward?fixed(analytics.levels.structureRiskReward,2)+'×':'—'}</b><small>nearest support → resistance</small></div>
             </div>
 
             </DetailSection>
@@ -859,12 +864,12 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
               <div>
                 <span>SUPPORT ZONES</span>
                 {(analytics.levels?.support||[]).map(value=><b key={value}>{tiny(value)}</b>)}
-                <small>Nearest: {tiny(analytics.levels?.nearestSupport)} · {analytics.levels?.downsideToSupportPercent==null?'—':analytics.levels.downsideToSupportPercent.toFixed(1)+'% below'}</small>
+                <small>Nearest: {tiny(analytics.levels?.nearestSupport)} · {analytics.levels?.downsideToSupportPercent==null?'—':fixed(analytics.levels.downsideToSupportPercent,1)+'% below'}</small>
               </div>
               <div>
                 <span>RESISTANCE ZONES</span>
                 {(analytics.levels?.resistance||[]).map(value=><b key={value}>{tiny(value)}</b>)}
-                <small>Nearest: {tiny(analytics.levels?.nearestResistance)} · {analytics.levels?.upsideToResistancePercent==null?'—':analytics.levels.upsideToResistancePercent.toFixed(1)+'% above'}</small>
+                <small>Nearest: {tiny(analytics.levels?.nearestResistance)} · {analytics.levels?.upsideToResistancePercent==null?'—':fixed(analytics.levels.upsideToResistancePercent,1)+'% above'}</small>
               </div>
               <div><span>WHY</span>{(analytics.reasons||[]).map(value=><small key={value}>+ {value}</small>)}</div>
               <div><span>RISKS</span>{(analytics.risks||[]).map(value=><small key={value}>− {value}</small>)}</div>
@@ -966,7 +971,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
             <div><span>Risk budget</span><b>{money(riskPlan.riskBudget)}</b></div>
             <div><span>Max position</span><b>{money(riskPlan.positionSize)}</b></div>
             <div><span>% of account</span><b>{riskPlan.positionPercent.toFixed(1)}%</b></div>
-            <div><span>Liquidity burden</span><b className={liquidityBurden?.label==='LOW'?'good':liquidityBurden?.label==='MODERATE'?'mid':'bad'}>{liquidityBurden?liquidityBurden.percent.toFixed(2)+'%':'—'}</b><small>{liquidityBurden?.label||'No liquidity data'}</small></div>
+            <div><span>Liquidity burden</span><b className={liquidityBurden?.label==='LOW'?'good':liquidityBurden?.label==='MODERATE'?'mid':'bad'}>{liquidityBurden?fixed(liquidityBurden.percent,2)+'%':'—'}</b><small>{liquidityBurden?.label||'No liquidity data'}</small></div>
           </div>
           <p>Uses your chosen stop distance. Liquidity burden compares planned position size with reported pool liquidity. Real losses can exceed the estimate because of slippage or failed exits.</p>
         </article>
@@ -1028,12 +1033,12 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
             <div>
               <span>Required market cap</span>
               <strong>{reverseTarget?money(reverseTarget.requiredMarketCap):'—'}</strong>
-              <small>{reverseTarget?reverseTarget.multiple.toFixed(2)+'× from entry MC':'Enter valid position + MC'}</small>
+              <small>{reverseTarget?fixed(reverseTarget.multiple,2)+'× from entry MC':'Enter valid position + MC'}</small>
             </div>
             <div>
               <span>Break-even MC</span>
               <strong>{breakEven?money(breakEven.marketCap):'—'}</strong>
-              <small>{breakEven?breakEven.multiple.toFixed(3)+'× after estimated costs':'—'}</small>
+              <small>{breakEven?fixed(breakEven.multiple,3)+'× after estimated costs':'—'}</small>
             </div>
           </div>
         </div>
@@ -1056,16 +1061,16 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
             <div>
               <span>Nearest support</span>
               <b>{tiny(analytics.levels?.nearestSupport)}</b>
-              <small>{analytics.levels?.downsideToSupportPercent==null?'—':analytics.levels.downsideToSupportPercent.toFixed(1)+'%'}</small>
+              <small>{analytics.levels?.downsideToSupportPercent==null?'—':fixed(analytics.levels.downsideToSupportPercent,1)+'%'}</small>
             </div>
             <div>
               <span>Nearest resistance</span>
               <b>{tiny(analytics.levels?.nearestResistance)}</b>
-              <small>{analytics.levels?.upsideToResistancePercent==null?'—':'+'+analytics.levels.upsideToResistancePercent.toFixed(1)+'%'}</small>
+              <small>{analytics.levels?.upsideToResistancePercent==null?'—':'+'+fixed(analytics.levels.upsideToResistancePercent,1)+'%'}</small>
             </div>
             <div>
               <span>Structure R:R</span>
-              <b>{analytics.levels?.structureRiskReward?analytics.levels.structureRiskReward.toFixed(2)+'×':'—'}</b>
+              <b>{analytics.levels?.structureRiskReward?fixed(analytics.levels.structureRiskReward,2)+'×':'—'}</b>
               <small>support → resistance</small>
             </div>
           </div>
@@ -1119,7 +1124,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
               <div><span>From entry MC</span><b className={livePosition.movePercent>=0?'good':'bad'}>{pct(livePosition.movePercent)}</b></div>
               <div><span>TP market cap</span><b>{money(livePosition.targetMarketCap)}</b><small>{livePosition.targetDistancePercent==null?'—':pct(livePosition.targetDistancePercent)} from current</small></div>
               <div><span>Stop market cap</span><b>{money(livePosition.stopMarketCap)}</b><small>{livePosition.stopDistanceFromCurrent==null?'—':pct(livePosition.stopDistanceFromCurrent)} from current</small></div>
-              <div><span>Remaining R:R</span><b>{livePosition.remainingRiskReward==null?'—':livePosition.remainingRiskReward.toFixed(2)+'×'}</b><small>to plan target vs stop</small></div>
+              <div><span>Remaining R:R</span><b>{livePosition.remainingRiskReward==null?'—':fixed(livePosition.remainingRiskReward,2)+'×'}</b><small>to plan target vs stop</small></div>
             </div>
           </div>
         ) : null}
@@ -1190,7 +1195,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
           <div className="customProfitResult">
             <span>Custom target</span>
             <strong>{money(customProjection.netValue)}</strong>
-            <b>{money(customProjection.netProfit)} est. P/L · {customProjection.multiple.toFixed(2)}× MC</b>
+            <b>{money(customProjection.netProfit)} est. P/L · {fixed(customProjection.multiple,2)}× MC</b>
           </div>
         ) : null}
 
@@ -1203,7 +1208,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
               {ladder.map((row)=>(
                 <tr key={row.targetMarketCap}>
                   <td>{money(row.targetMarketCap)}</td>
-                  <td>{row.multiple.toFixed(2)}×</td>
+                  <td>{fixed(row.multiple,2)}×</td>
                   <td>{money(row.netValue)}</td>
                   <td className={row.netProfit>=0?'positiveText':'negativeText'}>{money(row.netProfit)}</td>
                   <td>{pct(row.roiPercent,0)}</td>
