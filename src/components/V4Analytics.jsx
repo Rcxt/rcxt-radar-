@@ -666,6 +666,49 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
                 {tape.summary.flags?.length?(
                   <div className="tapeFlags">{tape.summary.flags.map(flag=><span key={flag}>{flag.replaceAll('_',' ')}</span>)}</div>
                 ):null}
+
+                <div className="whaleWalletPanel">
+                  <div className="whaleWalletHead">
+                    <div>
+                      <span>WHALE WALLET DETECTION</span>
+                      <strong>Large sampled participants</strong>
+                    </div>
+                    <div className="whaleNet">
+                      <span>Whale net flow</span>
+                      <b className={Number(tape.summary.whaleWalletNetFlowUsd||0)>=0?'good':'bad'}>
+                        {money(tape.summary.whaleWalletNetFlowUsd)}
+                      </b>
+                    </div>
+                  </div>
+
+                  <div className="whaleSummaryGrid">
+                    <div><span>Detected wallets</span><b>{tape.summary.whaleWalletCount||0}</b></div>
+                    <div><span>Accumulating</span><b className="good">{tape.summary.accumulatingWhales||0}</b></div>
+                    <div><span>Distributing</span><b className="bad">{tape.summary.distributingWhales||0}</b></div>
+                    <div><span>Largest share</span><b>{tape.summary.topWhaleVolumeSharePercent||0}%</b></div>
+                  </div>
+
+                  {tape.whaleWallets?.length ? (
+                    <div className="whaleWalletList">
+                      {tape.whaleWallets.slice(0,6).map((wallet)=>(
+                        <a key={wallet.wallet} href={wallet.explorerUrl} target="_blank" rel="noreferrer">
+                          <div>
+                            <strong>{wallet.wallet.slice(0,5)}…{wallet.wallet.slice(-5)}</strong>
+                            <span>{wallet.tradeCount} trades · {wallet.volumeSharePercent}% of sampled USD volume</span>
+                          </div>
+                          <div className="whaleWalletNumbers">
+                            <b className={wallet.netFlowUsd>=0?'good':'bad'}>{wallet.netFlowUsd>=0?'+':''}{money(wallet.netFlowUsd)}</b>
+                            <small className={wallet.direction==='ACCUMULATING'?'good':wallet.direction==='DISTRIBUTING'?'bad':'mid'}>{wallet.direction}</small>
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+                  ) : (
+                    <small className="whaleEmpty">No sampled wallet crossed RCXT's relative whale threshold.</small>
+                  )}
+
+                  <p>Whale labels are based only on relative activity in this recent public trade sample—not wallet identity, net worth, or ownership.</p>
+                </div>
               </div>
             ):null}
 
