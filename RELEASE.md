@@ -277,7 +277,7 @@ Rollback branch: `release/v4.0.0`
 - regression tests for whale-flow effects
 - production build runs tests before Vite compilation
 - GitHub CI validates every main/release push
-- Supabase writes remain OIDC-authenticated
+- Supabase writes remain OIDC-authenticated (logger v15)
 - GeckoTerminal chart/tape health monitored separately
 - build identity endpoint reports exact live Git SHA and engine versions
 
