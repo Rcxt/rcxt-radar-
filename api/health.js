@@ -32,7 +32,7 @@ async function testCharts() {
   const started = Date.now()
   try {
     const response = await fetch('https://api.geckoterminal.com/api/v2/networks/solana/new_pools?page=1', {
-      headers: { accept:'application/json', 'user-agent':'RCXT-Radar/5.1' },
+      headers: { accept:'application/json', 'user-agent':'RCXT-Radar/6.0' },
       signal: AbortSignal.timeout(3500),
     })
     const json = await response.json()
@@ -77,7 +77,7 @@ export default async function handler(req,res){
     refresh:{radarSeconds:10,scannerSeconds:15,chartsSeconds:30,tradeTapeSeconds:30,walletOpenSeconds:15,walletBackgroundSeconds:30},
     build:{
       app:'RCXT Radar',
-      version:'5.1.0-rc.1',
+      version:'6.0.0-rc.1',
       scoreEngine:SCORE_VERSION,
       trenchEngine:'1.0.0',
       chartEngine:'1.0.0',
@@ -99,6 +99,27 @@ export default async function handler(req,res){
     oidc:{available:Boolean(req.headers?.['x-vercel-oidc-token'])},
     socialProviders:{
       x:Boolean(process.env.X_BEARER_TOKEN)
+    },
+    dataProviders:{
+      core:{
+        solanaRpc:true,
+        dexscreener:true,
+        geckoterminal:true,
+        rugcheck:true,
+        goplus:String(process.env.GOPLUS_ENABLED || '1') !== '0',
+      },
+      optional:{
+        jupiter:Boolean(process.env.JUPITER_API_KEY) || String(process.env.JUPITER_KEYLESS_ENABLED || '0') === '1',
+        helius:Boolean(process.env.HELIUS_API_KEY),
+        birdeye:Boolean(process.env.BIRDEYE_API_KEY),
+      },
+      policy:'Missing optional providers lower corroboration depth; they do not break scans or count as proof of safety.'
+    },
+    launch:{
+      candidate:true,
+      productionPromoted:false,
+      requiredServicesHealthy:healthy,
+      note:'V6 remains a release candidate until production promotion after preview smoke checks.'
     }
   })
 }
