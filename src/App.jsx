@@ -529,6 +529,14 @@ export default function Home() {
     setMenuOpen(false)
   }
 
+  function navigateToTool(nextView, elementId) {
+    setView(nextView)
+    setMenuOpen(false)
+    window.setTimeout(() => {
+      document.getElementById(elementId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 120)
+  }
+
   function closeDrawer() {
     setActiveDrawer('')
   }
@@ -749,6 +757,8 @@ export default function Home() {
                     <button onClick={() => openDrawer('hidden')}><b>Hidden Coins</b><small>{hiddenCoins.length} filtered out</small></button>
                     <button onClick={() => openDrawer('history')}><b>Recent Scans</b><small>{history.length} local scans</small></button>
                     <button onClick={() => openDrawer('system')}><b>System Health</b><small>{health?.healthy === false ? 'Needs attention' : 'All systems live'}</small></button>
+                    <button onClick={() => navigateToTool('scanner','v4-market-lab')}><b>V4 Market Lab</b><small>Chart · forecast · flow · profit math</small></button>
+                    <button onClick={() => navigateToTool('wallet','challenge-tracker')}><b>$5 → $50K</b><small>Wallet equity challenge tracker</small></button>
                     <button onClick={() => { setView('scanner'); setMenuOpen(false); setNotificationStatus('Alert Center is inside the Deep Token Scanner.') }}><b>Alert Center</b><small>Score · MC · signal rules</small></button>
                     <button onClick={() => { exportRadarCsv(); setMenuOpen(false) }}><b>Export Center</b><small>Download radar CSV</small></button>
                   </div>
