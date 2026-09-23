@@ -2532,3 +2532,22 @@ input,select,textarea{font-size:16px}
   .tradeJournalActions{width:100%;justify-content:stretch}.tradeJournalActions button{flex:1}
   .closedTradeSummary{grid-template-columns:1fr}
 }
+
+
+/* Trade Plan Library drawer */
+.tradePlanLibrary{display:grid;gap:7px;padding-top:10px}
+.tradePlanLibraryRow{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:stretch}
+.tradePlanOpen{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;border:1px solid #1c2933;background:#091016;color:#d5dde5;border-radius:10px;padding:10px;cursor:pointer}
+.tradePlanOpen:hover{border-color:#355063;background:#0c171e}
+.tradePlanOpen>div:first-child strong{display:block;font-size:10px}.tradePlanOpen>div:first-child span{display:block;color:#617282;font-size:7px;margin-top:3px}
+.tradePlanLibraryMeta{text-align:right;display:grid;justify-items:end;gap:3px}
+.tradePlanLibraryMeta>b{display:inline-flex;border:1px solid #2b3a45;border-radius:999px;padding:4px 6px;font-size:6px;letter-spacing:.08em}
+.tradePlanLibraryMeta>b.open{color:var(--green);border-color:#315744}.tradePlanLibraryMeta>b.closedGood{color:#77d996;border-color:#315744}.tradePlanLibraryMeta>b.closedBad{color:var(--red);border-color:#5a373d}.tradePlanLibraryMeta>b.draft{color:var(--amber);border-color:#594b2e}
+.tradePlanLibraryMeta small{font-size:7px;color:#607182}
+.tradePlanDelete{width:38px;border:1px solid #382b30;background:#120c0e;color:#a46b72;border-radius:9px;font-size:16px;cursor:pointer}
+.tradePlanDelete:hover{border-color:#66424a;color:#e1929b}
+@media(max-width:480px){
+  .tradePlanOpen{align-items:flex-start;flex-direction:column}
+  .tradePlanLibraryMeta{text-align:left;justify-items:start}
+  .tradePlanDelete{width:42px}
+}
