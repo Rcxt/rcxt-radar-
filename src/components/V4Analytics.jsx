@@ -5,6 +5,7 @@ import {
   beginnerMarketExplanation,
   breakEvenMarketCap,
   buildEntryQuality,
+  buildRugRiskChecklist,
   buildExecutionChecklist,
   buildProfitLadder,
   positionPlan,
@@ -262,6 +263,11 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
     tape:tape?.summary,
   }),[scan,analytics,tape?.summary])
 
+  const rugGuard=useMemo(()=>buildRugRiskChecklist({
+    scan,
+    tape:tape?.summary,
+  }),[scan,tape?.summary])
+
   const liquidityBurden=useMemo(()=>{
     const liquidity=Number(scan?.market?.liquidityUsd||0)
     if(!liquidity||!riskPlan.positionSize) return null
@@ -308,10 +314,12 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
     if(tapeFlags.includes('WALLET_VOLUME_CONCENTRATION')){strength-=1;warnings.push('One wallet controls a large share of recent USD volume')}
     if(Number(scan?.market?.liquidityUsd||0)<5000){strength-=2;warnings.push('Liquidity is very thin')}
     if(scan?.intelligence?.risk==='EXTREME'){strength-=2;warnings.push('RCXT structural risk is extreme')}
+    if(rugGuard?.critical>=2){strength-=2;warnings.push('Rug / Manipulation Guard has multiple critical flags')}
+    else if(rugGuard?.critical===1){strength-=1;warnings.push('Rug / Manipulation Guard has a critical flag')}
 
     const label=strength>=4?'STRONG CONFLUENCE':strength>=2?'CONSTRUCTIVE':strength<=-3?'HIGH RISK':strength<=-1?'DEFENSIVE':'MIXED'
     return {label,strength,positives:positives.slice(0,4),warnings:warnings.slice(0,4)}
-  },[scan?.intelligence?.score,scan?.intelligence?.signal,scan?.intelligence?.risk,scan?.market?.liquidityUsd,analytics?.trend,tape?.summary?.netFlowUsd,tape?.summary?.buyVolumePercent,tape?.summary?.flags])
+  },[scan?.intelligence?.score,scan?.intelligence?.signal,scan?.intelligence?.risk,scan?.market?.liquidityUsd,analytics?.trend,tape?.summary?.netFlowUsd,tape?.summary?.buyVolumePercent,tape?.summary?.flags,rugGuard?.critical])
 
   const exitPlan=useMemo(()=>{
     const position=Math.max(0,Number(investment||0))
@@ -683,6 +691,32 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
             <p className="forecastDisclaimer">{analytics.disclaimer}</p>
           </>
         ):null}
+      </article>
+
+      <article className="panel rugGuardPanel">
+        <div className="v4PanelHead">
+          <div>
+            <span>RUG / MANIPULATION GUARD</span>
+            <h3>Structural red-flag evidence</h3>
+          </div>
+          <div className={'rugGuardStatus '+String(rugGuard?.label||'UNAVAILABLE').replaceAll(' ','-').toLowerCase()}>
+            <strong>{rugGuard?.label||'UNAVAILABLE'}</strong>
+            <small>{rugGuard?.critical||0} critical · {rugGuard?.warning||0} warnings · {rugGuard?.unknown||0} unknown</small>
+          </div>
+        </div>
+        <div className="rugGuardGrid">
+          {(rugGuard?.items||[]).map((item)=>(
+            <div className={'rugGuardRow '+item.severity} key={item.key}>
+              <span className="rugDot" />
+              <div>
+                <strong>{item.label}</strong>
+                <small>{item.detail}</small>
+              </div>
+              <b>{item.severity.toUpperCase()}</b>
+            </div>
+          ))}
+        </div>
+        <p>{rugGuard?.meaning}</p>
       </article>
 
       <article className="panel provenancePanel">
