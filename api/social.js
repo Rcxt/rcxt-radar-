@@ -21,7 +21,7 @@ export default async function handler(req,res){
   const address=String(getQuery(req, 'address')).trim()
   const symbol=String(getQuery(req, 'symbol')).trim().slice(0,32)
   const name=String(getQuery(req, 'name')).trim().slice(0,80)
-  if(!address&&!symbol&&!name) return res.status(400).json({success:false,error:'Token identity is required.'})
+  if(!address&&!symbol&&!name) return res.status(400).json({success:false,error:'Token identity is required for X search.'})
 
   const shouldPersist=String(getQuery(req, 'persist', '0'))==='1'
 
@@ -34,9 +34,9 @@ export default async function handler(req,res){
         ])
       : {ok:true,skipped:true,status:0,error:null}
 
-    res.setHeader('Cache-Control','public, s-maxage=30, stale-while-revalidate=60')
-    return res.status(200).json({success:true,scannedAt:new Date().toISOString(),persistence,social})
+    res.setHeader('Cache-Control','public, s-maxage=55, stale-while-revalidate=90')
+    return res.status(200).json({success:true,engine:'5.0.0-x',scannedAt:new Date().toISOString(),persistence,social})
   }catch(error){
-    return res.status(500).json({success:false,error:error?.message||'Social scan failed.'})
+    return res.status(500).json({success:false,error:error?.message||'X social scan failed.'})
   }
 }

@@ -15,6 +15,9 @@
     },
     "api/monitor.js": {
       "maxDuration": 15
+    },
+    "api/social.js": {
+      "maxDuration": 15
     }
   },
   "headers": [

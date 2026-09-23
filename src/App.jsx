@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import V4AnalyticsSuite from './components/V4Analytics.jsx'
 import ChallengeTracker from './components/ChallengeTracker.jsx'
 import WalletActivity from './components/WalletActivity.jsx'
+import XSocialIntel from './components/XSocialIntel.jsx'
 
 const WALLET_KEY = 'rcxt-wallet-address-v1'
 const HISTORY_KEY = 'rcxt-scan-history-v1'
@@ -1147,18 +1148,18 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="commandComingSoon">
+                <div className="commandComingSoon xReady">
                   <div>
-                    <span>COMING SOON</span>
-                    <strong>Social Intelligence</strong>
-                    <small>Reddit · X · Instagram signal layer</small>
+                    <span>V5 PREVIEW</span>
+                    <strong>X Intelligence</strong>
+                    <small>Name · ticker · contract search + AI feed report</small>
                   </div>
-                  <b>SOON</b>
+                  <b>X ONLY</b>
                 </div>
 
                 <div className="commandFooter">
                   <button onClick={resetRadarWorkspace}>Reset radar workspace</button>
-                  <span>v4.0 · Functional Analytics</span>
+                  <span>v5 RC · X Intelligence branch</span>
                 </div>
               </div>
             ) : null}
@@ -1758,32 +1759,7 @@ export default function Home() {
                   score={scan.intelligence.score}
                 />
               </article>
-              <article className="panel socialComingSoon">
-                <div className="comingSoonBadge">COMING SOON</div>
-                <div className="comingSoonMain">
-                  <div>
-                    <span className="eyebrow">SOCIAL INTELLIGENCE</span>
-                    <h3>Reddit · X · Instagram intelligence layer</h3>
-                    <p>
-                      Provider adapters, relevance filtering, duplicate detection, sentiment,
-                      author concentration, and calibration infrastructure are built. RCXT will
-                      activate this layer once the official provider connections are enabled.
-                    </p>
-                  </div>
-                  <div className="socialSoonScore">
-                    <span>SOCIAL SIGNAL</span>
-                    <strong>SOON</strong>
-                    <small>Won’t influence RCXT Score until verified live data is available.</small>
-                  </div>
-                </div>
-                <div className="comingSoonFeatures">
-                  <span>Relevant mention velocity</span>
-                  <span>Cross-source confirmation</span>
-                  <span>Bot / duplicate filtering</span>
-                  <span>Sentiment + author diversity</span>
-                </div>
-              </article>
-
+              <XSocialIntel scan={scan} />
               <div className="analysisGrid">
                 <article className="panel scorePanel">
                   <PanelHeader eyebrow="SIGNAL ENGINE" title="Why the score moved" />
@@ -2735,55 +2711,6 @@ function EmptyScanner({ history, onSelect }) {
       ) : null}
     </div>
   )
-}
-
-function SocialProviderCard({ provider }) {
-  const label = provider.source === 'x' ? 'X' : provider.source === 'reddit' ? 'Reddit' : 'Instagram'
-  return (
-    <div className={provider.available ? 'socialProvider active' : 'socialProvider unavailable'}>
-      <div className="socialProviderHead">
-        <strong>{label}</strong>
-        <span>{provider.available ? 'LIVE' : 'OFFLINE'}</span>
-      </div>
-      {provider.available ? (
-        <>
-          <div className="socialProviderStats">
-            <span>{provider.mentionCount} mentions</span>
-            <span>{provider.uniqueAuthors} authors</span>
-            <span>{provider.engagement} engagement</span>
-          </div>
-          <small>
-            Relevance {Math.round(Number(provider.relevanceScore || 0))}/100 · sentiment {socialSentimentLabel(provider.sentiment)}
-            {' · '}duplicates {Math.round(Number(provider.duplicateRatio || 0) * 100)}%
-            {provider.authorConcentration
-              ? ` · top-author share ${Math.round(Number(provider.authorConcentration) * 100)}%`
-              : ''}
-          </small>
-          {provider.posts?.length ? (
-            <div className="socialPostList">
-              {provider.posts.slice(0, 3).map((post) => (
-                <a key={post.id || post.url} href={post.url || '#'} target="_blank" rel="noreferrer">
-                  <span>{String(post.text || '').replace(/\s+/g, ' ').slice(0, 110)}</span>
-                  <small>{post.engagement || 0} engagement</small>
-                </a>
-              ))}
-            </div>
-          ) : null}
-        </>
-      ) : (
-        <small>{provider.reason || 'Provider not configured.'}</small>
-      )}
-    </div>
-  )
-}
-
-function socialSentimentLabel(value) {
-  const n = Number(value || 0)
-  if (n >= 0.25) return 'Bullish'
-  if (n >= 0.08) return 'Positive'
-  if (n <= -0.25) return 'Bearish'
-  if (n <= -0.08) return 'Negative'
-  return 'Neutral'
 }
 
 function CompareTray({ items, onRemove, onOpen }) {
