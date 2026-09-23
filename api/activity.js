@@ -1,14 +1,15 @@
 import { rateLimit, applyRateHeaders } from '../lib/rate-limit.js'
 import { getPairsForTokens } from '../lib/dexscreener.js'
+import {
+  parseWalletTransaction,
+  STABLE_MINTS,
+  WRAPPED_SOL_MINT,
+} from '../lib/wallet-activity.js'
 
 const RPC=process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com'
 const CACHE_TTL=20_000
 const cache=new Map()
 const addressPattern=/^[1-9A-HJ-NP-Za-km-z]{32,44}$/
-const USDC='EPjFWdd5AufqSSqeM2q9kwWBK6GfYxkKc8uYNxgXzV'
-const USDT='Es9vMFrzaCERmJfrF4H2FYD9Wg9kNnYFhXqGqKqMGV'
-const WSOL='So11111111111111111111111111111111111111112'
-const stableMints=new Set([USDC,USDT])
 
 function cached(key){
   const hit=cache.get(key)
@@ -29,102 +30,6 @@ async function rpc(body,timeout=5500){
   })
   if(!response.ok) throw new Error('Solana RPC HTTP '+response.status)
   return response.json()
-}
-
-function pubkeyValue(key){
-  if(typeof key==='string') return key
-  return key?.pubkey || key?.pubKey || null
-}
-
-function tokenAmount(balance){
-  const value=balance?.uiTokenAmount?.uiAmountString ?? balance?.uiTokenAmount?.uiAmount ?? '0'
-  const n=Number(value)
-  return Number.isFinite(n)?n:0
-}
-
-function ownedBalances(list,address){
-  const out=new Map()
-  for(const row of list||[]){
-    if(row?.owner && row.owner!==address) continue
-    if(!row?.mint) continue
-    out.set(row.mint,{
-      mint:row.mint,
-      amount:tokenAmount(row),
-      decimals:Number(row?.uiTokenAmount?.decimals||0),
-    })
-  }
-  return out
-}
-
-function classify(changes,solDelta){
-  const meaningful=changes.filter(change=>Math.abs(change.delta)>0)
-  const gained=meaningful.filter(change=>change.delta>0)
-  const lost=meaningful.filter(change=>change.delta<0)
-  const gainedStable=gained.some(change=>stableMints.has(change.mint))
-  const lostStable=lost.some(change=>stableMints.has(change.mint))
-  const gainedTrade=gained.some(change=>!stableMints.has(change.mint)&&change.mint!==WSOL)
-  const lostTrade=lost.some(change=>!stableMints.has(change.mint)&&change.mint!==WSOL)
-
-  if(gainedTrade && (lostStable || solDelta < -0.00005)) return 'BUY'
-  if(lostTrade && (gainedStable || solDelta > 0.00005)) return 'SELL'
-  if(gained.length && lost.length) return 'SWAP'
-  if(gained.length) return 'RECEIVE'
-  if(lost.length) return 'SEND'
-  return 'OTHER'
-}
-
-function primaryMint(changes,type){
-  const candidates=changes.filter(change=>{
-    if(stableMints.has(change.mint)||change.mint===WSOL) return false
-    if(type==='BUY'||type==='RECEIVE') return change.delta>0
-    if(type==='SELL'||type==='SEND') return change.delta<0
-    return true
-  })
-  return candidates.sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta))[0]?.mint || null
-}
-
-function parseTransaction(tx,address){
-  if(!tx?.meta||!tx?.transaction?.message) return null
-  const keys=(tx.transaction.message.accountKeys||[]).map(pubkeyValue)
-  const walletIndex=keys.indexOf(address)
-  const preSol=walletIndex>=0?Number(tx.meta.preBalances?.[walletIndex]||0):0
-  const postSol=walletIndex>=0?Number(tx.meta.postBalances?.[walletIndex]||0):0
-  let solDelta=(postSol-preSol)/1e9
-  if(walletIndex===0 && Number(tx.meta.fee||0)>0) solDelta+=Number(tx.meta.fee)/1e9
-
-  const pre=ownedBalances(tx.meta.preTokenBalances,address)
-  const post=ownedBalances(tx.meta.postTokenBalances,address)
-  const mints=new Set([...pre.keys(),...post.keys()])
-  const changes=[]
-  for(const mint of mints){
-    const before=pre.get(mint)?.amount||0
-    const after=post.get(mint)?.amount||0
-    const delta=after-before
-    if(Math.abs(delta)<1e-12) continue
-    changes.push({
-      mint,
-      before,
-      after,
-      delta,
-      decimals:post.get(mint)?.decimals??pre.get(mint)?.decimals??0,
-    })
-  }
-
-  if(!changes.length) return null
-  const type=classify(changes,solDelta)
-  const mint=primaryMint(changes,type)
-
-  return {
-    signature:tx.transaction.signatures?.[0]||null,
-    blockTime:tx.blockTime?new Date(tx.blockTime*1000).toISOString():null,
-    slot:tx.slot||null,
-    type,
-    primaryMint:mint,
-    solDelta:Number(solDelta.toFixed(9)),
-    feeSol:Number((Number(tx.meta.fee||0)/1e9).toFixed(9)),
-    changes,
-    failed:Boolean(tx.meta.err),
-  }
 }
 
 export default async function handler(req,res){
@@ -157,7 +62,14 @@ export default async function handler(req,res){
 
     const signatures=(sigResponse?.result||[]).map(row=>row.signature).filter(Boolean)
     if(!signatures.length){
-      const empty={success:true,address,count:0,events:[],newBuys:[],generatedAt:new Date().toISOString()}
+      const empty={
+        success:true,
+        address,
+        count:0,
+        events:[],
+        newBuys:[],
+        generatedAt:new Date().toISOString(),
+      }
       setCache(key,empty)
       return res.status(200).json(empty)
     }
@@ -173,10 +85,15 @@ export default async function handler(req,res){
     const txRows=Array.isArray(txResponse)?txResponse:[]
     const events=txRows
       .sort((a,b)=>Number(a.id||0)-Number(b.id||0))
-      .map(row=>parseTransaction(row?.result,address))
+      .map(row=>parseWalletTransaction(row?.result,address))
       .filter(Boolean)
 
-    const mints=[...new Set(events.flatMap(event=>event.changes.map(change=>change.mint)).filter(mint=>!stableMints.has(mint)&&mint!==WSOL))]
+    const mints=[...new Set(
+      events
+        .flatMap(event=>event.changes.map(change=>change.mint))
+        .filter(mint=>!STABLE_MINTS.has(mint)&&mint!==WRAPPED_SOL_MINT)
+    )]
+
     const pairs=await getPairsForTokens(mints)
 
     const enriched=events.map(event=>{
