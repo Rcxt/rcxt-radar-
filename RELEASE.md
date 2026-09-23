@@ -279,14 +279,14 @@ Rollback branch: `release/v4.0.0`
 - GitHub CI validates every main/release push
 - Supabase writes remain OIDC-authenticated (logger v16)
 - GeckoTerminal chart/tape health monitored separately
-- build identity endpoint reports exact live Git SHA and engine versions
+- /api/health reports exact live Git SHA, region, deployment URL, and engine versions
 
 ## Final-launch condition
 
 The final v4 repository is considered launch-ready only when:
 1. GitHub CI passes on the exact final SHA.
 2. Vercel deploys that exact SHA successfully.
-3. /api/build reports the same SHA.
+3. /api/health build.gitSha reports the same SHA.
 4. health, scanner, chart, trades, wallet, challenge, calibration, persistence and runtime logs pass production smoke tests.
 
-At the time this release note was updated, Vercel was refusing additional builds because the project had reached its build-rate limit. The current production build remains on the prior safe READY deployment until the limit resets or the plan limit changes.
+The final deployment was reduced to the Hobby-plan serverless-function limit by consolidating redundant build diagnostics into /api/health; no user-facing analytics feature was removed.
