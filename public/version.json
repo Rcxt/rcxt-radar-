@@ -13,10 +13,10 @@
   "challengeEngine": "1.1.0",
   "walletActivityEngine": "1.0.0",
   "socialEngine": "reserved-for-v5",
-  "persistence": "oidc-secured-v16",
+  "persistence": "oidc-secured-v17",
   "region": "sfo1",
   "release": "v4-final-functional-analytics",
   "releasedAt": "2026-09-22",
   "productionUrl": "https://rcxt-radar.vercel.app",
-  "note": "Final code is CI-validated; production promotion requires Vercel build-rate availability."
+  "note": "Final code is CI-validated and database-hardened; production promotion is waiting on Vercel's 24-hour deployment rate limit."
 }
