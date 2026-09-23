@@ -1984,6 +1984,64 @@ export default function Home() {
                       }
                     />
                     <SecurityRow
+                      label="Security sources"
+                      good={Number(scan.intelligence?.securityEvidence?.providerCount || 0) >= 2}
+                      unknown={!scan.intelligence?.securityEvidence?.providerCount}
+                      value={
+                        scan.intelligence?.securityEvidence?.providerCount
+                          ? `${scan.intelligence.securityEvidence.providerCount} source${scan.intelligence.securityEvidence.providerCount === 1 ? '' : 's'}`
+                          : 'Unavailable'
+                      }
+                    />
+                    <SecurityRow
+                      label="Security consensus"
+                      good={
+                        Number(scan.intelligence?.securityEvidence?.providerCount || 0) >= 2 &&
+                        !(scan.intelligence?.securityEvidence?.conflicts || []).length
+                      }
+                      unknown={Number(scan.intelligence?.securityEvidence?.providerCount || 0) < 2}
+                      value={
+                        (scan.intelligence?.securityEvidence?.conflicts || []).length
+                          ? `${scan.intelligence.securityEvidence.conflicts.length} conflict${scan.intelligence.securityEvidence.conflicts.length === 1 ? '' : 's'}`
+                          : Number(scan.intelligence?.securityEvidence?.providerCount || 0) >= 2
+                            ? 'Sources agree'
+                            : 'Needs corroboration'
+                      }
+                    />
+                    <SecurityRow
+                      label="Evidence quality"
+                      good={Number(scan.intelligence?.securityEvidence?.evidenceScore || 0) >= 70}
+                      unknown={scan.intelligence?.securityEvidence?.evidenceScore == null}
+                      value={
+                        scan.intelligence?.securityEvidence?.evidenceScore == null
+                          ? 'Unavailable'
+                          : `${Math.round(Number(scan.intelligence.securityEvidence.evidenceScore))}/100`
+                      }
+                    />
+                    {scan.security?.external?.rugcheck?.available ? (
+                      <SecurityRow
+                        label="RugCheck"
+                        good={
+                          !scan.intelligence?.securityEvidence?.rugged &&
+                          Number(scan.intelligence?.securityEvidence?.dangerRiskCount || 0) === 0
+                        }
+                        value={
+                          scan.intelligence?.securityEvidence?.rugged
+                            ? 'Rugged flag'
+                            : Number(scan.intelligence?.securityEvidence?.dangerRiskCount || 0) > 0
+                              ? `${scan.intelligence.securityEvidence.dangerRiskCount} danger finding${scan.intelligence.securityEvidence.dangerRiskCount === 1 ? '' : 's'}`
+                              : 'No danger flags'
+                        }
+                      />
+                    ) : null}
+                    {scan.intelligence?.securityEvidence?.jupiterOrganicScore != null ? (
+                      <SecurityRow
+                        label="Jupiter organic"
+                        good={Number(scan.intelligence.securityEvidence.jupiterOrganicScore) >= 55}
+                        value={`${Math.round(Number(scan.intelligence.securityEvidence.jupiterOrganicScore))}/100`}
+                      />
+                    ) : null}
+                    <SecurityRow
                       label="Concentration source"
                       good={scan.intelligence?.concentration?.available}
                       unknown={!scan.intelligence?.concentration?.available}
@@ -1992,14 +2050,18 @@ export default function Home() {
                           ? 'Resolved owners'
                           : scan.intelligence?.concentration?.method === 'TOKEN_ACCOUNTS'
                             ? 'Token accounts'
-                            : 'Unavailable'
+                            : scan.intelligence?.concentration?.method === 'RUGCHECK_TOP_HOLDERS'
+                              ? 'RugCheck holders'
+                              : 'Unavailable'
                       }
                     />
                     <SecurityRow
                       label={
                         scan.intelligence?.concentration?.method === 'RESOLVED_TOKEN_ACCOUNT_OWNERS'
                           ? 'Largest resolved owner'
-                          : 'Largest token account'
+                          : scan.intelligence?.concentration?.method === 'RUGCHECK_TOP_HOLDERS'
+                            ? 'Largest external holder'
+                            : 'Largest token account'
                       }
                       good={
                         scan.intelligence?.concentration?.available &&
@@ -2016,7 +2078,9 @@ export default function Home() {
                       label={
                         scan.intelligence?.concentration?.method === 'RESOLVED_TOKEN_ACCOUNT_OWNERS'
                           ? 'Top 10 resolved owners'
-                          : 'Top 10 token accounts'
+                          : scan.intelligence?.concentration?.method === 'RUGCHECK_TOP_HOLDERS'
+                            ? 'Top 10 external holders'
+                            : 'Top 10 token accounts'
                       }
                       good={
                         scan.intelligence?.concentration?.available &&
