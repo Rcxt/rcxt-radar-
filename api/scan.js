@@ -30,6 +30,12 @@ export default async function handler(req, res) {
     if (!pair) return res.status(404).json({ success:false, error:'No active DexScreener market found for this token.' })
 
     const intelligence=analyzePair(pair,mintSecurity)
+    const rawLiquidity=pair?.liquidity?.usd
+    const pumpFunMarket=String(pair?.dexId||'').toLowerCase()==='pumpfun'
+    const rawLiquidityFinite=rawLiquidity!==null&&rawLiquidity!==undefined&&rawLiquidity!==''&&Number.isFinite(Number(rawLiquidity))
+    const liquidityReported=pumpFunMarket
+      ? rawLiquidityFinite&&Number(rawLiquidity)>0
+      : rawLiquidityFinite
     const buys={m5:Number(pair?.txns?.m5?.buys||0),h1:Number(pair?.txns?.h1?.buys||0),h6:Number(pair?.txns?.h6?.buys||0),h24:Number(pair?.txns?.h24?.buys||0)}
     const sells={m5:Number(pair?.txns?.m5?.sells||0),h1:Number(pair?.txns?.h1?.sells||0),h6:Number(pair?.txns?.h6?.sells||0),h24:Number(pair?.txns?.h24?.sells||0)}
     const scan={
@@ -37,7 +43,10 @@ export default async function handler(req, res) {
       token:{name:pair?.baseToken?.name||'Unknown',symbol:pair?.baseToken?.symbol||'UNKNOWN',address},
       market:{
         priceUsd:Number(pair?.priceUsd||0),priceNative:Number(pair?.priceNative||0),
-        marketCap:Number(pair?.marketCap||0),fdv:Number(pair?.fdv||0),liquidityUsd:Number(pair?.liquidity?.usd||0),
+        marketCap:Number(pair?.marketCap||0),fdv:Number(pair?.fdv||0),
+        liquidityUsd:liquidityReported?Number(rawLiquidity):null,
+        liquidityReported,
+        liquiditySource:intelligence.liquiditySource||null,
         volume:{m5:Number(pair?.volume?.m5||0),h1:Number(pair?.volume?.h1||0),h6:Number(pair?.volume?.h6||0),h24:Number(pair?.volume?.h24||0)},
         priceChange:{m5:Number(pair?.priceChange?.m5||0),h1:Number(pair?.priceChange?.h1||0),h6:Number(pair?.priceChange?.h6||0),h24:Number(pair?.priceChange?.h24||0)}
       },

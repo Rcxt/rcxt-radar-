@@ -36,8 +36,8 @@ function baseSecurity(){
   }
 }
 
-test('score engine version is 4.2.0',()=>{
-  assert.equal(SCORE_VERSION,'4.2.0')
+test('score engine version is 4.2.1',()=>{
+  assert.equal(SCORE_VERSION,'4.2.1')
 })
 
 test('resolved owner concentration is preferred when available',()=>{
@@ -130,4 +130,21 @@ test('hard contract danger still vetoes momentum',()=>{
 
   assert.equal(result.signal,'SELL / AVOID')
   assert.ok(result.riskFlags.includes('MINT_AUTHORITY_ACTIVE'))
+})
+
+
+test('pumpfun missing AMM liquidity is treated as unknown instead of zero liquidity',()=>{
+  const pair=healthyPair()
+  pair.dexId='pumpfun'
+  pair.liquidity={}
+  pair.pairCreatedAt=Date.now()-10*60*1000
+
+  const result=analyzePair(pair,baseSecurity())
+
+  assert.equal(result.liquidityReported,false)
+  assert.equal(result.liquiditySource,'PUMPFUN_BONDING_CURVE_UNREPORTED')
+  assert.ok(result.riskFlags.includes('LIQUIDITY_DATA_UNAVAILABLE'))
+  assert.ok(!result.riskFlags.includes('LOW_LIQUIDITY'))
+  assert.ok(!result.riskFlags.includes('LOW_LIQUIDITY_RATIO'))
+  assert.notEqual(result.signal,'SELL / AVOID')
 })

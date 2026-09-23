@@ -2351,13 +2351,32 @@ function BeginnerSnapshot({ scan }) {
       <div className="beginnerTiles">
         <div><span>24H MOVE</span><strong className={Number(scan?.market?.priceChange?.h24 || 0) >= 0 ? 'positiveText' : 'negativeText'}>{percent(scan?.market?.priceChange?.h24)}</strong><small>Price direction</small></div>
         <div><span>BUY PRESSURE</span><strong>{intel.buyPercent24h ?? '—'}%</strong><small>24h transaction mix</small></div>
-        <div><span>LIQUIDITY</span><strong>{compactUsd(scan?.market?.liquidityUsd)}</strong><small>{intel.liquidityToCapPercent ?? '—'}% of market cap</small></div>
+        <div>
+          <span>LIQUIDITY</span>
+          <strong>{intel.liquidityReported === false ? 'N/A' : compactUsd(scan?.market?.liquidityUsd)}</strong>
+          <small>
+            {intel.liquidityReported === false
+              ? (intel.liquiditySource === 'PUMPFUN_BONDING_CURVE_UNREPORTED' ? 'Pump.fun bonding curve · AMM liquidity not reported' : 'Liquidity source unavailable')
+              : `${intel.liquidityToCapPercent ?? '—'}% of market cap`}
+          </small>
+        </div>
         <div><span>PAIR AGE</span><strong>{intel.ageHours == null ? 'Unknown' : formatAge(intel.ageHours)}</strong><small>{intel.marketState || 'Live market'}</small></div>
       </div>
       {entryBlockers.length ? (
         <div className="beginnerBlocker">
           <b>{intel.signal === 'WATCH' ? 'WHY NOT A BUY YET' : 'WHY RCXT IS CAUTIOUS'}</b>
           <span>{entryBlockers.slice(0, 3).join(' · ')}</span>
+        </div>
+      ) : null}
+
+      {intel.liquidityReported === false ? (
+        <div className="beginnerDataNotice">
+          <b>Liquidity data is incomplete</b>
+          <span>
+            {intel.liquiditySource === 'PUMPFUN_BONDING_CURVE_UNREPORTED'
+              ? 'This is a Pump.fun bonding-curve market. DexScreener is not reporting AMM-style pool liquidity, so RCXT no longer treats the missing field as literal $0 liquidity.'
+              : 'The current market source did not provide a usable liquidity value. RCXT treats it as unknown instead of assuming zero.'}
+          </span>
         </div>
       ) : null}
 
@@ -2799,7 +2818,39 @@ function usd(value) {
 }
 
 function compactUsd(value) {
-  return '$' + Intl.NumberFormat('en', {
+  if (value === null || value === undefined || value === '') return '—'
+  return '
+
+function tinyUsd(value) {
+  const amount = Number(value || 0)
+  if (!amount) return '$0'
+  if (amount >= 1) return '$' + amount.toLocaleString(undefined, { maximumFractionDigits: 4 })
+  if (amount >= 0.001) return '$' + amount.toFixed(6)
+  return '$' + amount.toPrecision(4)
+}
+
+function percent(value) {
+  const amount = Number(value || 0)
+  return `${amount >= 0 ? '+' : ''}${amount.toFixed(2)}%`
+}
+
+function shortAddress(value, size = 6) {
+  if (!value) return '—'
+  return `${value.slice(0, size)}…${value.slice(-size)}`
+}
+
+function isPumpFunToken(scan) {
+  const address = String(scan?.address || '')
+  const dex = String(scan?.pair?.dex || '').toLowerCase()
+  return address.endsWith('pump') || dex === 'pumpfun' || dex === 'pumpswap'
+}
+
+function formatAge(hours) {
+  if (hours < 1) return `${Math.round(hours * 60)}m`
+  if (hours < 48) return `${hours.toFixed(1)}h`
+  return `${(hours / 24).toFixed(1)}d`
+}
+ + Intl.NumberFormat('en', {
     notation: 'compact',
     maximumFractionDigits: 2,
   }).format(Number(value || 0))
