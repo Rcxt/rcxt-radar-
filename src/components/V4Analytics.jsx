@@ -436,7 +436,8 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
       a?.available?'Chart: '+a.trend+' · '+(a.regime?.structure||'—')+' / '+(a.regime?.phase||'—')+' · RSI '+(a.indicators?.rsi14??'—')+' · ATR '+(a.indicators?.atrPercent??'—')+'% · VWAP '+(a.indicators?.vwapDistancePercent??'—')+'%':'Chart: unavailable',
       entryQuality?.available?'Entry Quality: '+entryQuality.score+'/100 '+entryQuality.label:'Entry Quality: unavailable',
       a?.available?'Support '+tiny(a.levels?.nearestSupport)+' · Resistance '+tiny(a.levels?.nearestResistance)+' · Structure R:R '+(a.levels?.structureRiskReward??'—')+'x':'',
-      tapeSummary?'Trade tape: '+money(tapeSummary.netFlowUsd)+' net flow · '+tapeSummary.buyVolumePercent+'% buy volume · '+tapeSummary.uniqueWallets+' wallets':'Trade tape: unavailable',
+      tapeSummary?'Trade tape: '+money(tapeSummary.netFlowUsd)+' net flow · '+tapeSummary.buyVolumePercent+'% buy volume · '+tapeSummary.uniqueWallets+' wallets · whale net '+money(tapeSummary.whaleWalletNetFlowUsd):'Trade tape: unavailable',
+      scan?.security?.topOwners?.length?'Supply whales: '+scan.security.supplyWhaleCount+' owner wallets ≥5% · top owner '+Number(scan.security.topOwners[0]?.supplyPercent||0).toFixed(2)+'%':'Supply whales: unavailable',
       checklist?.knownCount?'Checklist: '+checklist.passCount+'/'+checklist.knownCount+' checks passing ('+checklist.readinessPercent+'%)':'Checklist: unavailable',
       'Liquidity: '+money(scan.market?.liquidityUsd)+' · Market cap: '+money(scan.market?.marketCap),
       'Risk flags: '+((scan.intelligence?.riskFlags||[]).join(', ')||'none'),
@@ -762,6 +763,33 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
             </div>
           ))}
         </div>
+
+        {scan?.security?.topOwners?.length ? (
+          <div className="supplyWhaleBlock">
+            <div className="supplyWhaleHead">
+              <div>
+                <span>SUPPLY WHALES</span>
+                <strong>Resolved owner concentration</strong>
+              </div>
+              <small>{scan.security.supplyWhaleCount||0} owner wallets ≥5% of supply</small>
+            </div>
+            <div className="supplyWhaleList">
+              {scan.security.topOwners.slice(0,6).map((holder)=>(
+                <a key={holder.owner} href={holder.explorerUrl} target="_blank" rel="noreferrer">
+                  <div>
+                    <strong>{holder.owner.slice(0,5)}…{holder.owner.slice(-5)}</strong>
+                    <span>Resolved token-account owner</span>
+                  </div>
+                  <b className={Number(holder.supplyPercent||0)>=10?'bad':Number(holder.supplyPercent||0)>=5?'mid':'good'}>
+                    {Number(holder.supplyPercent||0).toFixed(2)}%
+                  </b>
+                </a>
+              ))}
+            </div>
+            <p>Supply-whale data comes from public Solana token-account ownership resolution. It does not identify the person or entity controlling a wallet.</p>
+          </div>
+        ) : null}
+
         <p>{rugGuard?.meaning}</p>
       </article>
 
