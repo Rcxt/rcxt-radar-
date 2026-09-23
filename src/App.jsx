@@ -4,6 +4,7 @@ import ChallengeTracker from './components/ChallengeTracker.jsx'
 import WalletActivity from './components/WalletActivity.jsx'
 import XSocialIntel from './components/XSocialIntel.jsx'
 import NotificationCenter from './components/NotificationCenter.jsx'
+import DetailSection from './components/DetailSection.jsx'
 import {
   DEFAULT_NOTIFICATION_PREFS,
   normalizeNotificationPrefs,
@@ -29,6 +30,8 @@ function urlBase64ToUint8Array(base64String) {
 
 export default function Home() {
   const [view, setView] = useState('radar')
+  const activeScanAddressRef = useRef('')
+  const runScanRef = useRef(null)
   const [radar, setRadar] = useState([])
   const [radarLoading, setRadarLoading] = useState(true)
   const [radarError, setRadarError] = useState('')
@@ -239,6 +242,8 @@ export default function Home() {
   const runScan = useCallback(async ({ address, silent = false } = {}) => {
     const target = String(address ?? tokenAddress).trim()
     if (!target) return
+    if (silent && activeScanAddressRef.current !== target) return
+    if (!silent) activeScanAddressRef.current = target
 
     if (!silent) {
       setScanLoading(true)
@@ -254,6 +259,7 @@ export default function Home() {
         cache: 'no-store',
       })
       const data = await response.json()
+      if (activeScanAddressRef.current !== target) return
       if (!response.ok || !data.success) throw new Error(data.error || 'Scan failed')
 
       setTokenAddress(target)
@@ -278,9 +284,9 @@ export default function Home() {
         try {
           const historyResponse = await fetch(`/api/history?address=${encodeURIComponent(target)}`, { cache: 'no-store' })
           const historyData = await historyResponse.json()
-          if (historyResponse.ok && historyData?.success) setScoreHistory(historyData.rows || [])
+          if (activeScanAddressRef.current === target && historyResponse.ok && historyData?.success) setScoreHistory(historyData.rows || [])
         } catch {
-          setScoreHistory([])
+          if (activeScanAddressRef.current === target) setScoreHistory([])
         }
 
         const entry = {
@@ -303,20 +309,63 @@ export default function Home() {
         })
       }
     } catch (error) {
+      if (activeScanAddressRef.current !== target) return
       setScanError(error.message)
       if (!silent) setScan(null)
     } finally {
-      if (!silent) setScanLoading(false)
+      if (!silent && activeScanAddressRef.current === target) setScanLoading(false)
     }
   }, [tokenAddress, notificationsEnabled, alertScore, alertMarketCap, notificationPrefs])
 
+  useEffect(() => { runScanRef.current = runScan }, [runScan])
+
+  function navigateView(nextView) {
+    setActiveDrawer('')
+    setMenuOpen(false)
+    setView(nextView)
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }
+
   useEffect(() => {
-    const deepLinkedToken = new URLSearchParams(window.location.search).get('token')
-    if (!deepLinkedToken) return
-    setView('scanner')
-    setTokenAddress(deepLinkedToken)
-    runScan({ address: deepLinkedToken })
+    function openLinkedToken(value) {
+      const address = String(value || '').trim()
+      if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)) return false
+      setActiveDrawer('')
+      setMenuOpen(false)
+      setView('scanner')
+      setTokenAddress(address)
+      window.history.replaceState(null, '', '/?token=' + encodeURIComponent(address))
+      window.scrollTo({ top: 0, behavior: 'instant' })
+      runScanRef.current?.({ address })
+      return true
+    }
+    const fromUrl = () => openLinkedToken(new URLSearchParams(window.location.search).get('token'))
+    const onMessage = (event) => {
+      if (event.data?.type !== 'RCXT_OPEN_TOKEN') return
+      if (openLinkedToken(event.data.token)) event.ports?.[0]?.postMessage({ opened: true })
+    }
+    fromUrl()
+    window.addEventListener('popstate', fromUrl)
+    navigator.serviceWorker?.addEventListener('message', onMessage)
+    return () => {
+      window.removeEventListener('popstate', fromUrl)
+      navigator.serviceWorker?.removeEventListener('message', onMessage)
+    }
   }, [])
+
+  useEffect(() => {
+    const onEscape = (event) => {
+      if (event.key === 'Escape') { setActiveDrawer(''); setMenuOpen(false) }
+    }
+    window.addEventListener('keydown', onEscape)
+    return () => window.removeEventListener('keydown', onEscape)
+  }, [])
+
+  useEffect(() => {
+    if (!notificationStatus) return
+    const timer = window.setTimeout(() => setNotificationStatus(''), 6000)
+    return () => window.clearTimeout(timer)
+  }, [notificationStatus])
 
   useEffect(() => {
     if (!autoRefresh || !scan?.address) return
@@ -760,7 +809,7 @@ export default function Home() {
   }
 
   function openRadarToken(item) {
-    setView('scanner')
+    navigateView('scanner')
     setTokenAddress(item.address)
     runScan({ address: item.address })
   }
@@ -843,8 +892,7 @@ export default function Home() {
 
   function openTradePlan(plan) {
     if (!plan?.address) return
-    setActiveDrawer('')
-    setView('scanner')
+    navigateView('scanner')
     setTokenAddress(plan.address)
     runScan({ address: plan.address })
   }
@@ -858,10 +906,14 @@ export default function Home() {
   }
 
   function navigateToTool(nextView, elementId) {
-    setView(nextView)
+    navigateView(nextView)
     setMenuOpen(false)
     window.setTimeout(() => {
-      document.getElementById(elementId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      const target = document.getElementById(elementId)
+      for (let parent = target; parent; parent = parent.parentElement) {
+        if (parent.tagName === 'DETAILS') parent.open = true
+      }
+      target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 120)
   }
 
@@ -872,8 +924,7 @@ export default function Home() {
   function openHistoryScan(entry) {
     const address = entry?.address
     if (!address) return
-    closeDrawer()
-    setView('scanner')
+    navigateView('scanner')
     setTokenAddress(address)
     runScan({ address })
   }
@@ -1176,7 +1227,7 @@ export default function Home() {
   return (
     <main className="appShell">
       <header className="topbar">
-        <button className="brand" onClick={() => setView('radar')} aria-label="Open radar">
+        <button className="brand" onClick={() => navigateView('radar')} aria-label="Open radar">
           <span className="brandMark"><i /><i /><i /></span>
           <span>
             <b>RCXT</b>
@@ -1185,9 +1236,9 @@ export default function Home() {
         </button>
 
         <nav className="desktopNav">
-          <NavButton active={view === 'radar'} onClick={() => setView('radar')}>Radar</NavButton>
-          <NavButton active={view === 'scanner'} onClick={() => setView('scanner')}>Scanner</NavButton>
-          <NavButton active={view === 'wallet'} onClick={() => setView('wallet')}>Wallet</NavButton>
+          <NavButton active={view === 'radar'} onClick={() => navigateView('radar')}>Radar</NavButton>
+          <NavButton active={view === 'scanner'} onClick={() => navigateView('scanner')}>Scanner</NavButton>
+          <NavButton active={view === 'wallet'} onClick={() => navigateView('wallet')}>Wallet</NavButton>
         </nav>
 
         <div className="topActions">
@@ -1215,9 +1266,9 @@ export default function Home() {
                 <div className="commandSection">
                   <span>NAVIGATE</span>
                   <div className="commandGrid three">
-                    <button onClick={() => { setView('radar'); setMenuOpen(false) }}><b>Radar</b><small>Live opportunities</small></button>
-                    <button onClick={() => { setView('scanner'); setMenuOpen(false) }}><b>Scanner</b><small>Deep token intel</small></button>
-                    <button onClick={() => { setView('wallet'); setMenuOpen(false) }}><b>Wallet</b><small>Portfolio command</small></button>
+                    <button onClick={() => { navigateView('radar') }}><b>Radar</b><small>Live opportunities</small></button>
+                    <button onClick={() => { navigateView('scanner') }}><b>Scanner</b><small>Deep token intel</small></button>
+                    <button onClick={() => { navigateView('wallet') }}><b>Wallet</b><small>Portfolio command</small></button>
                   </div>
                 </div>
 
@@ -1453,9 +1504,9 @@ export default function Home() {
       ) : null}
 
       <div className="mobileNav">
-        <NavButton active={view === 'radar'} onClick={() => setView('radar')}>Radar</NavButton>
-        <NavButton active={view === 'scanner'} onClick={() => setView('scanner')}>Scanner</NavButton>
-        <NavButton active={view === 'wallet'} onClick={() => setView('wallet')}>Wallet</NavButton>
+        <NavButton active={view === 'radar'} onClick={() => navigateView('radar')}>Radar</NavButton>
+        <NavButton active={view === 'scanner'} onClick={() => navigateView('scanner')}>Scanner</NavButton>
+        <NavButton active={view === 'wallet'} onClick={() => navigateView('wallet')}>Wallet</NavButton>
       </div>
 
       {view === 'radar' && (
@@ -1838,16 +1889,17 @@ export default function Home() {
                 </div>
               </details>
 
-              <details className="advancedDisclosure">
+              <details className="advancedDisclosure" key={scan.address}>
                 <summary>
                   <div>
                     <span>ADVANCED DATA</span>
-                    <strong>Open the full RCXT breakdown</strong>
-                    <small>Score model, contract details, validation, charts, whale flow, forecasts and trade tools.</small>
+                    <strong>Explore one section at a time</strong>
+                    <small>Tap a section below for scores, charts, risk checks or trade tools.</small>
                   </div>
                   <b>OPEN</b>
                 </summary>
                 <div className="advancedDisclosureBody">
+              <DetailSection title="Score & history" description="Score axes, recent changes and model validation">
               <article className="scoreModelPanel">
                 <div className="scoreModelHead">
                   <div>
@@ -1881,7 +1933,11 @@ export default function Home() {
                   score={scan.intelligence.score}
                 />
               </article>
+              </DetailSection>
+              <DetailSection title="X intelligence" description="Social activity and connection status">
               <XSocialIntel scan={scan} notificationsEnabled={notificationsEnabled} notificationPrefs={notificationPrefs} />
+              </DetailSection>
+              <DetailSection title="Contract & trade thesis" description="Risk flags, supporting evidence and invalidation">
               <div className="analysisGrid">
                 <article className="panel scorePanel">
                   <PanelHeader eyebrow="SIGNAL ENGINE" title="Why the score moved" />
@@ -2047,6 +2103,8 @@ export default function Home() {
                 </article>
               </div>
 
+              </DetailSection>
+              <DetailSection title="Alerts & notes" description="Notification rules and your private token note">
               <div className="proDetailGrid">
                 <article className="panel alertPanel">
                   <PanelHeader eyebrow="ALERT ENGINE" title="Quiet by default · fully configurable" />
@@ -2113,6 +2171,7 @@ export default function Home() {
                 </article>
               </div>
 
+              </DetailSection>
               <V4AnalyticsSuite
                 scan={scan}
                 walletEquity={Number(walletData?.portfolioTotalUsd || walletData?.portfolioTokenValueUsd || 0)}
@@ -2280,7 +2339,7 @@ export default function Home() {
                             <button
                               className="tokenCell"
                               onClick={() => {
-                                setView('scanner')
+                                navigateView('scanner')
                                 runScan({ address: holding.mint })
                               }}
                             >

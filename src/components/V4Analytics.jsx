@@ -1,3 +1,4 @@
+import DetailSection from './DetailSection.jsx'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   beginnerMarketExplanation,
@@ -543,7 +544,12 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
         })
         return
       }
-      new Notification(title,{body,tag:'rcxt-plan-'+scan?.address})
+      const alert = new Notification(title,{body,tag:'rcxt-plan-'+scan?.address})
+      alert.onclick = () => {
+        alert.close()
+        window.focus()
+        window.location.assign('/?token=' + encodeURIComponent(scan?.address || ''))
+      }
     }catch{}
   }
 
@@ -704,9 +710,10 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
 
   return (
     <div className="v4Suite" id="v4-market-lab">
-      <article className="panel v4ChartPanel">
+      <DetailSection title="Chart & market flow" description="Candles, momentum, whales and forecast ranges">
+<article className="panel v4ChartPanel">
         <div className="v4PanelHead">
-          <div><span>V4 MARKET LAB</span><h3>Real OHLCV chart + technical analytics</h3></div>
+          <div><span>MARKET LAB</span><h3>Real OHLCV chart + technical analytics</h3></div>
           <div className="intervalTabs">
             {['1m','5m','15m','1h'].map(value=>(
               <button key={value} className={interval===value?'active':''} onClick={()=>setIntervalValue(value)}>{value}</button>
@@ -731,6 +738,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
 
         {analytics?.available?(
           <>
+            <DetailSection title="Chart indicators" description="Trend, confidence, RSI and volatility">
             <div className="technicalStrip">
               <div><span>Chart Bias</span><b className={analytics.trend==='BULLISH'?'good':analytics.trend==='BEARISH'?'bad':'mid'}>{analytics.trend}</b></div>
               <div><span>Model Confidence</span><b>{analytics.modelConfidence}%</b><small>not win probability</small></div>
@@ -747,7 +755,9 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
               <div><span>Structure R:R</span><b>{analytics.levels?.structureRiskReward?analytics.levels.structureRiskReward.toFixed(2)+'×':'—'}</b><small>nearest support → resistance</small></div>
             </div>
 
+            </DetailSection>
             {marketCapMap.available ? (
+              <DetailSection title="Market-cap map" description="Entry, breakout and invalidation scenarios">
               <div className="marketCapMapPanel">
                 <div className="marketCapMapHead">
                   <div>
@@ -771,9 +781,11 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
                 </div>
                 <p>{marketCapMap.basis}. These are scenario zones, not promised prices or automatic trade instructions.</p>
               </div>
+              </DetailSection>
             ) : null}
 
             {tape?.summary?(
+              <DetailSection title="Trade flow & whales" description="Recent buys, sells and large participants">
               <div className="tradeTape">
                 <div className="tradeTapeHead">
                   <div><span>LIVE TRADE TAPE</span><strong>Recent USD flow</strong></div>
@@ -834,8 +846,10 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
                   <p>Whale labels are based only on relative activity in this recent public trade sample—not wallet identity, net worth, or ownership.</p>
                 </div>
               </div>
+              </DetailSection>
             ):null}
 
+            <DetailSection title="Forecasts & price levels" description="Scenario ranges, support and resistance">
             <div className="forecastGrid">
               <ForecastCard label="NEXT 15M RANGE" forecast={analytics.forecast?.m15}/>
               <ForecastCard label="NEXT 1H RANGE" forecast={analytics.forecast?.h1}/>
@@ -856,11 +870,14 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
               <div><span>RISKS</span>{(analytics.risks||[]).map(value=><small key={value}>− {value}</small>)}</div>
             </div>
             <p className="forecastDisclaimer">{analytics.disclaimer}</p>
+            </DetailSection>
           </>
         ):null}
       </article>
+</DetailSection>
 
-      <article className="panel rugGuardPanel">
+      <DetailSection title="Rug & manipulation checks" description="Contract controls, holder concentration and exit liquidity">
+<article className="panel rugGuardPanel">
         <div className="v4PanelHead">
           <div>
             <span>RUG / MANIPULATION GUARD</span>
@@ -912,8 +929,10 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
 
         <p>{rugGuard?.meaning}</p>
       </article>
+</DetailSection>
 
-      <article className="panel provenancePanel">
+      <DetailSection title="Data sources" description="What is measured, calculated or estimated">
+<article className="panel provenancePanel">
         <div className="v4PanelHead">
           <div><span>DATA PROVENANCE</span><h3>Know what is measured vs calculated</h3></div>
         </div>
@@ -923,16 +942,20 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
           <div><b>ESTIMATED</b><strong>Forecast ranges / profit scenarios</strong><p>Volatility and market-cap scenarios. They are not promised future prices or probabilities.</p></div>
         </div>
       </article>
+</DetailSection>
 
       <div className="v4TwoCol">
-        <article className="panel beginnerPanel">
+        <DetailSection title="Simple explanation" description="A plain-language reading of the setup">
+<article className="panel beginnerPanel">
           <div className="v4PanelHead"><div><span>BEGINNER MODE</span><h3>Explain it like I’m new</h3></div></div>
           <div className="beginnerCards">
             {beginner.map(item=><div key={item.title}><strong>{item.title}</strong><p>{item.text}</p></div>)}
           </div>
         </article>
+</DetailSection>
 
-        <article className="panel riskPlannerPanel">
+        <DetailSection title="Position size" description="Set your risk budget before planning a position">
+<article className="panel riskPlannerPanel">
           <div className="v4PanelHead"><div><span>POSITION PLANNER</span><h3>Risk budget before position size</h3></div></div>
           <div className="plannerInputs">
             <label><span>Account value</span><input inputMode="decimal" value={accountValue} onChange={e=>setAccountValue(e.target.value)} placeholder="100"/></label>
@@ -947,10 +970,12 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
           </div>
           <p>Uses your chosen stop distance. Liquidity burden compares planned position size with reported pool liquidity. Real losses can exceed the estimate because of slippage or failed exits.</p>
         </article>
+</DetailSection>
       </div>
 
       <div className="v4TwoCol">
-        <article className="panel decisionPanel">
+        <DetailSection title="Signal agreement" description="Where the score, chart and trade flow agree">
+<article className="panel decisionPanel">
           <div className="v4PanelHead"><div><span>DECISION STACK</span><h3>RCXT + chart + tape confluence</h3></div></div>
           <div className={'decisionBadge '+decisionSummary.label.replaceAll(' ','-').toLowerCase()}>{decisionSummary.label}</div>
           <div className="decisionColumns">
@@ -959,8 +984,10 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
           </div>
           <small>This combines independent layers; it is not a probability of profit.</small>
         </article>
+</DetailSection>
 
-        <article className="panel exitPlannerPanel">
+        <DetailSection title="Exit planner" description="Take-profit, scale-out and stop scenarios">
+<article className="panel exitPlannerPanel">
           <div className="v4PanelHead"><div><span>EXIT PLANNER</span><h3>Plan the trade before the trade plans you</h3></div></div>
           <div className="plannerInputs">
             <label><span>TP target %</span><input inputMode="decimal" value={takeProfitPercent} onChange={e=>setTakeProfitPercent(e.target.value)}/></label>
@@ -975,9 +1002,11 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
           </div>
           <p>Simple planning math only. Real fills can differ because of liquidity, slippage, fees, taxes, and fast price changes.</p>
         </article>
+</DetailSection>
       </div>
 
-      <article className="panel executionLabPanel">
+      <DetailSection title="Execution checks" description="Readiness, break-even and target value">
+<article className="panel executionLabPanel">
         <div className="v4PanelHead">
           <div><span>EXECUTION LAB</span><h3>Plan the trade before the trade plans you</h3></div>
           <button className="toolButton" onClick={copyFullReport}>Copy full report</button>
@@ -1046,8 +1075,10 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
           Confirmation checks are descriptive—not a buy signal. Support/resistance can fail, pool liquidity can disappear, and realized slippage can be worse than the planner.
         </p>
       </article>
+</DetailSection>
 
-      <article className="panel tradePlanPanel">
+      <DetailSection title="Saved trade plan" description="Your entry, exit and invalidation">
+<article className="panel tradePlanPanel">
         <div className="v4PanelHead">
           <div><span>SAVED TRADE PLAN</span><h3>Pre-commit your entry, exit, and invalidation</h3></div>
           <div className="tradePlanActions">
@@ -1126,8 +1157,10 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
           <small>Stored locally on this device. Plan alerts work while RCXT is running; RCXT does not execute trades.</small>
         </div>
       </article>
+</DetailSection>
 
-      <article className="panel profitLadderPanel">
+      <DetailSection title="Profit calculator" description="What your position could be worth at each market cap">
+<article className="panel profitLadderPanel">
         <div className="v4PanelHead">
           <div><span>PROFIT LIST</span><h3>Instant “what if it hits…” market-cap math</h3></div>
           <button className="toolButton" onClick={copyProfitList}>Copy profit list</button>
@@ -1184,6 +1217,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
           MC-ratio math assumes comparable supply. Real fills differ with slippage, liquidity, fees, taxes, supply changes, and execution.
         </p>
       </article>
+</DetailSection>
     </div>
   )
 }
