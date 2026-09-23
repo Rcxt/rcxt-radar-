@@ -891,6 +891,7 @@ export default function Home() {
                 <ServiceTile label="RCXT App" service={health?.services?.app} />
                 <ServiceTile label="Solana RPC" service={health?.services?.solana} />
                 <ServiceTile label="DexScreener" service={health?.services?.dexscreener} />
+                <ServiceTile label="Charts / Tape" service={health?.services?.charts} />
                 <ServiceTile label="Supabase" service={health?.services?.supabase} />
                 <div className="systemMeta"><span>Score engine</span><b>{health?.scoreVersion || '4.0.0'}</b></div>
                 <div className="systemMeta"><span>Secure writes</span><b>{health?.oidc?.available ? 'OIDC ACTIVE' : 'CHECKING'}</b></div>
