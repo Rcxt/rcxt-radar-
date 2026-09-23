@@ -14,6 +14,11 @@ function pct(value,digits=1){
   return Number.isFinite(n)?(n>=0?'+':'')+n.toFixed(digits)+'%':'—'
 }
 
+function fixed(value,digits=1,fallback='—'){
+  const n=Number(value)
+  return Number.isFinite(n)?n.toFixed(digits):fallback
+}
+
 function EquitySparkline({rows,current}){
   const values=[...(rows||[]).map(row=>Number(row.totalValueUsd||0)),Number(current||0)].filter(Number.isFinite)
   if(values.length<2) return <div className="challengeEmptyChart">Sync more snapshots to build the equity curve.</div>
@@ -159,7 +164,7 @@ export default function ChallengeTracker({walletAddress='',walletData=null}){
 
       <div className="challengeStats">
         <div><span>Current equity</span><b>{money(stats.current)}</b></div>
-        <div><span>From $5</span><b>{stats.current>0?stats.multiple.toFixed(2)+'×':'—'}</b></div>
+        <div><span>From $5</span><b>{stats.current>0?fixed(stats.multiple,2)+'×':'—'}</b></div>
         <div><span>Next milestone</span><b>{money(stats.nextMilestone)}</b></div>
         <div><span>Needed to next</span><b>{stats.percentToNext==null?'—':pct(stats.percentToNext,0)}</b></div>
         <div><span>High-water mark</span><b>{money(Math.max(stats.highWater,Number(data?.highWater||0)))}</b></div>
@@ -189,7 +194,7 @@ export default function ChallengeTracker({walletAddress='',walletData=null}){
         <div>
           <span>To next milestone</span>
           <b>{money(performance.toNext)}</b>
-          <small>{stats.requiredMultiple?stats.requiredMultiple.toFixed(1)+'× remains to $50K':'Sync wallet for goal math'}</small>
+          <small>{Number.isFinite(Number(stats.requiredMultiple))?fixed(stats.requiredMultiple,1)+'× remains to $50K':'Sync wallet for goal math'}</small>
         </div>
         <div>
           <span>Server change</span>
@@ -234,7 +239,7 @@ export default function ChallengeTracker({walletAddress='',walletData=null}){
 
       <div className="challengeFoot">
         <span>{scopedRows.length} challenge snapshots{startedAt?' · started '+new Date(startedAt).toLocaleDateString():''}</span>
-        <span>{stats.requiredMultiple?stats.requiredMultiple.toFixed(1)+'× from current equity to $50K':'Sync a wallet to begin tracking'}</span>
+        <span>{Number.isFinite(Number(stats.requiredMultiple))?fixed(stats.requiredMultiple,1)+'× from current equity to $50K':'Sync a wallet to begin tracking'}</span>
         <button className="challengeReset" onClick={resetChallenge}>Reset challenge start</button>
       </div>
     </article>
