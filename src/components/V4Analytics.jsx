@@ -102,9 +102,30 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
   const [targetPositionValue,setTargetPositionValue]=useState('100')
   const [takeProfitPercent,setTakeProfitPercent]=useState('50')
   const [scaleOutPercent,setScaleOutPercent]=useState('25')
+  const [planThesis,setPlanThesis]=useState('')
+  const [planInvalidation,setPlanInvalidation]=useState('')
+  const [planSavedAt,setPlanSavedAt]=useState(null)
 
   useEffect(()=>{
     setEntryMarketCap(scan?.market?.marketCap?String(Math.round(scan.market.marketCap)):'')
+    if(!scan?.address) return
+    try{
+      const saved=JSON.parse(localStorage.getItem('rcxt-trade-plan:'+scan.address)||'null')
+      if(saved){
+        if(saved.investment!=null) setInvestment(String(saved.investment))
+        if(saved.entryMarketCap!=null) setEntryMarketCap(String(saved.entryMarketCap))
+        if(saved.takeProfitPercent!=null) setTakeProfitPercent(String(saved.takeProfitPercent))
+        if(saved.scaleOutPercent!=null) setScaleOutPercent(String(saved.scaleOutPercent))
+        if(saved.stopDistance!=null) setStopDistance(String(saved.stopDistance))
+        setPlanThesis(saved.thesis||'')
+        setPlanInvalidation(saved.invalidation||'')
+        setPlanSavedAt(saved.savedAt||null)
+      }else{
+        setPlanThesis('')
+        setPlanInvalidation('')
+        setPlanSavedAt(null)
+      }
+    }catch{}
   },[scan?.address])
 
   useEffect(()=>{
@@ -291,6 +312,41 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
       'Risk flags: '+((scan.intelligence?.riskFlags||[]).join(', ')||'none'),
       'Forecast bands are scenarios, not guaranteed targets.',
     ].filter(Boolean)
+    try{await navigator.clipboard.writeText(lines.join('\n'))}catch{}
+  }
+
+  function saveTradePlan(){
+    if(!scan?.address) return
+    const payload={
+      token:scan?.token?.symbol||'TOKEN',
+      address:scan.address,
+      investment:Number(investment||0),
+      entryMarketCap:Number(entryMarketCap||0),
+      takeProfitPercent:Number(takeProfitPercent||0),
+      scaleOutPercent:Number(scaleOutPercent||0),
+      stopDistance:Number(stopDistance||0),
+      thesis:planThesis,
+      invalidation:planInvalidation,
+      savedAt:Date.now(),
+    }
+    try{
+      localStorage.setItem('rcxt-trade-plan:'+scan.address,JSON.stringify(payload))
+      setPlanSavedAt(payload.savedAt)
+    }catch{}
+  }
+
+  async function copyTradePlan(){
+    const lines=[
+      (scan?.token?.symbol||'TOKEN')+' trade plan',
+      'Position: '+money(Number(investment||0)),
+      'Entry MC: '+money(Number(entryMarketCap||0)),
+      'TP: +'+Number(takeProfitPercent||0)+'%',
+      'Scale out: '+Number(scaleOutPercent||0)+'%',
+      'Stop: -'+Number(stopDistance||0)+'%',
+      'Thesis: '+(planThesis||'—'),
+      'Invalidation: '+(planInvalidation||'—'),
+      'RCXT: '+(scan?.intelligence?.signal||'WATCH')+' '+Number(scan?.intelligence?.score||0)+'/100',
+    ]
     try{await navigator.clipboard.writeText(lines.join('\n'))}catch{}
   }
 
@@ -499,6 +555,31 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
         <p className="profitNote">
           Confirmation checks are descriptive—not a buy signal. Support/resistance can fail, pool liquidity can disappear, and realized slippage can be worse than the planner.
         </p>
+      </article>
+
+      <article className="panel tradePlanPanel">
+        <div className="v4PanelHead">
+          <div><span>SAVED TRADE PLAN</span><h3>Pre-commit your entry, exit, and invalidation</h3></div>
+          <div className="tradePlanActions">
+            <button className="toolButton" onClick={copyTradePlan}>Copy plan</button>
+            <button className="toolButton active" onClick={saveTradePlan}>Save plan</button>
+          </div>
+        </div>
+        <div className="tradePlanGrid">
+          <label><span>Position</span><input inputMode="decimal" value={investment} onChange={e=>setInvestment(e.target.value)}/></label>
+          <label><span>Entry MC</span><input inputMode="decimal" value={entryMarketCap} onChange={e=>setEntryMarketCap(e.target.value)}/></label>
+          <label><span>TP %</span><input inputMode="decimal" value={takeProfitPercent} onChange={e=>setTakeProfitPercent(e.target.value)}/></label>
+          <label><span>Scale out %</span><input inputMode="decimal" value={scaleOutPercent} onChange={e=>setScaleOutPercent(e.target.value)}/></label>
+          <label><span>Stop %</span><input inputMode="decimal" value={stopDistance} onChange={e=>setStopDistance(e.target.value)}/></label>
+        </div>
+        <div className="tradePlanNotes">
+          <label><span>Thesis</span><textarea value={planThesis} onChange={e=>setPlanThesis(e.target.value)} placeholder="Why am I entering? Catalyst / setup / flow…"/></label>
+          <label><span>Invalidation</span><textarea value={planInvalidation} onChange={e=>setPlanInvalidation(e.target.value)} placeholder="What specifically makes me exit or stop believing the setup?"/></label>
+        </div>
+        <div className="tradePlanFoot">
+          <span>{planSavedAt?'Saved '+new Date(planSavedAt).toLocaleString():'Not saved yet'}</span>
+          <small>Stored locally on this device. RCXT does not execute trades.</small>
+        </div>
       </article>
 
       <article className="panel profitLadderPanel">
