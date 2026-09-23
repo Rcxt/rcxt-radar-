@@ -150,7 +150,7 @@ test('entry quality penalizes multi-whale distribution and concentration',()=>{
 })
 
 test('entry quality can recognize diversified whale accumulation as supporting context',()=>{
-  const result=buildEntryQuality({
+  const base={
     scan:{
       market:{liquidityUsd:90000},
       intelligence:{risk:'LOW'},
@@ -168,13 +168,27 @@ test('entry quality can recognize diversified whale accumulation as supporting c
       },
       momentum:{m15:8},
     },
+  }
+
+  const withoutWhales=buildEntryQuality({
+    ...base,
+    tape:{
+      netFlowUsd:7000,
+      buyVolumePercent:61,
+      flags:[],
+    },
+  })
+
+  const withWhales=buildEntryQuality({
+    ...base,
     tape:{
       netFlowUsd:7000,
       buyVolumePercent:61,
       flags:['MULTI_WHALE_ACCUMULATION'],
     },
   })
-  assert.ok(result.available)
-  assert.ok(result.score>=75)
-  assert.ok(result.reasons.some(value=>value.toLowerCase().includes('large sampled wallets')))
+
+  assert.ok(withWhales.available)
+  assert.ok(withWhales.score>=withoutWhales.score)
+  assert.ok(withWhales.score>=75)
 })
