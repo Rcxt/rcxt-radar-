@@ -2819,7 +2819,11 @@ function usd(value) {
 
 function compactUsd(value) {
   if (value === null || value === undefined || value === '') return '—'
-  return '
+  return '$' + Intl.NumberFormat('en', {
+    notation: 'compact',
+    maximumFractionDigits: 2,
+  }).format(Number(value || 0))
+}
 
 function tinyUsd(value) {
   const amount = Number(value || 0)
