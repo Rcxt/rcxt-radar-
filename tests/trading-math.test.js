@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import {
   buildEntryQuality,
   buildProfitLadder,
+  buildRugRiskChecklist,
   challengeStats,
   positionPlan,
   projectedPositionValue,
@@ -191,4 +192,33 @@ test('entry quality can recognize diversified whale accumulation as supporting c
   assert.ok(withWhales.available)
   assert.ok(withWhales.score>=withoutWhales.score)
   assert.ok(withWhales.score>=75)
+})
+
+
+test('rug guard treats unreported Pump.fun liquidity as unknown, not critical',()=>{
+  const result=buildRugRiskChecklist({
+    scan:{
+      market:{liquidityUsd:null,marketCap:12000,priceChange:{h1:20,h24:200}},
+      security:{available:true,mintAuthority:null,freezeAuthority:null},
+      intelligence:{
+        contractVerified:true,
+        concentration:{available:false},
+        liquidityReported:false,
+        liquiditySource:'PUMPFUN_BONDING_CURVE_UNREPORTED',
+        liquidityToCapPercent:null,
+        turnover24h:null,
+        ageHours:0.2,
+        buyPercent1h:62,
+      },
+    },
+    tape:null,
+  })
+
+  const liquidity=result.items.find(item=>item.key==='liquidity')
+  const liqCap=result.items.find(item=>item.key==='liq-cap')
+  const turnover=result.items.find(item=>item.key==='turnover')
+  assert.equal(liquidity?.severity,'unknown')
+  assert.equal(liqCap?.severity,'unknown')
+  assert.equal(turnover?.severity,'unknown')
+  assert.ok(!result.items.some(item=>item.key==='liquidity'&&item.severity==='critical'))
 })

@@ -354,19 +354,22 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
 
   const consensus=useMemo(()=>{
     if(!analytics?.available) return null
-    const signal=String(scan?.intelligence?.signal||'')
-    const coreBull=['BUY SETUP','LEAN BUY'].includes(signal)
-    const coreBear=['REDUCE','SELL / AVOID'].includes(signal)
+    const direction=String(scan?.intelligence?.directionalBias||'NEUTRAL')
+    const coreBull=direction==='BULLISH'
+    const coreBear=direction==='BEARISH'
     const chartBull=analytics.trend==='BULLISH'
     const chartBear=analytics.trend==='BEARISH'
-    if((coreBull&&chartBull)||(coreBear&&chartBear)) return {label:'ALIGNED',tone:'good',text:'RCXT market structure and candle model point in the same direction.'}
-    if((coreBull&&chartBear)||(coreBear&&chartBull)) return {label:'CONFLICT',tone:'bad',text:'RCXT and candle structure disagree. Treat the setup as lower-conviction until they converge.'}
-    return {label:'MIXED',tone:'mid',text:'At least one layer is neutral or watch-only. Confirmation is incomplete.'}
-  },[analytics?.available,analytics?.trend,scan?.intelligence?.signal])
+    if((coreBull&&chartBull)||(coreBear&&chartBear)) return {label:'ALIGNED',tone:'good',text:'RCXT directional structure and candle model point in the same direction.'}
+    if((coreBull&&chartBear)||(coreBear&&chartBull)) return {label:'CONFLICT',tone:'bad',text:'RCXT directional structure and candle model disagree. Treat direction as lower-conviction until they converge.'}
+    return {label:'MIXED',tone:'mid',text:'At least one directional layer is neutral. Confirmation is incomplete.'}
+  },[analytics?.available,analytics?.trend,scan?.intelligence?.directionalBias])
 
   const decisionSummary=useMemo(()=>{
     const score=Number(scan?.intelligence?.score||0)
     const signal=String(scan?.intelligence?.signal||'WATCH')
+    const direction=String(scan?.intelligence?.directionalBias||'NEUTRAL')
+    const opportunity=Number(scan?.intelligence?.opportunityScore??scan?.intelligence?.setupScore??0)
+    const liquidityReported=scan?.intelligence?.liquidityReported!==false
     const chartTrend=analytics?.trend||'UNKNOWN'
     const tapeNet=Number(tape?.summary?.netFlowUsd||0)
     const tapeBuyPct=Number(tape?.summary?.buyVolumePercent||50)
@@ -374,10 +377,13 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
     const positives=[]
     const warnings=[]
 
-    if(['BUY SETUP','LEAN BUY'].includes(signal)){strength+=2;positives.push('Core RCXT signal is constructive')}
-    if(['REDUCE','SELL / AVOID'].includes(signal)){strength-=2;warnings.push('Core RCXT signal is defensive')}
-    if(score>=75){strength+=1;positives.push('RCXT score is strong')}
-    if(score<50){strength-=1;warnings.push('RCXT score is weak')}
+    if(direction==='BULLISH'){strength+=2;positives.push('RCXT directional bias is bullish')}
+    if(direction==='BEARISH'){strength-=2;warnings.push('RCXT directional bias is bearish')}
+    if(opportunity>=70){strength+=1;positives.push('Opportunity / momentum score is strong')}
+    if(signal==='SELL / AVOID'){strength-=2;warnings.push('Hard structural safety controls are failing')}
+    else if(signal==='REDUCE'){strength-=1;warnings.push('Risk-adjusted setup is deteriorating')}
+    if(score>=75){strength+=1;positives.push('Risk-adjusted tradability score is strong')}
+    if(score<50){strength-=1;warnings.push('Risk-adjusted tradability score is weak')}
     if(chartTrend==='BULLISH'){strength+=1;positives.push('Candle structure is bullish')}
     if(chartTrend==='BEARISH'){strength-=1;warnings.push('Candle structure is bearish')}
     if(tapeNet>0&&tapeBuyPct>=55){strength+=1;positives.push('Recent USD flow favors buyers')}
@@ -389,14 +395,18 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
     if(tapeFlags.includes('MULTI_WHALE_ACCUMULATION')){strength+=1;positives.push('Multiple large sampled wallets are net accumulating')}
     if(tapeFlags.includes('MULTI_WHALE_DISTRIBUTION')){strength-=2;warnings.push('Multiple large sampled wallets are net distributing')}
     if(tapeFlags.includes('WHALE_FLOW_CONCENTRATED')){strength-=1;warnings.push('Whale-sized flow is concentrated in very few wallets')}
-    if(Number(scan?.market?.liquidityUsd||0)<5000){strength-=2;warnings.push('Liquidity is very thin')}
-    if(scan?.intelligence?.risk==='EXTREME'){strength-=2;warnings.push('RCXT structural risk is extreme')}
+    if(liquidityReported&&Number(scan?.market?.liquidityUsd||0)<5000){strength-=2;warnings.push('Reported liquidity is very thin')}
+    if(!liquidityReported){warnings.push('Liquidity is unreported; execution depth is uncertain')}
+    if(scan?.intelligence?.risk==='EXTREME'){strength-=2;warnings.push('RCXT structural / execution risk is extreme')}
     if(rugGuard?.critical>=2){strength-=2;warnings.push('Rug / Manipulation Guard has multiple critical flags')}
     else if(rugGuard?.critical===1){strength-=1;warnings.push('Rug / Manipulation Guard has a critical flag')}
 
-    const label=strength>=4?'STRONG CONFLUENCE':strength>=2?'CONSTRUCTIVE':strength<=-3?'HIGH RISK':strength<=-1?'DEFENSIVE':'MIXED'
+    let label=strength>=4?'STRONG CONFLUENCE':strength>=2?'CONSTRUCTIVE':strength<=-3?'HIGH RISK':strength<=-1?'DEFENSIVE':'MIXED'
+    if(direction==='BULLISH'&&['HIGH','EXTREME'].includes(scan?.intelligence?.risk)&&opportunity>=60){
+      label='HOT / HIGH RISK'
+    }
     return {label,strength,positives:positives.slice(0,4),warnings:warnings.slice(0,4)}
-  },[scan?.intelligence?.score,scan?.intelligence?.signal,scan?.intelligence?.risk,scan?.market?.liquidityUsd,analytics?.trend,tape?.summary?.netFlowUsd,tape?.summary?.buyVolumePercent,tape?.summary?.flags,rugGuard?.critical])
+  },[scan?.intelligence?.score,scan?.intelligence?.signal,scan?.intelligence?.risk,scan?.intelligence?.directionalBias,scan?.intelligence?.opportunityScore,scan?.intelligence?.setupScore,scan?.intelligence?.liquidityReported,scan?.market?.liquidityUsd,analytics?.trend,tape?.summary?.netFlowUsd,tape?.summary?.buyVolumePercent,tape?.summary?.flags,rugGuard?.critical])
 
   const exitPlan=useMemo(()=>{
     const position=Math.max(0,Number(investment||0))

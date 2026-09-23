@@ -400,22 +400,45 @@ export function buildRugRiskChecklist({scan,tape}){
     add('concentration','Supply concentration','unknown','Largest holder/account concentration could not be verified.','measured')
   }
 
-  const liquidity=Number(market.liquidityUsd||0)
-  const liquidityToCap=Number(intel.liquidityToCapPercent||0)
-  add(
-    'liquidity',
-    'Exit liquidity',
-    liquidity<3000?'critical':liquidity<10000?'warning':'pass',
-    liquidity?`Reported pool liquidity is about $${Math.round(liquidity).toLocaleString()}.`:'No usable liquidity reading.',
-    'measured'
-  )
-  add(
-    'liq-cap',
-    'Liquidity vs market cap',
-    liquidityToCap>0&&liquidityToCap<2?'critical':liquidityToCap<6?'warning':'pass',
-    `Liquidity is ${liquidityToCap.toFixed(1)}% of market cap.`,
-    'computed'
-  )
+  const liquidityReported=intel.liquidityReported!==false
+  const liquidity=liquidityReported?Number(market.liquidityUsd||0):null
+  const liquidityToCap=liquidityReported&&intel.liquidityToCapPercent!=null
+    ? Number(intel.liquidityToCapPercent)
+    : null
+
+  if(!liquidityReported){
+    add(
+      'liquidity',
+      'Exit liquidity',
+      'unknown',
+      intel.liquiditySource==='PUMPFUN_BONDING_CURVE_UNREPORTED'
+        ? 'Pump.fun bonding-curve liquidity is not reported as AMM pool liquidity.'
+        : 'Liquidity data is unavailable.',
+      'measured'
+    )
+    add(
+      'liq-cap',
+      'Liquidity vs market cap',
+      'unknown',
+      'Cannot compute a liquidity-to-market-cap ratio without a reported liquidity value.',
+      'computed'
+    )
+  }else{
+    add(
+      'liquidity',
+      'Exit liquidity',
+      liquidity<3000?'critical':liquidity<10000?'warning':'pass',
+      liquidity?`Reported pool liquidity is about ${Math.round(liquidity).toLocaleString()}.`:'Reported liquidity is zero.',
+      'measured'
+    )
+    add(
+      'liq-cap',
+      'Liquidity vs market cap',
+      liquidityToCap>0&&liquidityToCap<2?'critical':liquidityToCap<6?'warning':'pass',
+      `Liquidity is ${Number(liquidityToCap||0).toFixed(1)}% of market cap.`,
+      'computed'
+    )
+  }
 
   const ageHours=Number(intel.ageHours)
   if(Number.isFinite(ageHours)){
@@ -430,14 +453,24 @@ export function buildRugRiskChecklist({scan,tape}){
     add('age','Pair maturity','unknown','Pair creation time is unavailable.','measured')
   }
 
-  const turnover=Number(intel.turnover24h||0)
-  add(
-    'turnover',
-    'Turnover / churn',
-    turnover>=150?'warning':turnover>=60?'watch':'pass',
-    `24h volume is about ${turnover.toFixed(1)}× reported liquidity.`,
-    'computed'
-  )
+  if(intel.turnover24h==null){
+    add(
+      'turnover',
+      'Turnover / churn',
+      'unknown',
+      'Turnover cannot be calculated without a reported liquidity value.',
+      'computed'
+    )
+  }else{
+    const turnover=Number(intel.turnover24h||0)
+    add(
+      'turnover',
+      'Turnover / churn',
+      turnover>=150?'warning':turnover>=60?'watch':'pass',
+      `24h volume is about ${turnover.toFixed(1)}× reported liquidity.`,
+      'computed'
+    )
+  }
 
   const buy1=Number(intel.buyPercent1h||50)
   add(
