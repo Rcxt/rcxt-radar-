@@ -1285,6 +1285,18 @@ export default function Home() {
                 </div>
                 <ScoreAxes intelligence={scan.intelligence} />
                 <ScoreTrend rows={scoreHistory} currentScore={scan.intelligence.score} modelVersion={scan.intelligence.modelVersion} />
+                <SnapshotDelta
+                  rows={scoreHistory}
+                  current={{
+                    score:scan.intelligence.score,
+                    signal:scan.intelligence.signal,
+                    priceUsd:scan.market.priceUsd,
+                    marketCap:scan.market.marketCap,
+                    liquidityUsd:scan.market.liquidityUsd,
+                    volume24h:scan.market.volume.h24,
+                  }}
+                  modelVersion={scan.intelligence.modelVersion}
+                />
                 <CalibrationStrip
                   calibration={calibration}
                   modelVersion={scan.intelligence.modelVersion}
@@ -1780,6 +1792,79 @@ function CalibrationStrip({ calibration, modelVersion, signal }) {
   )
 }
 
+function SnapshotDelta({ rows, current, modelVersion }) {
+  const compatible = (rows || [])
+    .filter((row) => row.scoreVersion === modelVersion)
+    .sort((a,b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+
+  let previous = compatible[0] || null
+  if (
+    previous &&
+    Number(previous.score) === Number(current?.score) &&
+    Math.abs(Number(previous.priceUsd || 0) - Number(current?.priceUsd || 0)) <= Math.max(1e-12, Number(current?.priceUsd || 0) * 0.002)
+  ) {
+    previous = compatible[1] || null
+  }
+
+  if (!previous) {
+    return (
+      <div className="snapshotDelta empty">
+        <span>SNAPSHOT DELTA</span>
+        <small>Run another manual scan later to compare what changed.</small>
+      </div>
+    )
+  }
+
+  const deltaPct = (next, before) => {
+    const a = Number(before || 0)
+    const b = Number(next || 0)
+    return a > 0 ? ((b / a) - 1) * 100 : null
+  }
+
+  const scoreDelta = Number(current?.score || 0) - Number(previous.score || 0)
+  const ageMs = Date.now() - new Date(previous.createdAt || 0).getTime()
+  const ageMinutes = Number.isFinite(ageMs) ? Math.max(0, ageMs / 60000) : null
+  const items = [
+    ['Score', scoreDelta, 'pts'],
+    ['Price', deltaPct(current?.priceUsd, previous.priceUsd), '%'],
+    ['Market Cap', deltaPct(current?.marketCap, previous.marketCap), '%'],
+    ['Liquidity', deltaPct(current?.liquidityUsd, previous.liquidityUsd), '%'],
+    ['24H Volume', deltaPct(current?.volume24h, previous.volume24h), '%'],
+  ]
+
+  const ageLabel = ageMinutes == null
+    ? 'Prior saved scan'
+    : ageMinutes < 60
+      ? Math.round(ageMinutes) + 'm ago'
+      : (ageMinutes / 60).toFixed(1) + 'h ago'
+
+  return (
+    <div className="snapshotDelta">
+      <div className="snapshotDeltaHead">
+        <div>
+          <span>SNAPSHOT DELTA</span>
+          <strong>{(previous.signal || 'PRIOR') + ' → ' + (current?.signal || 'CURRENT')}</strong>
+        </div>
+        <small>{ageLabel}</small>
+      </div>
+      <div className="snapshotDeltaGrid">
+        {items.map(([label, raw, unit]) => {
+          const value = raw == null || !Number.isFinite(raw) ? null : raw
+          const tone = value == null ? '' : value > 0 ? 'positive' : value < 0 ? 'negative' : ''
+          const rendered = value == null
+            ? '—'
+            : (value >= 0 ? '+' : '') + value.toFixed(unit === 'pts' ? 0 : 1) + unit
+          return (
+            <div key={label}>
+              <span>{label}</span>
+              <b className={tone}>{rendered}</b>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
 function ScoreTrend({ rows, currentScore, modelVersion }) {
   const compatible = (rows || []).filter((row) => row.scoreVersion === modelVersion)
   const legacyCount = Math.max(0, (rows?.length || 0) - compatible.length)
