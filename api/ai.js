@@ -17,7 +17,7 @@ function fallbackAnalysis(scan,social,mode='pro'){
         ? 'The setup is mixed. There are positives, but enough weaknesses that patience matters.'
         : 'The setup currently has more weakness or uncertainty than confirmation.'
     return [
-      `BOTTOM LINE\n${intel?.signal||'WATCH'} · RCXT ${score}/100. ${plain}`,
+      `BOTTOM LINE\n${intel?.signal||'WATCH'} · RCXT ${score}/100 · Opportunity ${intel?.opportunityScore??intel?.setupScore??'—'}/100 (${intel?.opportunityLabel||'mixed'}). ${plain}`,
       `WHY\n${positives}`,
       `WHAT COULD GO WRONG\n${negatives}`,
       `BEGINNER NOTE\nA score is not a win chance. Liquidity tells you how easy it may be to exit, seller pressure can change fast, and a good-looking chart cannot make contract risk disappear. ${socialLine}`
@@ -25,7 +25,7 @@ function fallbackAnalysis(scan,social,mode='pro'){
   }
 
   return [
-    `SIGNAL\n${intel?.signal||'WATCH'} — risk-adjusted score ${intel?.score??0}/100. Setup ${intel?.setupScore??'—'}, execution ${intel?.executionScore??'—'}, safety ${intel?.safetyScore??'—'}, data quality ${intel?.dataQualityScore??'—'}.`,
+    `SIGNAL\n${intel?.signal||'WATCH'} — risk-adjusted score ${intel?.score??0}/100. Opportunity ${intel?.opportunityScore??intel?.setupScore??'—'}/100 (${intel?.opportunityLabel||'mixed'}), direction ${intel?.directionalBias||'NEUTRAL'}, execution ${intel?.executionScore??'—'}, safety ${intel?.safetyScore??'—'}, data quality ${intel?.dataQualityScore??'—'}.`,
     `WHY\n${positives}\n${socialLine}`,
     `INVALIDATION\n${negatives}`,
     'RISK\nTreat RCXT as decision support, not a profit forecast. Liquidity, contract risk, slippage, and changing market structure can invalidate the setup quickly.'
@@ -69,6 +69,7 @@ Analyze only the supplied token snapshot. Use plain language a brand-new trader 
 Avoid unexplained jargon. If you use a term like liquidity, RSI, slippage, or market cap, explain it in a few words.
 Never claim certainty, guaranteed profit, a win probability, insider information, or exact future prices.
 The deterministic RCXT v4 signal is the source of truth.
+Risk and direction are separate: a very young or thin-liquidity token can be extremely risky while momentum is still bullish. Never describe liquidity risk or pair age alone as proof price will fall.
 When candle analytics are supplied, explain chart bias, RSI, support/resistance, volatility, and forecast ranges in plain language.
 When live trade tape is supplied, explain whether recent USD flow confirms or contradicts the token-level buy/sell counts.
 Forecast ranges are scenario bands, not promised targets.
@@ -77,7 +78,8 @@ Explicitly say that score/confidence are not a probability of profit.
 Social evidence is lower trust and must never override contract, liquidity, or execution risk.`
     : `You are RCXT Radar's market analyst. Analyze only the supplied Solana token snapshot.
 Be concise, skeptical, and practical. Never claim certainty, guaranteed profit, insider knowledge, or future prices.
-The deterministic RCXT v4 signal is the source of truth. It separates setup, execution, safety, and data quality.
+The deterministic RCXT v4 signal is the source of truth. It separates directional opportunity/setup from execution risk, safety, and data quality.
+Risk is not the same as direction: thin liquidity, youth, or parabolic movement can coexist with bullish momentum. Do not turn those facts alone into a bearish forecast.
 Social data is lower-trust supporting evidence because it can be manipulated. Never let social momentum override contract, liquidity, execution, or market-structure risk.
 Explain contradictions explicitly. A high social score with weak setup/execution should be treated as hype risk, not confirmation.
 Use supplied candle regime, support/resistance, forecast ranges, and live trade tape as additional evidence.
@@ -106,12 +108,12 @@ Never claim probability of profit, guaranteed returns, insider information, or c
 
   const analysis=fallbackAnalysis(scan,social,mode)
   await logAiAnalysis(
-    {scan,model:'deterministic-fallback-v4',analysis,social},
+    {scan,model:'deterministic-fallback-v4.2',analysis,social},
     req.headers?.['x-vercel-oidc-token']
   )
   return res.status(200).json({
     success:true,
-    model:'deterministic-fallback-v4',
+    model:'deterministic-fallback-v4.2',
     analysis,
     gatewayAvailable:false
   })

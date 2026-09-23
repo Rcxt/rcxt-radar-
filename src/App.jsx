@@ -13,6 +13,13 @@ const WATCH_KEY = 'rcxt-watchlist-v1'
 const RULES_KEY = 'rcxt-alert-rules-v1'
 const NOTES_KEY = 'rcxt-token-notes-v1'
 
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4)
+  const base64 = (base64String + padding).replaceAll('-', '+').replaceAll('_', '/')
+  const raw = atob(base64)
+  return Uint8Array.from([...raw].map((char) => char.charCodeAt(0)))
+}
+
 export default function Home() {
   const [view, setView] = useState('radar')
   const [radar, setRadar] = useState([])
@@ -42,6 +49,15 @@ export default function Home() {
   const [showHidden, setShowHidden] = useState(false)
   const [notificationsEnabled, setNotificationsEnabled] = useState(false)
   const [notificationStatus, setNotificationStatus] = useState('')
+  const [liveMonitor, setLiveMonitor] = useState({
+    enabled:false,
+    loading:false,
+    subscriptionCount:0,
+    lastCheckedAt:null,
+    lastEventAt:null,
+    lastError:null,
+    vapidPublicKey:null,
+  })
   const [watchlist, setWatchlist] = useState([])
   const [showWatchlist, setShowWatchlist] = useState(false)
   const [compare, setCompare] = useState([])
@@ -286,6 +302,142 @@ export default function Home() {
 
     return () => clearInterval(timer)
   }, [autoRefresh, scan?.address, runScan])
+
+  const loadLiveMonitor = useCallback(async (targetWallet = wallet) => {
+    const address = String(targetWallet || '').trim()
+    if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)) {
+      setLiveMonitor((current) => ({ ...current, enabled:false, loading:false, subscriptionCount:0 }))
+      return null
+    }
+
+    setLiveMonitor((current) => ({ ...current, loading:true }))
+    try {
+      const response = await fetch('/api/monitor?wallet=' + encodeURIComponent(address), { cache:'no-store' })
+      const data = await response.json()
+      if (!response.ok || !data?.success) throw new Error(data?.error || 'Monitor status unavailable')
+      setLiveMonitor({
+        enabled:Boolean(data.enabled),
+        loading:false,
+        subscriptionCount:Number(data.subscriptionCount || 0),
+        lastCheckedAt:data.lastCheckedAt || null,
+        lastEventAt:data.lastEventAt || null,
+        lastError:data.lastError || null,
+        vapidPublicKey:data.vapidPublicKey || null,
+      })
+      return data
+    } catch (error) {
+      setLiveMonitor((current) => ({
+        ...current,
+        loading:false,
+        lastError:error?.message || 'Monitor status unavailable',
+      }))
+      return null
+    }
+  }, [wallet])
+
+  useEffect(() => {
+    if (!wallet) return
+    loadLiveMonitor(wallet)
+    const timer = setInterval(() => loadLiveMonitor(wallet), 60000)
+    return () => clearInterval(timer)
+  }, [wallet, loadLiveMonitor])
+
+  async function enableLiveMonitor() {
+    const address = String(wallet || '').trim()
+    if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)) {
+      setNotificationStatus('Load your Solana wallet first, then turn Live Monitor on.')
+      setView('wallet')
+      return
+    }
+
+    setLiveMonitor((current) => ({ ...current, loading:true }))
+    try {
+      if (typeof Notification === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+        throw new Error('Background push is not available in this browser. On iPhone, add RCXT to your Home Screen and open it there.')
+      }
+
+      const permission = Notification.permission === 'granted'
+        ? 'granted'
+        : await Notification.requestPermission()
+      if (permission !== 'granted') throw new Error('Notification permission is required for 24/7 alerts.')
+
+      const status = await loadLiveMonitor(address)
+      const publicKey = status?.vapidPublicKey || liveMonitor.vapidPublicKey
+      if (!publicKey) throw new Error('RCXT push key is not available yet.')
+
+      const registration = await navigator.serviceWorker.ready
+      let subscription = await registration.pushManager.getSubscription()
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly:true,
+          applicationServerKey:urlBase64ToUint8Array(publicKey),
+        })
+      }
+
+      const subscribeResponse = await fetch('/api/monitor', {
+        method:'POST',
+        headers:{'content-type':'application/json'},
+        body:JSON.stringify({
+          action:'subscribe',
+          wallet:address,
+          subscription:subscription.toJSON ? subscription.toJSON() : subscription,
+        }),
+      })
+      const subscribeData = await subscribeResponse.json()
+      if (!subscribeResponse.ok || !subscribeData?.success) {
+        throw new Error(subscribeData?.error || 'Could not register push alerts')
+      }
+
+      const enableResponse = await fetch('/api/monitor', {
+        method:'POST',
+        headers:{'content-type':'application/json'},
+        body:JSON.stringify({ action:'enable', wallet:address }),
+      })
+      const enabledData = await enableResponse.json()
+      if (!enableResponse.ok || !enabledData?.success) {
+        throw new Error(enabledData?.error || 'Could not enable background monitor')
+      }
+
+      localStorage.setItem(NOTIFY_KEY, 'enabled')
+      setNotificationsEnabled(true)
+      setLiveMonitor((current) => ({
+        ...current,
+        enabled:true,
+        loading:false,
+        subscriptionCount:Number(enabledData.subscriptionCount || subscribeData.subscriptionCount || 1),
+        lastCheckedAt:enabledData.lastCheckedAt || current.lastCheckedAt,
+        lastEventAt:enabledData.lastEventAt || current.lastEventAt,
+        lastError:null,
+      }))
+      setNotificationStatus('Live Monitor ACTIVE — RCXT now checks your wallet in the background and can alert you even when the app is closed.')
+    } catch (error) {
+      setLiveMonitor((current) => ({ ...current, loading:false, lastError:error?.message || 'Could not enable Live Monitor' }))
+      setNotificationStatus(error?.message || 'Could not enable Live Monitor.')
+    }
+  }
+
+  async function disableLiveMonitor() {
+    const address = String(wallet || '').trim()
+    setLiveMonitor((current) => ({ ...current, loading:true }))
+    try {
+      if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)) {
+        const response = await fetch('/api/monitor', {
+          method:'POST',
+          headers:{'content-type':'application/json'},
+          body:JSON.stringify({ action:'disable', wallet:address }),
+        })
+        const data = await response.json()
+        if (!response.ok || !data?.success) throw new Error(data?.error || 'Could not disable monitor')
+      }
+      localStorage.removeItem(NOTIFY_KEY)
+      setNotificationsEnabled(false)
+      setLiveMonitor((current) => ({ ...current, enabled:false, loading:false, lastError:null }))
+      setNotificationStatus('Live Monitor INACTIVE — background wallet checks and RCXT push alerts are off.')
+    } catch (error) {
+      setLiveMonitor((current) => ({ ...current, loading:false, lastError:error?.message || 'Could not disable monitor' }))
+      setNotificationStatus(error?.message || 'Could not disable Live Monitor.')
+    }
+  }
 
   async function enableNotifications() {
     if (typeof window === 'undefined' || !('Notification' in window)) {
@@ -1013,10 +1165,13 @@ export default function Home() {
           </div>
 
           <button
-            className={notificationsEnabled ? 'notifyButton enabled' : 'notifyButton'}
-            onClick={notificationsEnabled ? disableNotifications : enableNotifications}
+            className={liveMonitor.enabled ? 'liveMonitorButton active' : 'liveMonitorButton inactive'}
+            onClick={liveMonitor.enabled ? disableLiveMonitor : enableLiveMonitor}
+            disabled={liveMonitor.loading}
+            title={liveMonitor.enabled ? 'Background wallet monitoring is active' : 'Background wallet monitoring is off'}
           >
-            {notificationsEnabled ? 'Alerts On' : 'Enable Alerts'}
+            <span className="liveMonitorDot" />
+            {liveMonitor.loading ? 'CHECKING…' : liveMonitor.enabled ? 'LIVE ACTIVE' : 'LIVE OFF'}
           </button>
           <div className={health?.healthy === false ? 'systemStatus degraded' : 'systemStatus'}>
             <span className="pulse" />
@@ -1940,7 +2095,13 @@ export default function Home() {
           {walletError ? <ErrorBox text={walletError} /> : null}
 
           <ChallengeTracker walletAddress={wallet} walletData={walletData} />
-          <WalletActivity walletAddress={wallet} onOpenToken={openRadarToken} notificationsEnabled={notificationsEnabled} />
+          <WalletActivity
+            walletAddress={wallet}
+            onOpenToken={openRadarToken}
+            notificationsEnabled={notificationsEnabled}
+            serverMonitor={liveMonitor}
+            onToggleServerMonitor={liveMonitor.enabled ? disableLiveMonitor : enableLiveMonitor}
+          />
 
           {walletData ? (
             <>
@@ -2120,13 +2281,15 @@ function BeginnerSnapshot({ scan }) {
   const negatives = Array.isArray(intel.negatives) ? intel.negatives.slice(0, 3) : []
   const concentrationAvailable = Boolean(intel?.concentration?.available)
   const holderRpcMissing = scan?.security?.sources?.largestAccounts === false
-  const headline = {
-    'BUY SETUP': 'Strong setup structure',
-    'LEAN BUY': 'Constructive setup',
-    WATCH: 'Wait for a cleaner setup',
-    REDUCE: 'Setup is weakening',
-    'SELL / AVOID': 'High-risk setup',
-  }[intel.signal] || 'Live setup read'
+  const headline = intel.opportunityLabel === 'HOT / HIGH RISK'
+    ? 'Hot momentum, high risk'
+    : {
+        'BUY SETUP': 'Strong setup structure',
+        'LEAN BUY': 'Constructive setup',
+        WATCH: 'Wait for a cleaner setup',
+        REDUCE: 'Setup is weakening',
+        'SELL / AVOID': 'Structural danger detected',
+      }[intel.signal] || 'Live setup read'
   const riskLabel = {
     LOWER: 'Lower relative risk',
     MODERATE: 'Moderate risk',
@@ -2156,8 +2319,8 @@ function BeginnerSnapshot({ scan }) {
           <span>QUICK READ</span>
           <h3>{headline}</h3>
           <p>
-            RCXT score {intel.score ?? '—'}/100 · {intel.confidence ?? '—'}% model confidence · {riskLabel}.
-            Confidence describes data/model quality, not the chance of profit.
+            RCXT {intel.score ?? '—'}/100 is the risk-adjusted tradability score. Opportunity {intel.opportunityScore ?? intel.setupScore ?? '—'}/100 tracks setup/momentum separately · {riskLabel}.
+            Risk does not predict direction, and confidence is not the chance of profit.
           </p>
         </div>
         <div className="beginnerScore">
@@ -2165,6 +2328,26 @@ function BeginnerSnapshot({ scan }) {
           <small>{intel.signal || 'WATCH'}</small>
         </div>
       </div>
+      <div className="beginnerDualRead">
+        <div>
+          <span>OPPORTUNITY</span>
+          <strong>{intel.opportunityScore ?? intel.setupScore ?? '—'}/100</strong>
+          <small>{intel.opportunityLabel || 'Current setup'}</small>
+        </div>
+        <div className={'riskTone ' + String(intel.risk || '').toLowerCase()}>
+          <span>RISK</span>
+          <strong>{intel.risk || 'UNKNOWN'}</strong>
+          <small>{intel.directionalBias || 'NEUTRAL'} directional bias</small>
+        </div>
+      </div>
+
+      {intel.opportunityLabel === 'HOT / HIGH RISK' ? (
+        <div className="beginnerOpportunityNotice">
+          <b>IMPORTANT</b>
+          <span>RCXT sees real momentum, but execution/safety risk is still high. This token can keep running; the warning is about how fragile the trade is, not a prediction that price must fall.</span>
+        </div>
+      ) : null}
+
       <div className="beginnerTiles">
         <div><span>24H MOVE</span><strong className={Number(scan?.market?.priceChange?.h24 || 0) >= 0 ? 'positiveText' : 'negativeText'}>{percent(scan?.market?.priceChange?.h24)}</strong><small>Price direction</small></div>
         <div><span>BUY PRESSURE</span><strong>{intel.buyPercent24h ?? '—'}%</strong><small>24h transaction mix</small></div>

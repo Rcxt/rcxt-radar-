@@ -2807,3 +2807,125 @@ input,select,textarea{font-size:16px}
   .scanMoreActions>div{right:0}
   .beginnerBlocker,.chartHistoryNotice{flex-direction:column;gap:5px}
 }
+
+
+/* Always-on monitor + opportunity/risk split */
+.liveMonitorButton{
+  min-height:44px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  border-radius:999px;
+  padding:0 13px;
+  font-size:8px;
+  font-weight:900;
+  letter-spacing:.06em;
+  cursor:pointer;
+  transition:.18s ease;
+}
+.liveMonitorButton .liveMonitorDot{
+  width:7px;
+  height:7px;
+  border-radius:50%;
+}
+.liveMonitorButton.active{
+  border:1px solid #2f6b4a;
+  background:#0b2116;
+  color:var(--green);
+  box-shadow:0 0 0 1px rgba(77,226,146,.04),0 0 18px rgba(77,226,146,.08);
+}
+.liveMonitorButton.active .liveMonitorDot{background:var(--green);box-shadow:0 0 9px rgba(77,226,146,.55)}
+.liveMonitorButton.inactive{
+  border:1px solid #66343a;
+  background:#241014;
+  color:#ff7d89;
+}
+.liveMonitorButton.inactive .liveMonitorDot{background:#ff5968;box-shadow:0 0 9px rgba(255,89,104,.45)}
+.liveMonitorButton:disabled{opacity:.65;cursor:wait}
+
+.monitorMiniToggle{
+  min-height:38px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  border-radius:9px;
+  padding:0 10px;
+  font-size:7px;
+  font-weight:900;
+  cursor:pointer;
+}
+.monitorMiniToggle i{width:6px;height:6px;border-radius:50%;display:block}
+.monitorMiniToggle.active{border:1px solid #2f6548;background:#0b1d13;color:var(--green)}
+.monitorMiniToggle.active i{background:var(--green);box-shadow:0 0 8px rgba(77,226,146,.45)}
+.monitorMiniToggle.inactive{border:1px solid #5a343a;background:#1a0d10;color:#ef7782}
+.monitorMiniToggle.inactive i{background:#ff5968;box-shadow:0 0 8px rgba(255,89,104,.4)}
+
+.beginnerDualRead{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-top:12px;
+}
+.beginnerDualRead>div{
+  border:1px solid #1c2b35;
+  background:#091016;
+  border-radius:11px;
+  padding:11px;
+}
+.beginnerDualRead span{
+  display:block;
+  color:#617486;
+  font-size:7px;
+  font-weight:900;
+  letter-spacing:.1em;
+}
+.beginnerDualRead strong{
+  display:block;
+  margin-top:5px;
+  font-size:16px;
+}
+.beginnerDualRead small{
+  display:block;
+  margin-top:4px;
+  color:#5c6c7c;
+  font-size:7px;
+}
+.beginnerDualRead>div:first-child strong{color:var(--cyan)}
+.beginnerDualRead .riskTone.lower strong{color:var(--green)}
+.beginnerDualRead .riskTone.moderate strong{color:#d5c56f}
+.beginnerDualRead .riskTone.high strong{color:var(--amber)}
+.beginnerDualRead .riskTone.extreme strong{color:var(--red)}
+
+.beginnerOpportunityNotice{
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  margin-top:9px;
+  padding:10px 11px;
+  border:1px solid #5a4626;
+  background:linear-gradient(135deg,#181207,#0d1012);
+  border-radius:10px;
+}
+.beginnerOpportunityNotice b{
+  flex:0 0 auto;
+  color:var(--amber);
+  font-size:8px;
+  letter-spacing:.08em;
+}
+.beginnerOpportunityNotice span{
+  color:#a29577;
+  font-size:8px;
+  line-height:1.45;
+}
+
+@media(max-width:650px){
+  .liveMonitorButton{min-height:42px;padding:0 11px;font-size:7px}
+  .walletActivityActions .monitorMiniToggle{flex:1}
+}
+@media(max-width:420px){
+  .beginnerDualRead{grid-template-columns:1fr 1fr}
+  .beginnerDualRead strong{font-size:14px}
+  .beginnerOpportunityNotice{flex-direction:column;gap:5px}
+}

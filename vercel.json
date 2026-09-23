@@ -12,6 +12,9 @@
     },
     "api/wallet.js": {
       "maxDuration": 15
+    },
+    "api/monitor.js": {
+      "maxDuration": 15
     }
   },
   "headers": [

@@ -36,8 +36,8 @@ function baseSecurity(){
   }
 }
 
-test('score engine version is 4.1.0',()=>{
-  assert.equal(SCORE_VERSION,'4.1.0')
+test('score engine version is 4.2.0',()=>{
+  assert.equal(SCORE_VERSION,'4.2.0')
 })
 
 test('resolved owner concentration is preferred when available',()=>{
@@ -84,4 +84,50 @@ test('extreme concentration vetoes otherwise healthy setup',()=>{
   assert.ok(result.score<=38)
   assert.equal(result.signal,'SELL / AVOID')
   assert.equal(result.risk,'EXTREME')
+})
+
+
+test('newborn thin-liquidity momentum is high risk without becoming a bearish sell signal',()=>{
+  const pair={
+    baseToken:{symbol:'SOMO',name:'StreamFomo'},
+    liquidity:{usd:0},
+    marketCap:5000,
+    fdv:5000,
+    volume:{m5:2200,h1:9500,h6:11000,h24:12000},
+    priceChange:{m5:18,h1:42,h6:180,h24:350},
+    txns:{
+      m5:{buys:42,sells:20},
+      h1:{buys:170,sells:92},
+      h24:{buys:180,sells:96},
+    },
+    pairCreatedAt:Date.now()-10*60*1000,
+  }
+
+  const result=analyzePair(pair,{
+    ...baseSecurity(),
+    concentrationAvailable:false,
+    top1Percent:null,
+    top5Percent:null,
+    top10Percent:null,
+  })
+
+  assert.equal(result.risk,'EXTREME')
+  assert.equal(result.signal,'WATCH')
+  assert.equal(result.directionalBias,'BULLISH')
+  assert.equal(result.opportunityLabel,'HOT / HIGH RISK')
+  assert.ok(result.opportunityScore>=60)
+  assert.ok(result.riskFlags.includes('VERY_NEW_PAIR'))
+  assert.ok(result.riskFlags.includes('LOW_LIQUIDITY'))
+})
+
+test('hard contract danger still vetoes momentum',()=>{
+  const pair=healthyPair()
+  pair.priceChange={m5:6,h1:15,h6:35,h24:80}
+  const result=analyzePair(pair,{
+    ...baseSecurity(),
+    mintAuthority:'active-authority',
+  })
+
+  assert.equal(result.signal,'SELL / AVOID')
+  assert.ok(result.riskFlags.includes('MINT_AUTHORITY_ACTIVE'))
 })

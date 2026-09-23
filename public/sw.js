@@ -1,6 +1,23 @@
 self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()))
 
+self.addEventListener('push', (event) => {
+  let data = {}
+  try { data = event.data?.json() || {} } catch {}
+
+  const title = data.title || 'RCXT Radar'
+  const options = {
+    body: data.body || 'RCXT has a new wallet alert.',
+    icon: '/icon.svg',
+    badge: '/icon.svg',
+    tag: data.tag || 'rcxt-alert',
+    renotify: true,
+    data: { url: data.url || '/' },
+  }
+
+  event.waitUntil(self.registration.showNotification(title, options))
+})
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
   const target = event.notification?.data?.url || '/'

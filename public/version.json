@@ -3,7 +3,7 @@
   "version": "4.0.0",
   "channel": "production",
   "status": "release-candidate",
-  "scoreEngine": "4.1.0",
+  "scoreEngine": "4.2.0",
   "trenchEngine": "1.0.0",
   "chartEngine": "1.0.0",
   "forecastEngine": "1.0.0",
@@ -11,12 +11,13 @@
   "supplyWhaleEngine": "1.0.0",
   "calibrationEngine": "2.0.0",
   "challengeEngine": "1.1.0",
-  "walletActivityEngine": "1.0.0",
+  "walletActivityEngine": "1.1.0",
   "socialEngine": "reserved-for-v5",
   "persistence": "oidc-secured-v17",
   "region": "sfo1",
   "release": "v4-final-functional-analytics",
   "releasedAt": "2026-09-22",
   "productionUrl": "https://rcxt-radar.vercel.app",
-  "note": "Final code is CI-validated and database-hardened; production promotion is waiting on Vercel's 24-hour deployment rate limit."
+  "note": "V4 production includes server-side wallet monitoring, web-push alerts, and score engine 4.2 risk/direction separation.",
+  "backgroundMonitorEngine": "1.0.0"
 }

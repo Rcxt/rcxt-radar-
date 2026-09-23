@@ -36,7 +36,7 @@ function typeTone(type){
   return ''
 }
 
-export default function WalletActivity({walletAddress='',onOpenToken,notificationsEnabled=false}){
+export default function WalletActivity({walletAddress='',onOpenToken,notificationsEnabled=false,serverMonitor=null,onToggleServerMonitor=null}){
   const [data,setData]=useState(null)
   const [loading,setLoading]=useState(false)
   const [error,setError]=useState('')
@@ -279,9 +279,17 @@ export default function WalletActivity({walletAddress='',onOpenToken,notificatio
         <div>
           <span>WALLET ACTIVITY INTELLIGENCE</span>
           <h3>Recent on-chain token activity</h3>
-          <p>RCXT checks this wallet about every 15 seconds while the app is active. New buys are auto-scored, and enabled notifications warn you about the buy plus serious contract/concentration risk.</p>
+          <p>RCXT checks this wallet about every 15 seconds while the app is open. Live Monitor adds a server-side background check about every 30 seconds so buy/rug alerts can continue after you leave the app.</p>
         </div>
         <div className="walletActivityActions">
+          <button
+            className={serverMonitor?.enabled ? 'monitorMiniToggle active' : 'monitorMiniToggle inactive'}
+            onClick={()=>onToggleServerMonitor?.()}
+            disabled={Boolean(serverMonitor?.loading)}
+          >
+            <i />
+            {serverMonitor?.loading ? 'Checking…' : serverMonitor?.enabled ? '24/7 ACTIVE' : '24/7 OFF'}
+          </button>
           <button className={autoScore?'toolButton active':'toolButton'} onClick={toggleAutoScore}>
             {autoScore?'Auto Score On':'Auto Score Off'}
           </button>
@@ -303,7 +311,8 @@ export default function WalletActivity({walletAddress='',onOpenToken,notificatio
             <div><span>SOL from sells</span><b>{number(data.summary?.solReceivedOnSells||0,4)} SOL</b></div>
             <div><span>Unique traded mints</span><b>{data.summary?.uniqueTradedMints||0}</b></div>
             <div><span>Likely recent buys</span><b className={(data.newBuys?.length||0)>0?'good':''}>{data.newBuys?.length||0}</b></div>
-            <div><span>Refresh</span><b>15s</b><small>{lastRefresh?'updated '+new Date(lastRefresh).toLocaleTimeString():'—'}</small></div>
+            <div><span>Open-app refresh</span><b>15s</b><small>{lastRefresh?'updated '+new Date(lastRefresh).toLocaleTimeString():'—'}</small></div>
+            <div><span>Background</span><b className={serverMonitor?.enabled?'good':'bad'}>{serverMonitor?.enabled?'ACTIVE':'OFF'}</b><small>{serverMonitor?.enabled?'~30s server checks':'no closed-app checks'}</small></div>
             <button className="toolButton" onClick={scoreRecentBuys} disabled={!data.newBuys?.length}>Score recent buys</button>
           </div>
 
