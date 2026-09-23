@@ -2512,3 +2512,23 @@ input,select,textarea{font-size:16px}
   .livePlanHead{flex-direction:column}.livePlanHead small{text-align:left}
   .livePlanGrid{grid-template-columns:1fr 1fr}
 }
+
+
+/* V4 manual trade journal */
+.tradeJournalBar{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-top:12px;border-top:1px solid #1c2932;padding-top:11px}
+.tradeJournalBar>div:first-child>span{display:block;color:#637586;font-size:7px;letter-spacing:.1em}
+.tradeJournalBar strong{display:block;font-size:12px;margin-top:4px}
+.tradeJournalBar strong.good{color:var(--green)}.tradeJournalBar strong.bad{color:var(--red)}.tradeJournalBar strong.mid{color:var(--amber)}
+.tradeJournalBar small{display:block;color:#586979;font-size:7px;margin-top:4px;line-height:1.4}
+.tradeJournalActions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.tradeJournalActions button{min-height:36px;border:1px solid #2b3a45;background:#0a131a;color:#8d9daa;border-radius:8px;padding:0 9px;font-size:7px;font-weight:900;cursor:pointer}
+.tradeJournalActions .closeTradeButton{border-color:#4c373a;color:#e0868f;background:#170d10}
+.closedTradeSummary{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:9px}
+.closedTradeSummary>div{border:1px solid #1d2b34;background:#080f14;border-radius:9px;padding:9px}
+.closedTradeSummary span{display:block;color:#5f7080;font-size:7px}.closedTradeSummary b{display:block;font-size:11px;margin-top:4px}
+.closedTradeSummary b.good{color:var(--green)}.closedTradeSummary b.bad{color:var(--red)}
+@media(max-width:650px){
+  .tradeJournalBar{flex-direction:column}
+  .tradeJournalActions{width:100%;justify-content:stretch}.tradeJournalActions button{flex:1}
+  .closedTradeSummary{grid-template-columns:1fr}
+}
