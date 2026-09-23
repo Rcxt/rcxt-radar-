@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import V4AnalyticsSuite from './components/V4Analytics.jsx'
 import ChallengeTracker from './components/ChallengeTracker.jsx'
+import WalletActivity from './components/WalletActivity.jsx'
 
 const WALLET_KEY = 'rcxt-wallet-address-v1'
 const HISTORY_KEY = 'rcxt-scan-history-v1'
@@ -1602,6 +1603,7 @@ export default function Home() {
           {walletError ? <ErrorBox text={walletError} /> : null}
 
           <ChallengeTracker walletAddress={wallet} walletData={walletData} />
+          <WalletActivity walletAddress={wallet} onOpenToken={openRadarToken} />
 
           {walletData ? (
             <>
@@ -1679,7 +1681,7 @@ export default function Home() {
             <div className="walletEmpty">
               <span className="walletGlyph">◎</span>
               <h3>Load a wallet to begin</h3>
-              <p>Your test wallet is prefilled. RCXT reads public on-chain balances only—no wallet connection or signing required.</p>
+              <p>Paste a public Solana wallet. RCXT reads public on-chain balances and activity only—no wallet connection or signing required.</p>
             </div>
           )}
         </section>
