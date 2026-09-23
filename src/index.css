@@ -2304,3 +2304,23 @@ input,select,textarea{font-size:16px}
   .aiModeButtons{width:100%;justify-content:stretch}.aiModeButtons .aiButton{flex:1;min-height:42px}
   .challengeFoot{flex-wrap:wrap}.challengeReset{width:100%;text-align:left}
 }
+
+
+/* V4 decision stack / exit planner */
+.quickProfitPresets{display:flex;flex-wrap:wrap;gap:7px;margin:10px 0}
+.quickProfitPresets button{min-height:36px;border:1px solid #253441;background:#0a1218;color:#8798a8;border-radius:8px;padding:0 10px;font-size:8px;font-weight:800;cursor:pointer}
+.quickProfitPresets button:hover{border-color:#3e5b70;color:#dfe8ef}
+.decisionPanel,.exitPlannerPanel{min-width:0}
+.decisionBadge{display:inline-flex;margin:10px 0 12px;border:1px solid #2b3945;border-radius:999px;padding:6px 9px;font-size:8px;font-weight:900;letter-spacing:.08em}
+.decisionBadge.strong-confluence,.decisionBadge.constructive{color:var(--green);border-color:#2f5b44;background:#0d1812}
+.decisionBadge.high-risk,.decisionBadge.defensive{color:var(--red);border-color:#57343a;background:#180d10}
+.decisionBadge.mixed{color:var(--amber);border-color:#554a2d;background:#171309}
+.decisionColumns{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.decisionColumns>div{border:1px solid #1b2832;background:#091016;border-radius:10px;padding:10px}
+.decisionColumns span{display:block;font-size:7px;color:#607082;letter-spacing:.08em;margin-bottom:7px}
+.decisionColumns p{font-size:8px;line-height:1.45;color:#8a99a8;margin:5px 0}
+.decisionPanel>small,.exitPlannerPanel>p{display:block;font-size:7px;line-height:1.45;color:#566576;margin-top:10px}
+@media(max-width:560px){
+  .decisionColumns{grid-template-columns:1fr}
+  .quickProfitPresets{display:grid;grid-template-columns:1fr 1fr}
+}
