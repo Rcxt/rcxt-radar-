@@ -259,3 +259,90 @@ export function buildExecutionChecklist({scan,analytics,tape,positionSize=0}){
     readinessPercent:known.length?Math.round(known.filter(item=>item.pass).length/known.length*100):0,
   }
 }
+
+
+export function buildEntryQuality({scan,analytics,tape}){
+  if(!scan) return {available:false,score:null,label:'UNAVAILABLE',reasons:[],warnings:[]}
+
+  const reasons=[]
+  const warnings=[]
+  let score=50
+  let evidence=0
+
+  const liquidity=Number(scan?.market?.liquidityUsd||0)
+  if(liquidity>0){
+    evidence+=1
+    if(liquidity>=50000){score+=12;reasons.push('Liquidity is relatively healthy')}
+    else if(liquidity>=15000){score+=6;reasons.push('Liquidity is usable but still needs care')}
+    else if(liquidity<5000){score-=18;warnings.push('Liquidity is very thin')}
+    else {score-=6;warnings.push('Liquidity is below the preferred range')}
+  }
+
+  if(analytics?.available){
+    evidence+=1
+    const rr=Number(analytics?.levels?.structureRiskReward||0)
+    const supportDistance=Number(analytics?.levels?.downsideToSupportPercent)
+    const resistanceDistance=Number(analytics?.levels?.upsideToResistancePercent)
+    const vwapDistance=Number(analytics?.indicators?.vwapDistancePercent)
+    const m15=Number(analytics?.momentum?.m15||0)
+    const atrPct=Number(analytics?.indicators?.atrPercent||0)
+
+    if(rr>=2){score+=14;reasons.push('Nearest structure offers at least 2:1 upside-to-support geometry')}
+    else if(rr>=1.2){score+=7;reasons.push('Nearest structure has positive risk/reward geometry')}
+    else if(rr>0&&rr<0.8){score-=10;warnings.push('Nearby resistance is close relative to support')}
+
+    if(Number.isFinite(supportDistance)){
+      if(supportDistance>=-12&&supportDistance<0){score+=8;reasons.push('Price is relatively close to nearby support')}
+      if(supportDistance<-25){score-=8;warnings.push('Nearest support is far below current price')}
+    }
+
+    if(Number.isFinite(resistanceDistance)&&resistanceDistance>20){
+      score+=5
+      reasons.push('There is room before the nearest resistance zone')
+    }
+
+    if(Number.isFinite(vwapDistance)){
+      if(vwapDistance>=-4&&vwapDistance<=8){score+=6;reasons.push('Price is near recent volume-weighted value')}
+      if(vwapDistance>18){score-=10;warnings.push('Price is stretched well above recent volume-weighted value')}
+      if(vwapDistance<-10){score-=8;warnings.push('Price is trading well below recent volume-weighted value')}
+    }
+
+    if(m15>25){score-=12;warnings.push('15m move is extended and vulnerable to chasing')}
+    if(m15<-20){score-=8;warnings.push('15m momentum is sharply negative')}
+    if(atrPct>=18){score-=8;warnings.push('Per-candle volatility is extreme')}
+  }
+
+  if(tape){
+    evidence+=1
+    const net=Number(tape?.netFlowUsd||0)
+    const buyPct=Number(tape?.buyVolumePercent||50)
+    const flags=tape?.flags||[]
+
+    if(net>0&&buyPct>=55){score+=8;reasons.push('Recent USD trade flow favors buyers')}
+    if(net<0&&buyPct<=45){score-=10;warnings.push('Recent USD trade flow favors sellers')}
+    if(flags.includes('MICROTRADE_NOISE')){score-=6;warnings.push('Trade activity contains heavy micro-trade noise')}
+    if(flags.includes('REPEAT_WALLET_CHURN')){score-=7;warnings.push('Repeated-wallet churn reduces flow quality')}
+    if(flags.includes('WALLET_VOLUME_CONCENTRATION')){score-=7;warnings.push('Recent USD volume is concentrated in one wallet')}
+  }
+
+  const risk=String(scan?.intelligence?.risk||'')
+  if(risk==='EXTREME'){score=Math.min(score,45);warnings.push('RCXT structural risk is EXTREME')}
+  else if(risk==='HIGH'){score=Math.min(score,62)}
+
+  score=Math.max(0,Math.min(100,Math.round(score)))
+  const label=
+    score>=78?'FAVORABLE' :
+    score>=62?'DECENT' :
+    score>=45?'MIXED' :
+    score>=30?'POOR' : 'AVOID CHASING'
+
+  return {
+    available:evidence>=2,
+    score,
+    label,
+    evidenceCount:evidence,
+    reasons:reasons.slice(0,4),
+    warnings:warnings.slice(0,4),
+    meaning:'Entry-context quality, not a probability of profit or a trade recommendation.',
+  }
+}
