@@ -50,12 +50,12 @@ V6 changes the scoring philosophy from **one market feed + heuristics** to **fac
    - Organic Score
    - Verification and suspicious-token signal
    - Holder / market metadata
-   - Independently filtered price source
+   - Independently filtered live price source
    - A Jupiter price omission is treated as unavailable evidence, not automatic proof of danger
 
 7. **Helius**
    - DAS fungible-token metadata
-   - Independent token price when available
+   - Auxiliary token price when available (not used as a real-time veto because Helius fungible pricing can be cached)
    - Supply / decimals / token program corroboration
    - Automatic Solana RPC fallback when a key is configured
 
@@ -66,6 +66,7 @@ V6 changes the scoring philosophy from **one market feed + heuristics** to **fac
    - Mutable metadata, freeze/mint authority corroboration
    - Creator and top-holder concentration
    - Any unavailable endpoint fails soft instead of breaking RCXT
+   - CU-consuming Birdeye market/security calls are opt-in for launch
 
 ## V6 score rules
 
@@ -118,6 +119,8 @@ Optional:
 - `JUPITER_KEYLESS_ENABLED=0`
 - `HELIUS_API_KEY`
 - `BIRDEYE_API_KEY`
+- `BIRDEYE_MARKET_ENABLED=0`
+- `BIRDEYE_SECURITY_ENABLED=0`
 
 None of the optional provider keys is required for the app to boot or scan.
 
@@ -132,3 +135,11 @@ V6 stores security consensus and market consensus inside `token_scans.payload`. 
 - How much does multi-provider agreement improve score reliability?
 
 Weights should move based on those measured outcomes, not intuition alone.
+
+## Launch cost controls
+
+- GeckoTerminal is the default second market feed and is cached to respect the public API rate limit.
+- GoPlus is attempted as a free security cross-check and fails soft.
+- Helius is only called when a key exists; it also becomes an RPC fallback.
+- Birdeye calls remain disabled even when a key is present until the matching enable flag is set. This prevents accidental CU burn during 15-second scanner refreshes.
+- Helius fungible price is stored as auxiliary evidence and cannot by itself trigger a price-source conflict.
