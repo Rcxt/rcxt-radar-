@@ -36,8 +36,8 @@ function baseSecurity(){
   }
 }
 
-test('score engine version is 6.0.0-rc.1',()=>{
-  assert.equal(SCORE_VERSION,'6.0.0-rc.1')
+test('score engine version is 6.0.0',()=>{
+  assert.equal(SCORE_VERSION,'6.0.0')
 })
 
 test('resolved owner concentration is preferred when available',()=>{
