@@ -166,6 +166,8 @@ export default function ChallengeTracker({walletAddress='',walletData=null}){
         <div><span>Needed to next</span><b>{stats.percentToNext==null?'—':pct(stats.percentToNext,0)}</b></div>
         <div><span>High-water mark</span><b>{money(Math.max(stats.highWater,Number(data?.highWater||0)))}</b></div>
         <div><span>Drawdown</span><b className={stats.drawdownPercent<0?'bad':''}>{pct(stats.drawdownPercent)}</b></div>
+        <div><span>Max drawdown</span><b className={Number(data?.maxDrawdown||0)<0?'bad':''}>{pct(data?.maxDrawdown)}</b></div>
+        <div><span>Recovery needed</span><b>{Number(data?.recoveryPercent||0)>0?pct(data.recoveryPercent,1):'0.0%'}</b></div>
       </div>
 
       <div className="challengePerformance">
@@ -191,6 +193,25 @@ export default function ChallengeTracker({walletAddress='',walletData=null}){
           <b>{money(performance.toNext)}</b>
           <small>{stats.requiredMultiple?stats.requiredMultiple.toFixed(1)+'× remains to $50K':'Sync wallet for goal math'}</small>
         </div>
+        <div>
+          <span>Server change</span>
+          <b className={data?.changeSinceStart==null?'':Number(data.changeSinceStart)>=0?'good':'bad'}>
+            {data?.changeSinceStart==null?'—':pct(data.changeSinceStart)}
+          </b>
+          <small>Since first persisted snapshot</small>
+        </div>
+        <div>
+          <span>24h equity change</span>
+          <b className={data?.change24h==null?'':Number(data.change24h)>=0?'good':'bad'}>
+            {data?.change24h==null?'—':pct(data.change24h)}
+          </b>
+          <small>Shows once enough history exists</small>
+        </div>
+        <div>
+          <span>Equity volatility</span>
+          <b>{data?.equityVolatility==null?'—':pct(data.equityVolatility)}</b>
+          <small>Snapshot-to-snapshot variability</small>
+        </div>
       </div>
 
       <div className="challengeProgress">
@@ -206,7 +227,7 @@ export default function ChallengeTracker({walletAddress='',walletData=null}){
 
       <EquitySparkline rows={scopedRows} current={stats.current}/>
 
-      {stats.drawdownPercent <= -20 ? (
+      {(stats.drawdownPercent <= -20 || Number(data?.maxDrawdown||0) <= -25) ? (
         <div className="challengeRiskNotice">
           <strong>Drawdown guard</strong>
           <span>Equity is more than 20% below the tracked high-water mark. The challenge dashboard is flagging capital preservation—not asking you to trade bigger to catch up.</span>
