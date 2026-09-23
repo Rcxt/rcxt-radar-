@@ -87,7 +87,7 @@ export default async function handler(req,res){
       calibrationEngine:'2.0.0',
       challengeEngine:'1.1.0',
       walletActivityEngine:'1.0.0',
-      persistence:'supabase-oidc-v16',
+      persistence:'supabase-oidc-v17',
       gitSha:process.env.VERCEL_GIT_COMMIT_SHA||null,
       gitRef:process.env.VERCEL_GIT_COMMIT_REF||null,
       environment:process.env.VERCEL_ENV||null,
