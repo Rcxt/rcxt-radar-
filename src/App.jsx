@@ -785,6 +785,58 @@ export default function Home() {
     }
   }, [walletData])
 
+  const portfolioStress = useMemo(() => {
+    const holdings = walletData?.holdings || []
+    const solValue = Number(walletData?.solValueUsd || 0)
+    const tokenValue = Number(walletData?.portfolioTokenValueUsd || 0)
+    const totalValue = Number(walletData?.portfolioTotalUsd ?? (solValue + tokenValue))
+    const priced = holdings.filter((item) => Number(item.valueUsd || 0) > 0)
+    const largest = priced.reduce(
+      (best,item) => Number(item.valueUsd || 0) > Number(best?.valueUsd || 0) ? item : best,
+      null,
+    )
+    const highRiskValue = priced
+      .filter((item) => ['HIGH','EXTREME'].includes(item.intelligence?.risk))
+      .reduce((sum,item) => sum + Number(item.valueUsd || 0), 0)
+
+    function marketShock(percent) {
+      const loss = tokenValue * (percent / 100)
+      return {
+        label: `Tokens -${percent}%`,
+        endValue: Math.max(0, totalValue - loss),
+        loss,
+        percentLoss: totalValue > 0 ? (loss / totalValue) * 100 : 0,
+      }
+    }
+
+    const largestLoss = Number(largest?.valueUsd || 0)
+    const highRiskLoss = highRiskValue * 0.5
+
+    return {
+      scenarios: [
+        marketShock(10),
+        marketShock(25),
+        marketShock(50),
+        {
+          label: 'Largest → $0',
+          endValue: Math.max(0, totalValue - largestLoss),
+          loss: largestLoss,
+          percentLoss: totalValue > 0 ? (largestLoss / totalValue) * 100 : 0,
+        },
+        {
+          label: 'High-risk -50%',
+          endValue: Math.max(0, totalValue - highRiskLoss),
+          loss: highRiskLoss,
+          percentLoss: totalValue > 0 ? (highRiskLoss / totalValue) * 100 : 0,
+        },
+      ],
+      solValue,
+      tokenValue,
+      totalValue,
+      largestSymbol: largest?.symbol || '—',
+    }
+  }, [walletData])
+
   const walletSignals = useMemo(() => {
     if (!walletData?.holdings) return { buy: 0, watch: 0, reduce: 0 }
 
@@ -1844,6 +1896,28 @@ export default function Home() {
                 <MetricCard label="Buy Signals" value={walletSignals.buy} tone="positive" />
                 <MetricCard label="Reduce / Sell" value={walletSignals.reduce} tone="negative" />
               </div>
+
+              <article className="panel portfolioStressPanel">
+                <PanelHeader eyebrow="PORTFOLIO STRESS LAB" title="What-if downside scenarios" />
+                <div className="stressIntro">
+                  <p>Stress tests keep SOL value unchanged and shock token positions only. They are scenario math—not forecasts.</p>
+                  <div><span>Token value</span><b>{usd(portfolioStress.tokenValue)}</b></div>
+                  <div><span>SOL cushion</span><b>{usd(portfolioStress.solValue)}</b></div>
+                </div>
+                <div className="stressGrid">
+                  {portfolioStress.scenarios.map((scenario) => (
+                    <div className="stressCard" key={scenario.label}>
+                      <span>{scenario.label}</span>
+                      <strong>{usd(scenario.endValue)}</strong>
+                      <b className="negativeText">−{usd(scenario.loss)}</b>
+                      <small>{scenario.percentLoss.toFixed(1)}% of total portfolio</small>
+                    </div>
+                  ))}
+                </div>
+                <p className="stressNote">
+                  “Largest → $0” stresses {portfolioStress.largestSymbol}. Real losses can be worse if liquidity disappears or prices gap.
+                </p>
+              </article>
 
               <article className="panel holdingsPanel">
                 <PanelHeader eyebrow="POSITION INTELLIGENCE" title="Current holdings" />
