@@ -1,7 +1,15 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { beginnerMarketExplanation, buildProfitLadder, positionPlan, projectedPositionValue } from '../lib/trading-math.js'
+import {
+  beginnerMarketExplanation,
+  breakEvenMarketCap,
+  buildExecutionChecklist,
+  buildProfitLadder,
+  positionPlan,
+  projectedPositionValue,
+  requiredMarketCapForValue,
+} from '../lib/trading-math.js'
 
 function money(value){
   const n=Number(value)
@@ -91,6 +99,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
   const [riskPercent,setRiskPercent]=useState('1')
   const [stopDistance,setStopDistance]=useState('15')
   const [accountValue,setAccountValue]=useState(walletEquity?String(walletEquity):'')
+  const [targetPositionValue,setTargetPositionValue]=useState('100')
   const [takeProfitPercent,setTakeProfitPercent]=useState('50')
   const [scaleOutPercent,setScaleOutPercent]=useState('25')
 
@@ -163,6 +172,19 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
   const beginner=useMemo(()=>beginnerMarketExplanation(scan,chart?.analytics),[scan,chart?.analytics])
   const analytics=chart?.analytics
 
+  const reverseTarget=useMemo(()=>requiredMarketCapForValue({
+    investment,
+    entryMarketCap,
+    targetPositionValue,
+    estimatedCostsPercent:estimatedCosts,
+  }),[investment,entryMarketCap,targetPositionValue,estimatedCosts])
+
+  const breakEven=useMemo(()=>breakEvenMarketCap({
+    investment,
+    entryMarketCap,
+    estimatedCostsPercent:estimatedCosts,
+  }),[investment,entryMarketCap,estimatedCosts])
+
   useEffect(()=>{
     if(typeof onContext!=='function') return
     onContext({
@@ -182,6 +204,13 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
       tape: tape?.summary || null,
     })
   },[analytics,tape?.summary,onContext])
+
+  const checklist=useMemo(()=>buildExecutionChecklist({
+    scan,
+    analytics,
+    tape:tape?.summary,
+    positionSize:riskPlan.positionSize,
+  }),[scan,analytics,tape?.summary,riskPlan.positionSize])
 
   const liquidityBurden=useMemo(()=>{
     const liquidity=Number(scan?.market?.liquidityUsd||0)
@@ -241,6 +270,30 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
     const runnerValue=targetValue-firstScaleValue
     return {position,tp,scale,stop,targetValue,stopValue,firstScaleValue,runnerValue}
   },[investment,takeProfitPercent,scaleOutPercent,stopDistance])
+  async function copyFullReport(){
+    if(!scan) return
+    const a=analytics
+    const tapeSummary=tape?.summary
+    const lines=[
+      'RCXT V4 REPORT · '+(scan.token?.symbol||'TOKEN'),
+      'Signal: '+(scan.intelligence?.signal||'WATCH')+' · Score '+(scan.intelligence?.score??'—')+'/100 · Risk '+(scan.intelligence?.risk||'—'),
+      'Setup / Execution / Safety / Data: '+[
+        scan.intelligence?.setupScore,
+        scan.intelligence?.executionScore,
+        scan.intelligence?.safetyScore,
+        scan.intelligence?.dataQualityScore,
+      ].map(v=>v??'—').join(' / '),
+      a?.available?'Chart: '+a.trend+' · '+(a.regime?.structure||'—')+' · RSI '+(a.indicators?.rsi14??'—')+' · ATR '+(a.indicators?.atrPercent??'—')+'%':'Chart: unavailable',
+      a?.available?'Support '+tiny(a.levels?.nearestSupport)+' · Resistance '+tiny(a.levels?.nearestResistance)+' · Structure R:R '+(a.levels?.structureRiskReward??'—')+'x':'',
+      tapeSummary?'Trade tape: '+money(tapeSummary.netFlowUsd)+' net flow · '+tapeSummary.buyVolumePercent+'% buy volume · '+tapeSummary.uniqueWallets+' wallets':'Trade tape: unavailable',
+      checklist?.knownCount?'Checklist: '+checklist.passCount+'/'+checklist.knownCount+' checks passing ('+checklist.readinessPercent+'%)':'Checklist: unavailable',
+      'Liquidity: '+money(scan.market?.liquidityUsd)+' · Market cap: '+money(scan.market?.marketCap),
+      'Risk flags: '+((scan.intelligence?.riskFlags||[]).join(', ')||'none'),
+      'Forecast bands are scenarios, not guaranteed targets.',
+    ].filter(Boolean)
+    try{await navigator.clipboard.writeText(lines.join('\n'))}catch{}
+  }
+
   async function copyProfitList(){
     if(!ladder.length) return
     const lines=[
@@ -377,6 +430,76 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
           <p>Simple planning math only. Real fills can differ because of liquidity, slippage, fees, taxes, and fast price changes.</p>
         </article>
       </div>
+
+      <article className="panel executionLabPanel">
+        <div className="v4PanelHead">
+          <div><span>EXECUTION LAB</span><h3>Plan the trade before the trade plans you</h3></div>
+          <button className="toolButton" onClick={copyFullReport}>Copy full report</button>
+        </div>
+
+        <div className="executionTop">
+          <div className="readinessGauge">
+            <span>CONFIRMATION CHECKS</span>
+            <strong>{checklist?.knownCount ? checklist.readinessPercent : 0}%</strong>
+            <small>{checklist?.passCount || 0}/{checklist?.knownCount || 0} known checks passing</small>
+            <i><em style={{width:(checklist?.readinessPercent || 0)+'%'}} /></i>
+          </div>
+
+          <div className="reverseTargetBox">
+            <label>
+              <span>I want this position worth</span>
+              <input inputMode="decimal" value={targetPositionValue} onChange={e=>setTargetPositionValue(e.target.value)} />
+            </label>
+            <div>
+              <span>Required market cap</span>
+              <strong>{reverseTarget?money(reverseTarget.requiredMarketCap):'—'}</strong>
+              <small>{reverseTarget?reverseTarget.multiple.toFixed(2)+'× from entry MC':'Enter valid position + MC'}</small>
+            </div>
+            <div>
+              <span>Break-even MC</span>
+              <strong>{breakEven?money(breakEven.marketCap):'—'}</strong>
+              <small>{breakEven?breakEven.multiple.toFixed(3)+'× after estimated costs':'—'}</small>
+            </div>
+          </div>
+        </div>
+
+        <div className="executionChecklist">
+          {(checklist?.items || []).map(item=>(
+            <div key={item.key} className={item.unknown?'unknown':item.pass?'pass':'fail'}>
+              <span className="checkMark">{item.unknown?'?':item.pass?'✓':'!'}</span>
+              <div><strong>{item.label}</strong><small>{item.detail}</small></div>
+            </div>
+          ))}
+        </div>
+
+        {analytics?.available ? (
+          <div className="entryMap">
+            <div>
+              <span>Current</span>
+              <b>{tiny(analytics.latestPrice)}</b>
+            </div>
+            <div>
+              <span>Nearest support</span>
+              <b>{tiny(analytics.levels?.nearestSupport)}</b>
+              <small>{analytics.levels?.downsideToSupportPercent==null?'—':analytics.levels.downsideToSupportPercent.toFixed(1)+'%'}</small>
+            </div>
+            <div>
+              <span>Nearest resistance</span>
+              <b>{tiny(analytics.levels?.nearestResistance)}</b>
+              <small>{analytics.levels?.upsideToResistancePercent==null?'—':'+'+analytics.levels.upsideToResistancePercent.toFixed(1)+'%'}</small>
+            </div>
+            <div>
+              <span>Structure R:R</span>
+              <b>{analytics.levels?.structureRiskReward?analytics.levels.structureRiskReward.toFixed(2)+'×':'—'}</b>
+              <small>support → resistance</small>
+            </div>
+          </div>
+        ) : null}
+
+        <p className="profitNote">
+          Confirmation checks are descriptive—not a buy signal. Support/resistance can fail, pool liquidity can disappear, and realized slippage can be worse than the planner.
+        </p>
+      </article>
 
       <article className="panel profitLadderPanel">
         <div className="v4PanelHead">
