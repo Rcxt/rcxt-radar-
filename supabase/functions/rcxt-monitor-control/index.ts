@@ -159,6 +159,7 @@ function responseShape(wallet:string,status:any,secrets:any=null){
     wallet,
     enabled:Boolean(status.monitor?.enabled),
     subscriptionCount:status.subscriptionCount,
+    preferencesStored:Boolean(status.monitor?.preferences),
     preferences:sanitizePrefs(status.monitor?.preferences),
     lastCheckedAt:status.monitor?.last_checked_at || null,
     lastEventAt:status.monitor?.last_event_at || null,

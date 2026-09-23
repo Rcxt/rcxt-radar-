@@ -340,9 +340,13 @@ export default function Home() {
       const response = await fetch('/api/monitor?wallet=' + encodeURIComponent(address), { cache:'no-store' })
       const data = await response.json()
       if (!response.ok || !data?.success) throw new Error(data?.error || 'Monitor status unavailable')
-      const serverPrefs=normalizeNotificationPrefs(data.preferences || notificationPrefs)
-      setNotificationPrefs(serverPrefs)
-      try{ localStorage.setItem(NOTIFY_PREFS_KEY,JSON.stringify(serverPrefs)) }catch{}
+      const serverPrefs=data.preferencesStored
+        ? normalizeNotificationPrefs(data.preferences)
+        : normalizeNotificationPrefs(notificationPrefs)
+      if(data.preferencesStored){
+        setNotificationPrefs(serverPrefs)
+        try{ localStorage.setItem(NOTIFY_PREFS_KEY,JSON.stringify(serverPrefs)) }catch{}
+      }
       setLiveMonitor({
         enabled:Boolean(data.enabled),
         loading:false,
