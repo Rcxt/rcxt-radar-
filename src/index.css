@@ -2626,3 +2626,22 @@ input,select,textarea{font-size:16px}
   .whaleSummaryGrid{grid-template-columns:1fr 1fr}
   .whaleWalletHead{flex-direction:column}.whaleNet{text-align:left}
 }
+
+
+/* V4 supply-whale ownership */
+.supplyWhaleBlock{margin-top:12px;border-top:1px solid #1c2831;padding-top:12px}
+.supplyWhaleHead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.supplyWhaleHead span{display:block;font-size:7px;color:#778596;letter-spacing:.1em}
+.supplyWhaleHead strong{display:block;font-size:11px;margin-top:3px}
+.supplyWhaleHead small{font-size:7px;color:#5c6d7d;text-align:right}
+.supplyWhaleList{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}
+.supplyWhaleList a{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid #1b2933;background:#091016;border-radius:10px;padding:9px 10px;text-decoration:none;color:#cbd5dd}
+.supplyWhaleList a:hover{border-color:#355064}
+.supplyWhaleList strong{display:block;font-size:9px}.supplyWhaleList span{display:block;font-size:7px;color:#5d6e7e;margin-top:3px}
+.supplyWhaleList b{font-size:10px}
+.supplyWhaleBlock>p{font-size:7px;line-height:1.45;color:#526171;margin:8px 0 0}
+@media(max-width:560px){
+  .supplyWhaleHead{flex-direction:column}
+  .supplyWhaleHead small{text-align:left}
+  .supplyWhaleList{grid-template-columns:1fr}
+}
