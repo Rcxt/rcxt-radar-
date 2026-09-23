@@ -449,6 +449,17 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
         ):null}
       </article>
 
+      <article className="panel provenancePanel">
+        <div className="v4PanelHead">
+          <div><span>DATA PROVENANCE</span><h3>Know what is measured vs calculated</h3></div>
+        </div>
+        <div className="provenanceGrid">
+          <div><b>MEASURED</b><strong>Market / wallet / trades</strong><p>DexScreener prices and liquidity, GeckoTerminal candles/trades, Solana wallet and mint data.</p></div>
+          <div><b>COMPUTED</b><strong>RCXT / Trench / Entry Quality</strong><p>Deterministic formulas derived from measured inputs. Useful for comparison, not a guaranteed outcome.</p></div>
+          <div><b>ESTIMATED</b><strong>Forecast ranges / profit scenarios</strong><p>Volatility and market-cap scenarios. They are not promised future prices or probabilities.</p></div>
+        </div>
+      </article>
+
       <div className="v4TwoCol">
         <article className="panel beginnerPanel">
           <div className="v4PanelHead"><div><span>BEGINNER MODE</span><h3>Explain it like I’m new</h3></div></div>
