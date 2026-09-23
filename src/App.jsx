@@ -1519,6 +1519,10 @@ export default function Home() {
                     marketCap:scan.market.marketCap,
                     liquidityUsd:scan.market.liquidityUsd,
                     volume24h:scan.market.volume.h24,
+                    setupScore:scan.intelligence.setupScore,
+                    executionScore:scan.intelligence.executionScore,
+                    safetyScore:scan.intelligence.safetyScore,
+                    dataQualityScore:scan.intelligence.dataQualityScore,
                   }}
                   modelVersion={scan.intelligence.modelVersion}
                 />
@@ -2150,6 +2154,10 @@ function SnapshotDelta({ rows, current, modelVersion }) {
   const ageMinutes = Number.isFinite(ageMs) ? Math.max(0, ageMs / 60000) : null
   const items = [
     ['Score', scoreDelta, 'pts'],
+    ...(previous.setupScore == null ? [] : [['Setup', Number(current?.setupScore || 0) - Number(previous.setupScore || 0), 'pts']]),
+    ...(previous.executionScore == null ? [] : [['Execution', Number(current?.executionScore || 0) - Number(previous.executionScore || 0), 'pts']]),
+    ...(previous.safetyScore == null ? [] : [['Safety', Number(current?.safetyScore || 0) - Number(previous.safetyScore || 0), 'pts']]),
+    ...(previous.dataQualityScore == null ? [] : [['Data Quality', Number(current?.dataQualityScore || 0) - Number(previous.dataQualityScore || 0), 'pts']]),
     ['Price', deltaPct(current?.priceUsd, previous.priceUsd), '%'],
     ['Market Cap', deltaPct(current?.marketCap, previous.marketCap), '%'],
     ['Liquidity', deltaPct(current?.liquidityUsd, previous.liquidityUsd), '%'],
