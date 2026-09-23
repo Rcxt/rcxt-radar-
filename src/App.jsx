@@ -180,7 +180,7 @@ export default function Home() {
 
     async function loadCalibration() {
       try {
-        const response = await fetch('/api/calibration', { cache: 'no-store' })
+        const response = await fetch('/api/history?calibration=1', { cache: 'no-store' })
         const data = await response.json()
         if (active && response.ok && data?.success) {
           setCalibration({

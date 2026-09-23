@@ -25,11 +25,93 @@ function getQuery(req, name, fallback = '') {
 export default async function handler(req,res){
   if(req.method!=='GET') return res.status(405).json({success:false,error:'Method not allowed'})
 
-  const limited=rateLimit(req,{key:'history',limit:30,windowMs:60_000})
-  applyRateHeaders(res,limited,30)
-  if(!limited.allowed) return res.status(429).json({success:false,error:'Too many history requests. Try again shortly.'})
+  const calibration=getQuery(req,'calibration')==='1'
+  const limited=rateLimit(req,{
+    key:calibration?'calibration':'history',
+    limit:calibration?20:30,
+    windowMs:60_000,
+  })
+  applyRateHeaders(res,limited,calibration?20:30)
+  if(!limited.allowed){
+    return res.status(429).json({
+      success:false,
+      error:calibration?'Too many calibration requests.':'Too many history requests. Try again shortly.',
+    })
+  }
 
-  const address=String(getQuery(req, 'address')).trim()
+  if(calibration){
+    try{
+      const response=await fetch(`${SUPABASE_URL}/functions/v1/rcxt-log?calibration=1`,{
+        headers:{apikey:SUPABASE_PUBLISHABLE_KEY},
+        cache:'no-store',
+        signal:AbortSignal.timeout(3000),
+      })
+      const data=await response.json()
+      if(!response.ok||!data?.ok) throw new Error(data?.error||'Calibration service unavailable')
+
+      const rows=(data.summary||data.rows||[]).map(row=>({
+        scoreVersion:row.score_version,
+        signal:row.signal,
+        horizon:row.horizon,
+        samples:Number(row.samples||0),
+        avgReturnPct:row.avg_return_pct==null?null:Number(row.avg_return_pct),
+        directionalHitRate:row.directional_hit_rate==null?null:Number(row.directional_hit_rate),
+        avgDelayMinutes:row.avg_delay_minutes==null?null:Number(row.avg_delay_minutes),
+      }))
+
+      const buckets=(data.buckets||[]).map(row=>({
+        scoreVersion:row.score_version,
+        scoreBucketMin:Number(row.score_bucket_min||0),
+        scoreBucketMax:Number(row.score_bucket_max||0),
+        signal:row.signal,
+        risk:row.risk,
+        horizon:row.horizon,
+        samples:Number(row.samples||0),
+        avgReturnPct:row.avg_return_pct==null?null:Number(row.avg_return_pct),
+        medianReturnPct:row.median_return_pct==null?null:Number(row.median_return_pct),
+        directionalHitRate:row.directional_hit_rate==null?null:Number(row.directional_hit_rate),
+        avgAbsDelayMinutes:row.avg_abs_delay_minutes==null?null:Number(row.avg_abs_delay_minutes),
+      }))
+
+      const components=(data.components||[]).map(row=>({
+        scoreVersion:row.score_version,
+        horizon:row.horizon,
+        setupSamples:Number(row.setup_samples||0),
+        setupReturnCorrelation:row.setup_return_corr==null?null:Number(row.setup_return_corr),
+        executionSamples:Number(row.execution_samples||0),
+        executionReturnCorrelation:row.execution_return_corr==null?null:Number(row.execution_return_corr),
+        safetySamples:Number(row.safety_samples||0),
+        safetyReturnCorrelation:row.safety_return_corr==null?null:Number(row.safety_return_corr),
+        dataQualitySamples:Number(row.data_quality_samples||0),
+        dataQualityReturnCorrelation:row.data_quality_return_corr==null?null:Number(row.data_quality_return_corr),
+      }))
+
+      const rawRows=(data.rawSummary||[]).map(row=>({
+        scoreVersion:row.score_version,
+        signal:row.signal,
+        horizon:row.horizon,
+        samples:Number(row.samples||0),
+        avgReturnPct:row.avg_return_pct==null?null:Number(row.avg_return_pct),
+        directionalHitRate:row.directional_hit_rate==null?null:Number(row.directional_hit_rate),
+        avgDelayMinutes:row.avg_delay_minutes==null?null:Number(row.avg_delay_minutes),
+      }))
+
+      return res.status(200).json({
+        success:true,
+        samplePolicy:data.samplePolicy||'clean-complete-components-with-timing-window',
+        totalSamples:rows.reduce((sum,row)=>sum+row.samples,0),
+        rawTotalSamples:rawRows.reduce((sum,row)=>sum+row.samples,0),
+        rows,
+        rawRows,
+        buckets,
+        components,
+      })
+    }catch(error){
+      return res.status(502).json({success:false,error:error?.message||'Calibration service unavailable.'})
+    }
+  }
+
+  const address=String(getQuery(req,'address')).trim()
   if(!addressPattern.test(address)) return res.status(400).json({success:false,error:'Invalid Solana token address.'})
 
   try{
