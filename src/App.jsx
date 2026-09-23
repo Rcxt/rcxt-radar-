@@ -2323,8 +2323,8 @@ export default function Home() {
 
       <footer className="footer">
         <div>
-          <b>RCXT RADAR · v4.0.0 PRODUCTION</b>
-          <span>Score engine v4.1.0 · Solana · DexScreener · Supabase · Vercel</span>
+          <b>RCXT RADAR · v5.1.0 RC</b>
+          <span>Score engine v5.0.0 · Solana · DexScreener · Supabase · Vercel</span>
         </div>
         <p>
           Signals are software-generated market intelligence, not guarantees or personalized financial advice.
