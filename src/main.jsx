@@ -23,9 +23,13 @@ class ErrorBoundary extends React.Component {
         <main className="fatalScreen">
           <div className="fatalCard">
             <span>RCXT RADAR</span>
-            <h1>Something crashed on this device.</h1>
-            <p>{String(this.state.error?.message || 'Unknown browser error')}</p>
+            <h1>RCXT hit bad screen data.</h1>
+            <p>The app caught the error instead of silently freezing. Reload to recover; your saved watchlist and notes stay intact.</p>
             <button onClick={() => window.location.reload()}>Reload RCXT Radar</button>
+            <details className="fatalDetails">
+              <summary>Technical details</summary>
+              <code>{String(this.state.error?.message || 'Unknown browser error')}</code>
+            </details>
           </div>
         </main>
       )
