@@ -279,7 +279,7 @@ test('GoPlus blacklist is preserved as hard structural evidence',()=>{
   assert.ok(merged.external.dangerRiskCount>=1)
 })
 
-test('Jupiter audit isSus presence is treated as suspicious signal',()=>{
+test('Jupiter audit isSus false is not treated as suspicious',()=>{
   const address='Mint11111111111111111111111111111111111111'
   const normalized=normalizeJupiterToken([{
     id:address,
@@ -289,5 +289,5 @@ test('Jupiter audit isSus presence is treated as suspicious signal',()=>{
   }],address)
 
   assert.equal(normalized.available,true)
-  assert.equal(normalized.suspicious,true)
+  assert.equal(normalized.suspicious,false)
 })
