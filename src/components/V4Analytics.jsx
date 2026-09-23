@@ -302,6 +302,60 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
     const runnerValue=targetValue-firstScaleValue
     return {position,tp,scale,stop,targetValue,stopValue,firstScaleValue,runnerValue}
   },[investment,takeProfitPercent,scaleOutPercent,stopDistance])
+
+  const livePosition=useMemo(()=>{
+    const position=Math.max(0,Number(investment||0))
+    const entry=Math.max(0,Number(entryMarketCap||0))
+    const currentMc=Math.max(0,Number(scan?.market?.marketCap||0))
+    const tp=Math.max(0,Number(takeProfitPercent||0))
+    const stop=Math.max(0,Number(stopDistance||0))
+
+    if(!position||!entry||!currentMc){
+      return {available:false}
+    }
+
+    const current=projectedPositionValue({
+      investment:position,
+      entryMarketCap:entry,
+      targetMarketCap:currentMc,
+      estimatedCostsPercent:estimatedCosts,
+    })
+    const targetMc=entry*(1+tp/100)
+    const stopMc=Math.max(0,entry*(1-stop/100))
+    const movePercent=((currentMc/entry)-1)*100
+    const targetDistancePercent=currentMc>0?((targetMc/currentMc)-1)*100:null
+    const stopDistanceFromCurrent=currentMc>0?((stopMc/currentMc)-1)*100:null
+    const remainingUpside=Math.max(0,targetMc-currentMc)
+    const remainingDownside=Math.max(0,currentMc-stopMc)
+    const remainingRiskReward=remainingDownside>0?remainingUpside/remainingDownside:null
+
+    const status=
+      currentMc>=targetMc?'TARGET ZONE':
+      currentMc<=stopMc?'STOP / INVALIDATION ZONE':
+      currentMc>entry?'IN PROFIT':
+      currentMc<entry?'UNDER ENTRY':'AT ENTRY'
+
+    return {
+      available:true,
+      current,
+      entryMarketCap:entry,
+      currentMarketCap:currentMc,
+      targetMarketCap:targetMc,
+      stopMarketCap:stopMc,
+      movePercent,
+      targetDistancePercent,
+      stopDistanceFromCurrent,
+      remainingRiskReward,
+      status,
+    }
+  },[
+    investment,
+    entryMarketCap,
+    scan?.market?.marketCap,
+    takeProfitPercent,
+    stopDistance,
+    estimatedCosts,
+  ])
   async function copyFullReport(){
     if(!scan) return
     const a=analytics
@@ -602,6 +656,30 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
           <label><span>Thesis</span><textarea value={planThesis} onChange={e=>setPlanThesis(e.target.value)} placeholder="Why am I entering? Catalyst / setup / flow…"/></label>
           <label><span>Invalidation</span><textarea value={planInvalidation} onChange={e=>setPlanInvalidation(e.target.value)} placeholder="What specifically makes me exit or stop believing the setup?"/></label>
         </div>
+        {livePosition.available ? (
+          <div className="livePlanTracker">
+            <div className="livePlanHead">
+              <div>
+                <span>LIVE PLAN TRACKER</span>
+                <strong className={
+                  livePosition.status==='TARGET ZONE'?'good':
+                  livePosition.status==='STOP / INVALIDATION ZONE'?'bad':
+                  livePosition.status==='IN PROFIT'?'good':'mid'
+                }>{livePosition.status}</strong>
+              </div>
+              <small>Uses live market-cap ratio · supply assumed comparable</small>
+            </div>
+            <div className="livePlanGrid">
+              <div><span>Est. current value</span><b>{money(livePosition.current?.netValue)}</b></div>
+              <div><span>Est. P/L</span><b className={Number(livePosition.current?.netProfit||0)>=0?'good':'bad'}>{money(livePosition.current?.netProfit)}</b></div>
+              <div><span>From entry MC</span><b className={livePosition.movePercent>=0?'good':'bad'}>{pct(livePosition.movePercent)}</b></div>
+              <div><span>TP market cap</span><b>{money(livePosition.targetMarketCap)}</b><small>{livePosition.targetDistancePercent==null?'—':pct(livePosition.targetDistancePercent)} from current</small></div>
+              <div><span>Stop market cap</span><b>{money(livePosition.stopMarketCap)}</b><small>{livePosition.stopDistanceFromCurrent==null?'—':pct(livePosition.stopDistanceFromCurrent)} from current</small></div>
+              <div><span>Remaining R:R</span><b>{livePosition.remainingRiskReward==null?'—':livePosition.remainingRiskReward.toFixed(2)+'×'}</b><small>to plan target vs stop</small></div>
+            </div>
+          </div>
+        ) : null}
+
         <div className="tradePlanFoot">
           <span>{planSavedAt?'Saved '+new Date(planSavedAt).toLocaleString():'Not saved yet'}</span>
           <small>Stored locally on this device. RCXT does not execute trades.</small>
