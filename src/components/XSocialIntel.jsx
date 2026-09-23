@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { normalizeNotificationPrefs } from '../lib/notification-prefs.js'
 
 function compact(value) {
   const number = Number(value || 0)
@@ -35,7 +36,7 @@ function Metric({ label, value, detail, tone = '' }) {
   )
 }
 
-export default function XSocialIntel({ scan }) {
+export default function XSocialIntel({ scan, notificationsEnabled=false, notificationPrefs=null }) {
   const address = String(scan?.address || '')
   const symbol = String(scan?.token?.symbol || '')
   const name = String(scan?.token?.name || '')
@@ -48,6 +49,41 @@ export default function XSocialIntel({ scan }) {
   const [aiModel, setAiModel] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
   const [lastRefresh, setLastRefresh] = useState(null)
+  const prefs=normalizeNotificationPrefs(notificationPrefs||{})
+
+  async function maybeNotifyX(nextSocial){
+    if(!prefs.xMomentum||!notificationsEnabled||typeof Notification==='undefined'||Notification.permission!=='granted') return
+    const signal=String(nextSocial?.signal||'')
+    if(!['IGNITING','NEGATIVE PRESSURE','SHILL-HEAVY'].includes(signal)) return
+
+    const key=address+':'+signal
+    try{
+      const now=Date.now()
+      const stored=JSON.parse(localStorage.getItem('rcxt-x-alert-dedupe-v1')||'{}')
+      const previous=Number(stored?.[key]||0)
+      const cooldown=Math.max(1,Number(prefs.cooldownMinutes||20))*60_000
+      if(previous&&now-previous<cooldown) return
+      stored[key]=now
+      localStorage.setItem('rcxt-x-alert-dedupe-v1',JSON.stringify(stored))
+
+      const registration=await navigator.serviceWorker?.ready
+      if(!registration?.showNotification) return
+      const title=signal==='IGNITING'
+        ? 'RCXT X momentum: '+(symbol||name||'Token')
+        : 'RCXT X quality warning: '+(symbol||name||'Token')
+      const detail=signal==='IGNITING'
+        ? 'Momentum '+Number(nextSocial?.momentumScore||0)+'/100 · '+Number(nextSocial?.accelerationRatio||0).toFixed(1)+'× acceleration'
+        : signal+' · shill risk '+String(nextSocial?.shillRisk||'UNKNOWN')
+      await registration.showNotification(title,{
+        body:detail,
+        icon:'/icon.svg',
+        badge:'/icon.svg',
+        tag:'x-'+address,
+        renotify:false,
+        data:{url:'/?token='+encodeURIComponent(address)},
+      })
+    }catch{}
+  }
 
   useEffect(() => {
     scanRef.current = scan
@@ -96,13 +132,14 @@ export default function XSocialIntel({ scan }) {
       if (!response.ok || !data?.success) throw new Error(data?.error || 'X search failed')
       setSocial(data.social)
       setLastRefresh(data.scannedAt || new Date().toISOString())
+      if(data.social?.available) await maybeNotifyX(data.social)
       if (withAi && data.social?.available) await runAiReport(data.social)
     } catch (nextError) {
       setError(nextError?.message || 'X search failed')
     } finally {
       setLoading(false)
     }
-  }, [address, symbol, name, runAiReport])
+  }, [address, symbol, name, runAiReport, notificationsEnabled, notificationPrefs])
 
   useEffect(() => {
     setSocial(null)

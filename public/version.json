@@ -1,9 +1,9 @@
 {
   "name": "RCXT Radar",
-  "version": "5.0.0-rc.1",
+  "version": "5.1.0-rc.1",
   "channel": "release-candidate",
   "status": "development",
-  "scoreEngine": "4.2.1",
+  "scoreEngine": "5.0.0",
   "trenchEngine": "1.0.0",
   "chartEngine": "1.0.0",
   "forecastEngine": "1.0.0",
@@ -11,16 +11,19 @@
   "supplyWhaleEngine": "1.0.0",
   "calibrationEngine": "2.0.0",
   "challengeEngine": "1.1.0",
-  "walletActivityEngine": "1.1.0",
-  "backgroundMonitorEngine": "1.0.0",
+  "walletActivityEngine": "1.2.0",
+  "backgroundMonitorEngine": "1.1.0",
   "marketCapMapEngine": "1.0.0",
   "socialEngine": "5.0.0-x",
-  "socialSources": ["x"],
+  "socialSources": [
+    "x"
+  ],
   "socialSearch": "official-x-api-v2",
   "persistence": "oidc-secured-v17",
   "region": "sfo1",
-  "release": "v5-x-social-rc1",
+  "release": "v5.1-clarity-alerts-rc1",
   "releasedAt": null,
   "productionUrl": "https://rcxt-radar.vercel.app",
-  "note": "V5 release branch adds X-only name/ticker/CA search, mention velocity, author quality, duplicate/shill detection, narrative mapping, influential-post ranking, and an AI X-feed report. Live X data requires X_BEARER_TOKEN."
+  "note": "V5.1 adds X-only social intelligence, score engine 5.0 provenance/entry gates, simplified scanner delivery, configurable alert presets, server-synced notification preferences, and anti-spam cooldowns.",
+  "notificationEngine": "2.0.0"
 }

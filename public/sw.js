@@ -11,8 +11,10 @@ self.addEventListener('push', (event) => {
     icon: '/icon.svg',
     badge: '/icon.svg',
     tag: data.tag || 'rcxt-alert',
-    renotify: true,
-    data: { url: data.url || '/' },
+    renotify: Boolean(data.renotify),
+    requireInteraction: Boolean(data.critical),
+    silent: Boolean(data.silent),
+    data: { url: data.url || '/', category:data.category || null },
   }
 
   event.waitUntil(self.registration.showNotification(title, options))

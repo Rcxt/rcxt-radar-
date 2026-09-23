@@ -32,7 +32,7 @@ async function testCharts() {
   const started = Date.now()
   try {
     const response = await fetch('https://api.geckoterminal.com/api/v2/networks/solana/new_pools?page=1', {
-      headers: { accept:'application/json', 'user-agent':'RCXT-Radar/4.0' },
+      headers: { accept:'application/json', 'user-agent':'RCXT-Radar/5.1' },
       signal: AbortSignal.timeout(3500),
     })
     const json = await response.json()
@@ -74,10 +74,10 @@ export default async function handler(req,res){
     checkedAt:new Date().toISOString(),
     scoreVersion:SCORE_VERSION,
     services,
-    refresh:{radarSeconds:10,scannerSeconds:5,chartsSeconds:30,tradeTapeSeconds:30},
+    refresh:{radarSeconds:10,scannerSeconds:15,chartsSeconds:30,tradeTapeSeconds:30,walletOpenSeconds:15,walletBackgroundSeconds:30},
     build:{
       app:'RCXT Radar',
-      version:'4.0.0',
+      version:'5.1.0-rc.1',
       scoreEngine:SCORE_VERSION,
       trenchEngine:'1.0.0',
       chartEngine:'1.0.0',
@@ -86,7 +86,8 @@ export default async function handler(req,res){
       supplyWhaleEngine:'1.0.0',
       calibrationEngine:'2.0.0',
       challengeEngine:'1.1.0',
-      walletActivityEngine:'1.0.0',
+      walletActivityEngine:'1.2.0',
+      notificationEngine:'2.0.0',
       persistence:'supabase-oidc-v17',
       gitSha:process.env.VERCEL_GIT_COMMIT_SHA||null,
       gitRef:process.env.VERCEL_GIT_COMMIT_REF||null,
@@ -97,12 +98,7 @@ export default async function handler(req,res){
     ai:{mode:'multi-model-gateway-with-deterministic-fallback'},
     oidc:{available:Boolean(req.headers?.['x-vercel-oidc-token'])},
     socialProviders:{
-      reddit:Boolean(
-        process.env.REDDIT_BEARER_TOKEN ||
-        (process.env.REDDIT_CLIENT_ID && process.env.REDDIT_CLIENT_SECRET)
-      ),
-      x:Boolean(process.env.X_BEARER_TOKEN),
-      instagram:Boolean(process.env.INSTAGRAM_ACCESS_TOKEN && process.env.INSTAGRAM_USER_ID)
+      x:Boolean(process.env.X_BEARER_TOKEN)
     }
   })
 }

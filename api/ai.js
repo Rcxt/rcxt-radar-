@@ -6,6 +6,12 @@ function fallbackAnalysis(scan,social,mode='pro'){
   const intel=scan?.intelligence
   const positives=intel?.positives?.slice(0,3).join('; ')||'No strong positive signals.'
   const negatives=intel?.negatives?.slice(0,3).join('; ')||'No major negative signals.'
+  const capLine=Array.isArray(intel?.scoreCaps)&&intel.scoreCaps.length
+    ? ' Raw blend '+(intel?.scoreBeforeCaps??'—')+'/100 was capped by '+intel.scoreCaps.slice(0,3).map((item)=>String(item?.reason||'').replaceAll('_',' ').toLowerCase()).join(', ')+'.'
+    : ''
+  const blockers=Array.isArray(intel?.entryGate?.leanBuyMissing)&&intel.entryGate.leanBuyMissing.length
+    ? intel.entryGate.leanBuyMissing.slice(0,3).join('; ')
+    : 'No major Lean Buy gate is currently missing.'
   const socialLine = social?.available
     ? `Social momentum ${social.momentumScore}/100 with quality ${social.qualityScore}/100 across ${social.sourceDiversity} source(s). Treat this as supporting evidence, not primary evidence.`
     : 'Social data is unavailable or not configured; do not infer social confirmation.'
@@ -18,15 +24,15 @@ function fallbackAnalysis(scan,social,mode='pro'){
         : 'The setup currently has more weakness or uncertainty than confirmation.'
     return [
       `BOTTOM LINE\n${intel?.signal||'WATCH'} · RCXT ${score}/100 · Opportunity ${intel?.opportunityScore??intel?.setupScore??'—'}/100 (${intel?.opportunityLabel||'mixed'}). ${plain}`,
-      `WHY\n${positives}`,
+      `WHY\n${positives}.${capLine} Entry blockers: ${blockers}`,
       `WHAT COULD GO WRONG\n${negatives}`,
       `BEGINNER NOTE\nA score is not a win chance. Liquidity tells you how easy it may be to exit, seller pressure can change fast, and a good-looking chart cannot make contract risk disappear. ${socialLine}`
     ].join('\n\n')
   }
 
   return [
-    `SIGNAL\n${intel?.signal||'WATCH'} — risk-adjusted score ${intel?.score??0}/100. Opportunity ${intel?.opportunityScore??intel?.setupScore??'—'}/100 (${intel?.opportunityLabel||'mixed'}), direction ${intel?.directionalBias||'NEUTRAL'}, execution ${intel?.executionScore??'—'}, safety ${intel?.safetyScore??'—'}, data quality ${intel?.dataQualityScore??'—'}.`,
-    `WHY\n${positives}\n${socialLine}`,
+    `SIGNAL\n${intel?.signal||'WATCH'} — RCXT ${intel?.score??0}/100 after risk caps; raw blend ${intel?.scoreBeforeCaps??intel?.score??0}/100. Opportunity ${intel?.opportunityScore??intel?.setupScore??'—'}/100 (${intel?.opportunityLabel||'mixed'}), direction ${intel?.directionalBias||'NEUTRAL'}, execution ${intel?.executionScore??'—'}, safety ${intel?.safetyScore??'—'}, data quality ${intel?.dataQualityScore??'—'}.`,
+    `WHY\n${positives}.${capLine} Entry blockers: ${blockers}.\n${socialLine}`,
     `INVALIDATION\n${negatives}`,
     'RISK\nTreat RCXT as decision support, not a profit forecast. Liquidity, contract risk, slippage, and changing market structure can invalidate the setup quickly.'
   ].join('\n\n')
@@ -91,7 +97,7 @@ export default async function handler(req,res){
     'Analyze only the supplied token snapshot. Use plain language a brand-new trader can understand.',
     'Avoid unexplained jargon. If you use a term like liquidity, RSI, slippage, or market cap, explain it in a few words.',
     'Never claim certainty, guaranteed profit, a win probability, insider information, or exact future prices.',
-    'The deterministic RCXT signal is the source of truth.',
+    'The deterministic RCXT v5 signal is the source of truth. Explain scoreBeforeCaps, scoreCaps, and entryGate when they materially explain the displayed score or WATCH state.',
     'Risk and direction are separate: a very young or thin-liquidity token can be extremely risky while momentum is still bullish.',
     'Never describe liquidity risk or pair age alone as proof price will fall. If liquidityReported is false, treat liquidity as unknown.',
     'When candle analytics are supplied, explain chart bias, RSI, support/resistance, volatility, and forecast ranges in plain language.',
@@ -105,7 +111,7 @@ export default async function handler(req,res){
   const proSystem=[
     "You are RCXT Radar's market analyst. Analyze only the supplied Solana token snapshot.",
     'Be concise, skeptical, and practical. Never claim certainty, guaranteed profit, insider knowledge, or future prices.',
-    'The deterministic RCXT signal is the source of truth. It separates directional opportunity/setup from execution risk, safety, and data quality.',
+    'The deterministic RCXT v5 signal is the source of truth. It separates directional opportunity/setup from execution risk, safety, data quality, and explicit score caps/entry gates.',
     'Risk is not the same as direction. If liquidityReported is false, explain that the liquidity field is unavailable rather than assuming zero.',
     'Social data is lower-trust supporting evidence because it can be manipulated. Never let social momentum override contract, liquidity, execution, or market-structure risk.',
     'Explain contradictions explicitly. A high social score with weak setup/execution is hype risk, not confirmation.',
@@ -148,7 +154,7 @@ export default async function handler(req,res){
   }
 
   const analysis=mode==='social'?fallbackSocialAnalysis(scan,social):fallbackAnalysis(scan,social,mode)
-  const fallbackModel=mode==='social'?'deterministic-x-social-v5':'deterministic-fallback-v4.2'
+  const fallbackModel=mode==='social'?'deterministic-x-social-v5':'deterministic-fallback-v5'
   await logAiAnalysis(
     {scan,model:fallbackModel,analysis,social},
     req.headers?.['x-vercel-oidc-token']

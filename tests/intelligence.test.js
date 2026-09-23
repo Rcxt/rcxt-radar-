@@ -36,8 +36,8 @@ function baseSecurity(){
   }
 }
 
-test('score engine version is 4.2.1',()=>{
-  assert.equal(SCORE_VERSION,'4.2.1')
+test('score engine version is 5.0.0',()=>{
+  assert.equal(SCORE_VERSION,'5.0.0')
 })
 
 test('resolved owner concentration is preferred when available',()=>{
@@ -177,4 +177,57 @@ test('hard structural danger vetoes entry market-cap estimates',()=>{
   assert.equal(result.marketCapPlan.entryLow,null)
   assert.equal(result.marketCapPlan.entryHigh,null)
   assert.match(result.marketCapPlan.action,/NO ENTRY/)
+})
+
+
+test('v5 exposes score provenance and entry-gate blockers',()=>{
+  const pair=healthyPair()
+  pair.priceChange={m5:2,h1:1,h6:4,h24:170}
+  const result=analyzePair(pair,baseSecurity())
+
+  assert.ok(Number.isFinite(result.scoreBeforeCaps))
+  assert.ok(Array.isArray(result.scoreCaps))
+  assert.ok(result.entryGate)
+  assert.ok(Array.isArray(result.entryGate.leanBuyMissing))
+  assert.ok(result.entryGate.leanBuyMissing.some((item)=>item.includes('150%')))
+  assert.equal(result.entryGate.buySetupEligible,false)
+})
+
+test('informational risk flags do not become extreme risk by count alone',()=>{
+  const pair=healthyPair()
+  pair.dexId='pumpfun'
+  pair.liquidity={}
+  pair.pairCreatedAt=Date.now()-40*60*1000
+  pair.priceChange={m5:8,h1:22,h6:70,h24:160}
+  pair.volume={m5:8000,h1:50000,h6:140000,h24:260000}
+  pair.txns={
+    m5:{buys:70,sells:40},
+    h1:{buys:310,sells:180},
+    h24:{buys:1100,sells:780},
+  }
+
+  const result=analyzePair(pair,{
+    ...baseSecurity(),
+    concentrationAvailable:false,
+    top1Percent:null,
+    top5Percent:null,
+    top10Percent:null,
+  })
+
+  assert.ok(result.riskFlags.includes('LIQUIDITY_DATA_UNAVAILABLE'))
+  assert.notEqual(result.risk,'EXTREME')
+  assert.notEqual(result.signal,'SELL / AVOID')
+})
+
+test('v5 confidence is capped when critical market fields are missing',()=>{
+  const pair=healthyPair()
+  pair.dexId='pumpfun'
+  pair.liquidity={}
+  const result=analyzePair(pair,{
+    available:false,
+    concentrationAvailable:false,
+  })
+
+  assert.ok(result.confidence<=72)
+  assert.equal(result.liquidityReported,false)
 })

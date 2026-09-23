@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { normalizeNotificationPrefs } from '../lib/notification-prefs.js'
 
 function short(value,size=5){
   const text=String(value||'')
@@ -36,7 +37,7 @@ function typeTone(type){
   return ''
 }
 
-export default function WalletActivity({walletAddress='',onOpenToken,notificationsEnabled=false,serverMonitor=null,onToggleServerMonitor=null}){
+export default function WalletActivity({walletAddress='',onOpenToken,notificationsEnabled=false,notificationPrefs=null,serverMonitor=null,onToggleServerMonitor=null}){
   const [data,setData]=useState(null)
   const [loading,setLoading]=useState(false)
   const [error,setError]=useState('')
@@ -46,6 +47,7 @@ export default function WalletActivity({walletAddress='',onOpenToken,notificatio
   const scoringRef=useRef(new Set())
   const seenBuyRef=useRef(new Set())
   const initializedBuyMonitorRef=useRef(false)
+  const prefs=normalizeNotificationPrefs(notificationPrefs||serverMonitor?.preferences||{})
 
   function canNotify(){
     return Boolean(
@@ -55,8 +57,8 @@ export default function WalletActivity({walletAddress='',onOpenToken,notificatio
     )
   }
 
-  async function showAlert(title,body,{tag,url}={}){
-    if(!canNotify()) return
+  async function showAlert(title,body,{tag,url,critical=false}={}){
+    if(!canNotify()||serverMonitor?.enabled) return
     try{
       const registration=await navigator.serviceWorker?.ready
       if(!registration?.showNotification) return
@@ -65,7 +67,8 @@ export default function WalletActivity({walletAddress='',onOpenToken,notificatio
         icon:'/icon.svg',
         badge:'/icon.svg',
         tag:tag||'rcxt-wallet-alert',
-        renotify:true,
+        renotify:Boolean(critical),
+        requireInteraction:Boolean(critical),
         data:{url:url||'/'},
       })
     }catch{}
@@ -147,8 +150,8 @@ export default function WalletActivity({walletAddress='',onOpenToken,notificatio
         alreadyNotified.add(buy.signature)
         const mint=buy?.token?.address
         if(mint){
-          scoreMint(mint,{buy,notifyOnComplete:true,force:true})
-        }else{
+          scoreMint(mint,{buy,notifyOnComplete:!serverMonitor?.enabled,force:true})
+        }else if(prefs.newBuy&&!serverMonitor?.enabled){
           showAlert(
             'RCXT detected a new token buy',
             buy?.solSpent ? number(buy.solSpent,4)+' SOL spent · token scan unavailable' : 'Token inflow detected · scan unavailable',
@@ -196,6 +199,7 @@ export default function WalletActivity({walletAddress='',onOpenToken,notificatio
         score:json.scan?.intelligence?.score,
         signal:json.scan?.intelligence?.signal,
         risk:json.scan?.intelligence?.risk,
+        opportunityScore:json.scan?.intelligence?.opportunityScore??json.scan?.intelligence?.setupScore,
         riskFlags:json.scan?.intelligence?.riskFlags||[],
         updatedAt:Date.now(),
       }
@@ -212,42 +216,49 @@ export default function WalletActivity({walletAddress='',onOpenToken,notificatio
       const riskKey=mint+':'+riskFingerprint
       const url='/?token='+encodeURIComponent(mint)
 
-      if(assessment.rugFlags.length){
+      const hotButRisky=Number(next.opportunityScore||0)>=60&&['HIGH','EXTREME'].includes(next.risk)
+      if(assessment.rugFlags.length&&prefs.rugRisk){
         if(!storedRisks.has(riskKey)){
           storedRisks.add(riskKey)
           writeStoredSet('rcxt-risk-alerted-v1',storedRisks,120)
           await showAlert(
             'RCXT RUG RISK: '+symbol,
-            'Score '+next.score+'/100 · '+next.signal+' · '+assessment.rugFlags.slice(0,2).map(shortFlag).join(' · '),
-            {tag:'rug-'+mint,url}
+            'RCXT '+next.score+'/100 · '+next.signal+' · '+assessment.rugFlags.slice(0,2).map(shortFlag).join(' · '),
+            {tag:'rug-'+mint,url,critical:true}
           )
         }
-      }else if(assessment.severe){
+      }else if(hotButRisky&&prefs.hotMomentumBuy){
+        await showAlert(
+          'RCXT HOT / HIGH RISK: '+symbol,
+          'Opportunity '+next.opportunityScore+'/100 · RCXT '+next.score+'/100 · '+next.risk+' risk',
+          {tag:'hot-'+mint,url}
+        )
+      }else if(assessment.severe&&prefs.highRiskBuy){
         if(!storedRisks.has(riskKey)){
           storedRisks.add(riskKey)
           writeStoredSet('rcxt-risk-alerted-v1',storedRisks,120)
           await showAlert(
-            'RCXT high-risk alert: '+symbol,
-            'Score '+next.score+'/100 · '+next.signal+' · '+next.risk+' risk',
+            'RCXT high-risk buy: '+symbol,
+            'RCXT '+next.score+'/100 · '+next.signal+' · '+next.risk+' risk',
             {tag:'risk-'+mint,url}
           )
         }
-      }else if(notifyOnComplete){
+      }else if(notifyOnComplete&&prefs.newBuy){
         const spent=buy?.solSpent?number(buy.solSpent,4)+' SOL · ':''
         await showAlert(
           'RCXT buy detected: '+symbol,
-          spent+'Score '+next.score+'/100 · '+next.signal+' · '+next.risk+' risk',
-          {tag:'buy-score-'+(buy?.signature||mint),url}
+          spent+'RCXT '+next.score+'/100 · opportunity '+(next.opportunityScore??'—')+'/100 · '+next.signal,
+          {tag:'buy-'+mint,url}
         )
       }
     }catch(err){
       setScores(current=>({...current,[mint]:{loading:false,error:err?.message||'Score unavailable',updatedAt:Date.now()}}))
-      if(notifyOnComplete){
+      if(notifyOnComplete&&prefs.newBuy&&!serverMonitor?.enabled){
         const symbol=buy?.token?.symbol||short(mint)
         await showAlert(
           'RCXT buy detected: '+symbol,
           'New buy detected, but the first risk scan could not complete. RCXT will retry.',
-          {tag:'buy-pending-'+(buy?.signature||mint),url:'/?token='+encodeURIComponent(mint)}
+          {tag:'buy-pending-'+mint,url:'/?token='+encodeURIComponent(mint)}
         )
       }
     }finally{
@@ -279,7 +290,7 @@ export default function WalletActivity({walletAddress='',onOpenToken,notificatio
         <div>
           <span>WALLET ACTIVITY INTELLIGENCE</span>
           <h3>Recent on-chain token activity</h3>
-          <p>RCXT checks this wallet about every 15 seconds while the app is open. Live Monitor adds a server-side background check about every 30 seconds so buy/rug alerts can continue after you leave the app.</p>
+          <p>RCXT checks this wallet about every 15 seconds while the app is open. When 24/7 Live Monitor is active, background push handles buy alerts so the open app does not send a duplicate copy.</p>
         </div>
         <div className="walletActivityActions">
           <button

@@ -73,7 +73,7 @@ export default async function handler(req,res){
   const wallet=String(body?.wallet||'').trim()
   const action=String(body?.action||'')
   if(!addressPattern.test(wallet)) return res.status(400).json({success:false,error:'Invalid wallet address.'})
-  if(!['enable','disable','subscribe','unsubscribe'].includes(action)){
+  if(!['enable','disable','subscribe','unsubscribe','preferences'].includes(action)){
     return res.status(400).json({success:false,error:'Invalid monitor action.'})
   }
 
@@ -83,6 +83,12 @@ export default async function handler(req,res){
     const auth=String(body?.subscription?.keys?.auth||'')
     if(!endpoint.startsWith('https://')||!p256dh||!auth){
       return res.status(400).json({success:false,error:'Invalid push subscription.'})
+    }
+  }
+
+  if(action==='preferences'){
+    if(!body?.preferences||typeof body.preferences!=='object'||Array.isArray(body.preferences)){
+      return res.status(400).json({success:false,error:'Invalid notification preferences.'})
     }
   }
 

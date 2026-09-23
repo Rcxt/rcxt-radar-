@@ -1,15 +1,23 @@
 'use client'
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import V4AnalyticsSuite from './components/V4Analytics.jsx'
 import ChallengeTracker from './components/ChallengeTracker.jsx'
 import WalletActivity from './components/WalletActivity.jsx'
 import XSocialIntel from './components/XSocialIntel.jsx'
+import NotificationCenter from './components/NotificationCenter.jsx'
+import {
+  DEFAULT_NOTIFICATION_PREFS,
+  normalizeNotificationPrefs,
+  shouldNotifySignalTransition,
+} from './lib/notification-prefs.js'
 
 const WALLET_KEY = 'rcxt-wallet-address-v1'
 const HISTORY_KEY = 'rcxt-scan-history-v1'
 const HIDDEN_KEY = 'rcxt-hidden-coins-v1'
 const NOTIFY_KEY = 'rcxt-notifications-v1'
+const NOTIFY_PREFS_KEY = 'rcxt-notification-prefs-v2'
+const ALERT_DEDUPE_KEY = 'rcxt-alert-dedupe-v2'
 const WATCH_KEY = 'rcxt-watchlist-v1'
 const RULES_KEY = 'rcxt-alert-rules-v1'
 const NOTES_KEY = 'rcxt-token-notes-v1'
@@ -50,6 +58,8 @@ export default function Home() {
   const [showHidden, setShowHidden] = useState(false)
   const [notificationsEnabled, setNotificationsEnabled] = useState(false)
   const [notificationStatus, setNotificationStatus] = useState('')
+  const [notificationPrefs, setNotificationPrefs] = useState(DEFAULT_NOTIFICATION_PREFS)
+  const notificationPrefsRef = useRef(DEFAULT_NOTIFICATION_PREFS)
   const [liveMonitor, setLiveMonitor] = useState({
     enabled:false,
     loading:false,
@@ -58,6 +68,7 @@ export default function Home() {
     lastEventAt:null,
     lastError:null,
     vapidPublicKey:null,
+    preferences:DEFAULT_NOTIFICATION_PREFS,
   })
   const [watchlist, setWatchlist] = useState([])
   const [showWatchlist, setShowWatchlist] = useState(false)
@@ -78,6 +89,10 @@ export default function Home() {
   const [activeDrawer, setActiveDrawer] = useState('')
   const [radarPreset, setRadarPreset] = useState('balanced')
   const [tradePlans, setTradePlans] = useState([])
+
+  useEffect(() => {
+    notificationPrefsRef.current = notificationPrefs
+  }, [notificationPrefs])
 
   const loadRadar = useCallback(async () => {
     setRadarLoading(true)
@@ -111,6 +126,11 @@ export default function Home() {
 
       const notifySaved = localStorage.getItem(NOTIFY_KEY) === 'enabled'
       setNotificationsEnabled(notifySaved && typeof Notification !== 'undefined' && Notification.permission === 'granted')
+
+      const savedNotificationPrefs = normalizeNotificationPrefs(
+        JSON.parse(localStorage.getItem(NOTIFY_PREFS_KEY) || '{}')
+      )
+      setNotificationPrefs(savedNotificationPrefs)
 
       const savedWatchlist = JSON.parse(localStorage.getItem(WATCH_KEY) || '[]')
       if (Array.isArray(savedWatchlist)) setWatchlist(savedWatchlist.filter((item) => item?.address).slice(0, 50))
@@ -284,7 +304,7 @@ export default function Home() {
     } finally {
       if (!silent) setScanLoading(false)
     }
-  }, [tokenAddress, notificationsEnabled, alertScore, alertMarketCap, alertSignalChanges])
+  }, [tokenAddress, notificationsEnabled, alertScore, alertMarketCap, alertSignalChanges, notificationPrefs])
 
   useEffect(() => {
     const deepLinkedToken = new URLSearchParams(window.location.search).get('token')
@@ -316,6 +336,9 @@ export default function Home() {
       const response = await fetch('/api/monitor?wallet=' + encodeURIComponent(address), { cache:'no-store' })
       const data = await response.json()
       if (!response.ok || !data?.success) throw new Error(data?.error || 'Monitor status unavailable')
+      const serverPrefs=normalizeNotificationPrefs(data.preferences || notificationPrefs)
+      setNotificationPrefs(serverPrefs)
+      try{ localStorage.setItem(NOTIFY_PREFS_KEY,JSON.stringify(serverPrefs)) }catch{}
       setLiveMonitor({
         enabled:Boolean(data.enabled),
         loading:false,
@@ -324,8 +347,9 @@ export default function Home() {
         lastEventAt:data.lastEventAt || null,
         lastError:data.lastError || null,
         vapidPublicKey:data.vapidPublicKey || null,
+        preferences:serverPrefs,
       })
-      return data
+      return {...data,preferences:serverPrefs}
     } catch (error) {
       setLiveMonitor((current) => ({
         ...current,
@@ -334,14 +358,14 @@ export default function Home() {
       }))
       return null
     }
-  }, [wallet])
+  }, [wallet, notificationPrefs])
 
   useEffect(() => {
     if (!wallet) return
     loadLiveMonitor(wallet)
     const timer = setInterval(() => loadLiveMonitor(wallet), 60000)
     return () => clearInterval(timer)
-  }, [wallet, loadLiveMonitor])
+  }, [wallet])
 
   async function enableLiveMonitor() {
     const address = String(wallet || '').trim()
@@ -392,7 +416,7 @@ export default function Home() {
       const enableResponse = await fetch('/api/monitor', {
         method:'POST',
         headers:{'content-type':'application/json'},
-        body:JSON.stringify({ action:'enable', wallet:address }),
+        body:JSON.stringify({ action:'enable', wallet:address, preferences:notificationPrefs }),
       })
       const enabledData = await enableResponse.json()
       if (!enableResponse.ok || !enabledData?.success) {
@@ -425,7 +449,7 @@ export default function Home() {
         const response = await fetch('/api/monitor', {
           method:'POST',
           headers:{'content-type':'application/json'},
-          body:JSON.stringify({ action:'disable', wallet:address }),
+          body:JSON.stringify({ action:'disable', wallet:address, preferences:notificationPrefs }),
         })
         const data = await response.json()
         if (!response.ok || !data?.success) throw new Error(data?.error || 'Could not disable monitor')
@@ -452,14 +476,7 @@ export default function Home() {
         localStorage.setItem(NOTIFY_KEY, 'enabled')
         setNotificationsEnabled(true)
         setNotificationStatus('Buy detection, rug-risk, and signal alerts enabled while RCXT is active.')
-        const registration = await navigator.serviceWorker?.ready
-        if (registration?.showNotification) {
-          registration.showNotification('RCXT Radar', {
-            body: 'New-buy, rug-risk, score, market-cap, and signal alerts are enabled while RCXT is active.',
-            icon: '/icon.svg',
-            badge: '/icon.svg',
-          })
-        }
+
       } else {
         setNotificationsEnabled(false)
         localStorage.removeItem(NOTIFY_KEY)
@@ -476,118 +493,177 @@ export default function Home() {
     setNotificationStatus('Notifications disabled.')
   }
 
-  function maybeNotifySignalChange(previous, next) {
-    if (!alertSignalChanges) return
-    if (!notificationsEnabled || typeof Notification === 'undefined' || Notification.permission !== 'granted') return
-    const before = previous?.intelligence?.signal
-    const after = next?.intelligence?.signal
-    if (!before || !after || before === after) return
+  async function saveNotificationPreferences(nextPrefs) {
+    const clean=normalizeNotificationPrefs(nextPrefs)
+    setNotificationPrefs(clean)
+    setLiveMonitor((current)=>({...current,preferences:clean}))
+    try{ localStorage.setItem(NOTIFY_PREFS_KEY,JSON.stringify(clean)) }catch{}
 
-    navigator.serviceWorker?.ready.then((registration) => {
-      registration.showNotification(`${next.token?.symbol || 'Token'} signal changed`, {
-        body: `${before} → ${after} · Score ${next.intelligence?.score ?? '—'}/100`,
-        icon: '/icon.svg',
-        badge: '/icon.svg',
-        tag: `scan-${next.address}`,
+    const address=String(wallet||'').trim()
+    if(!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)) return
+
+    try{
+      const response=await fetch('/api/monitor',{
+        method:'POST',
+        headers:{'content-type':'application/json'},
+        body:JSON.stringify({action:'preferences',wallet:address,preferences:clean}),
       })
-    }).catch(() => {})
+      const data=await response.json()
+      if(response.ok&&data?.success){
+        const serverPrefs=normalizeNotificationPrefs(data.preferences||clean)
+        setNotificationPrefs(serverPrefs)
+        setLiveMonitor((current)=>({...current,preferences:serverPrefs}))
+        try{ localStorage.setItem(NOTIFY_PREFS_KEY,JSON.stringify(serverPrefs)) }catch{}
+      }
+    }catch{}
+  }
+
+  function localAlertAllowed(key,{critical=false,cooldownMinutes=notificationPrefs.cooldownMinutes}={}){
+    if(typeof window==='undefined') return false
+    try{
+      const now=Date.now()
+      const stored=JSON.parse(localStorage.getItem(ALERT_DEDUPE_KEY)||'{}')
+      const previous=Number(stored?.[key]||0)
+      const cooldown=Math.max(1,Number(cooldownMinutes||20))*60_000
+      if(previous>0&&now-previous<cooldown) return false
+      const next={...stored,[key]:now}
+      const entries=Object.entries(next).sort((a,b)=>Number(b[1])-Number(a[1])).slice(0,120)
+      localStorage.setItem(ALERT_DEDUPE_KEY,JSON.stringify(Object.fromEntries(entries)))
+      return true
+    }catch{
+      return true
+    }
+  }
+
+  async function showRcxtAlert(key,title,body,{tag,url,critical=false,cooldownMinutes}={}){
+    if(!notificationsEnabled||typeof Notification==='undefined'||Notification.permission!=='granted') return
+    if(!localAlertAllowed(key,{critical,cooldownMinutes})) return
+    try{
+      const registration=await navigator.serviceWorker?.ready
+      if(!registration?.showNotification) return
+      await registration.showNotification(title,{
+        body,
+        icon:'/icon.svg',
+        badge:'/icon.svg',
+        tag:tag||key,
+        renotify:Boolean(critical),
+        requireInteraction:Boolean(critical),
+        data:{url:url||'/'},
+      })
+    }catch{}
+  }
+
+  function maybeNotifySignalChange(previous, next) {
+    const before=previous?.intelligence?.signal
+    const after=next?.intelligence?.signal
+    if(!shouldNotifySignalTransition(before,after,notificationPrefs)) return
+
+    const kind=['REDUCE','SELL / AVOID'].includes(after)?'danger':'upgrade'
+    showRcxtAlert(
+      `signal:${next.address}:${after}`,
+      `${next.token?.symbol||'Token'} ${kind==='danger'?'risk signal':'signal upgrade'}`,
+      `${before} → ${after} · RCXT ${next.intelligence?.score??'—'}/100 · opportunity ${next.intelligence?.opportunityScore??next.intelligence?.setupScore??'—'}/100`,
+      {
+        tag:`signal-${next.address}`,
+        url:`/?token=${encodeURIComponent(next.address)}`,
+        critical:after==='SELL / AVOID',
+      },
+    )
   }
 
   function maybeNotifyRadarChanges(previous, next) {
-    if (!notificationsEnabled || typeof Notification === 'undefined' || Notification.permission !== 'granted') return
-    if (!Array.isArray(previous) || previous.length === 0) return
+    const prefs=notificationPrefsRef.current
+    if(!prefs.radarChanges) return
+    if(!Array.isArray(previous)||previous.length===0) return
 
-    const before = new Map(previous.map((item) => [item.address, item.intelligence?.signal]))
-    for (const item of next) {
-      const oldSignal = before.get(item.address)
-      const newSignal = item.intelligence?.signal
-      if (!oldSignal || !newSignal || oldSignal === newSignal) continue
-      if (!['BUY SETUP', 'LEAN BUY', 'REDUCE', 'SELL / AVOID'].includes(newSignal)) continue
+    const before=new Map(previous.map((item)=>[item.address,item.intelligence?.signal]))
+    for(const item of next){
+      const oldSignal=before.get(item.address)
+      const newSignal=item.intelligence?.signal
+      if(!shouldNotifySignalTransition(oldSignal,newSignal,prefs)) continue
 
-      navigator.serviceWorker?.ready.then((registration) => {
-        registration.showNotification(`${item.symbol || 'Token'}: ${newSignal}`, {
-          body: `RCXT score ${item.intelligence?.score ?? '—'}/100 · ${item.intelligence?.risk || 'risk'} risk`,
-          icon: '/icon.svg',
-          badge: '/icon.svg',
-          tag: `radar-${item.address}`,
-        })
-      }).catch(() => {})
+      showRcxtAlert(
+        `radar:${item.address}:${newSignal}`,
+        `${item.symbol||'Token'}: ${newSignal}`,
+        `RCXT ${item.intelligence?.score??'—'}/100 · opportunity ${item.intelligence?.opportunityScore??item.intelligence?.setupScore??'—'}/100 · ${item.intelligence?.risk||'risk'} risk`,
+        {
+          tag:`radar-${item.address}`,
+          url:`/?token=${encodeURIComponent(item.address)}`,
+          critical:newSignal==='SELL / AVOID',
+        },
+      )
     }
   }
 
   function maybeNotifyRuleCrossings(previous, next) {
-    if (!notificationsEnabled || typeof Notification === 'undefined' || Notification.permission !== 'granted') return
-
-    const scoreTarget = Number(alertScore || 0)
-    if (
-      scoreTarget > 0 &&
-      Number(previous?.intelligence?.score || 0) < scoreTarget &&
-      Number(next?.intelligence?.score || 0) >= scoreTarget
-    ) {
-      navigator.serviceWorker?.ready.then((registration) => {
-        registration.showNotification(`${next.token?.symbol || 'Token'} crossed score ${scoreTarget}`, {
-          body: `RCXT score is now ${next.intelligence?.score}/100 · ${next.intelligence?.signal}`,
-          icon: '/icon.svg',
-          badge: '/icon.svg',
-          tag: `score-${next.address}`,
-        })
-      }).catch(() => {})
+    const scoreTarget=Number(alertScore||0)
+    if(
+      notificationPrefs.scoreCrossing &&
+      scoreTarget>0 &&
+      Number(previous?.intelligence?.score||0)<scoreTarget &&
+      Number(next?.intelligence?.score||0)>=scoreTarget
+    ){
+      showRcxtAlert(
+        `score:${next.address}:${scoreTarget}`,
+        `${next.token?.symbol||'Token'} crossed RCXT ${scoreTarget}`,
+        `Score is now ${next.intelligence?.score}/100 · ${next.intelligence?.signal} · opportunity ${next.intelligence?.opportunityScore??next.intelligence?.setupScore??'—'}/100`,
+        {tag:`score-${next.address}`,url:`/?token=${encodeURIComponent(next.address)}`},
+      )
     }
 
-    const marketCapTarget = Number(alertMarketCap || 0)
-    if (
-      marketCapTarget > 0 &&
-      Number(previous?.market?.marketCap || 0) < marketCapTarget &&
-      Number(next?.market?.marketCap || 0) >= marketCapTarget
-    ) {
-      navigator.serviceWorker?.ready.then((registration) => {
-        registration.showNotification(`${next.token?.symbol || 'Token'} hit MC target`, {
-          body: `Market cap crossed ${compactUsd(marketCapTarget)} · now ${compactUsd(next.market?.marketCap)}`,
-          icon: '/icon.svg',
-          badge: '/icon.svg',
-          tag: `mc-${next.address}`,
-        })
-      }).catch(() => {})
+    const marketCapTarget=Number(alertMarketCap||0)
+    if(
+      notificationPrefs.marketCapCrossing &&
+      marketCapTarget>0 &&
+      Number(previous?.market?.marketCap||0)<marketCapTarget &&
+      Number(next?.market?.marketCap||0)>=marketCapTarget
+    ){
+      showRcxtAlert(
+        `mc:${next.address}:${marketCapTarget}`,
+        `${next.token?.symbol||'Token'} hit MC target`,
+        `Market cap crossed ${compactUsd(marketCapTarget)} · now ${compactUsd(next.market?.marketCap)}`,
+        {tag:`mc-${next.address}`,url:`/?token=${encodeURIComponent(next.address)}`},
+      )
     }
   }
 
   function maybeNotifyRiskEscalation(previous, next) {
-    if (!notificationsEnabled || typeof Notification === 'undefined' || Notification.permission !== 'granted') return
-
-    const dangerFlags = [
+    const dangerFlags=[
       'MINT_AUTHORITY_ACTIVE',
       'FREEZE_AUTHORITY_ACTIVE',
       'EXTREME_OWNER_CONCENTRATION',
       'EXTREME_ACCOUNT_CONCENTRATION',
     ]
-    const beforeFlags = new Set(previous?.intelligence?.riskFlags || [])
-    const afterFlags = (next?.intelligence?.riskFlags || []).filter((flag) => dangerFlags.includes(flag))
-    const newDanger = afterFlags.filter((flag) => !beforeFlags.has(flag))
-    const riskRank = { LOWER: 0, MODERATE: 1, HIGH: 2, EXTREME: 3 }
-    const beforeRank = riskRank[previous?.intelligence?.risk] ?? 0
-    const afterRank = riskRank[next?.intelligence?.risk] ?? 0
-    const severeEscalation = afterRank >= 2 && afterRank > beforeRank
+    const beforeFlags=new Set(previous?.intelligence?.riskFlags||[])
+    const afterFlags=(next?.intelligence?.riskFlags||[]).filter((flag)=>dangerFlags.includes(flag))
+    const newDanger=afterFlags.filter((flag)=>!beforeFlags.has(flag))
+    const riskRank={LOWER:0,MODERATE:1,HIGH:2,EXTREME:3}
+    const beforeRank=riskRank[previous?.intelligence?.risk]??0
+    const afterRank=riskRank[next?.intelligence?.risk]??0
+    const severeEscalation=afterRank>=2&&afterRank>beforeRank
 
-    if (!newDanger.length && !severeEscalation) return
+    if(!newDanger.length&&!severeEscalation) return
+    if(newDanger.length&&!notificationPrefs.rugRisk) return
+    if(!newDanger.length&&!notificationPrefs.highRiskBuy) return
 
-    const rugLike = newDanger.length > 0
-    const title = rugLike
-      ? `RCXT RUG RISK: ${next.token?.symbol || 'Token'}`
-      : `RCXT risk increased: ${next.token?.symbol || 'Token'}`
-    const detail = rugLike
-      ? newDanger.slice(0, 2).map((flag) => flag.replaceAll('_', ' ').toLowerCase()).join(' · ')
+    const rugLike=newDanger.length>0
+    const title=rugLike
+      ? `RCXT RUG RISK: ${next.token?.symbol||'Token'}`
+      : `RCXT risk increased: ${next.token?.symbol||'Token'}`
+    const detail=rugLike
+      ? newDanger.slice(0,2).map((flag)=>flag.replaceAll('_',' ').toLowerCase()).join(' · ')
       : `${next.intelligence?.risk} risk · ${next.intelligence?.signal}`
 
-    navigator.serviceWorker?.ready.then((registration) => {
-      registration.showNotification(title, {
-        body: `Score ${next.intelligence?.score ?? '—'}/100 · ${detail}`,
-        icon: '/icon.svg',
-        badge: '/icon.svg',
-        tag: `risk-${next.address}`,
-        renotify: true,
-        data: { url: `/?token=${encodeURIComponent(next.address)}` },
-      })
-    }).catch(() => {})
+    showRcxtAlert(
+      `risk:${next.address}:${rugLike?newDanger.sort().join('-'):next.intelligence?.risk}`,
+      title,
+      `RCXT ${next.intelligence?.score??'—'}/100 · ${detail}`,
+      {
+        tag:`risk-${next.address}`,
+        url:`/?token=${encodeURIComponent(next.address)}`,
+        critical:rugLike,
+      },
+    )
   }
 
   function saveAlertRules(next = {}) {
@@ -1130,9 +1206,9 @@ export default function Home() {
                     <button onClick={() => openDrawer('history')}><b>Recent Scans</b><small>{history.length} local scans</small></button>
                     <button onClick={() => openDrawer('plans')}><b>Trade Plans</b><small>{tradePlans.length} draft / open / closed</small></button>
                     <button onClick={() => openDrawer('system')}><b>System Health</b><small>{health?.healthy === false ? 'Needs attention' : 'All systems live'}</small></button>
-                    <button onClick={() => navigateToTool('scanner','v4-market-lab')}><b>V4 Market Lab</b><small>Chart · forecast · flow · profit math</small></button>
+                    <button onClick={() => navigateToTool('scanner','v4-market-lab')}><b>Market Lab</b><small>Chart · forecast · flow · profit math</small></button>
                     <button onClick={() => navigateToTool('wallet','challenge-tracker')}><b>$5 → $50K</b><small>Wallet equity challenge tracker</small></button>
-                    <button onClick={() => { setView('scanner'); setMenuOpen(false); setNotificationStatus('Alert Center is inside the Deep Token Scanner.') }}><b>Alert Center</b><small>Score · MC · signal rules</small></button>
+                    <button onClick={() => openDrawer('alerts')}><b>Alert Center</b><small>Key alerts · anti-spam · thresholds</small></button>
                     <button onClick={() => { exportRadarCsv(); setMenuOpen(false) }}><b>Export Center</b><small>Download radar CSV</small></button>
                   </div>
                 </div>
@@ -1159,7 +1235,7 @@ export default function Home() {
 
                 <div className="commandFooter">
                   <button onClick={resetRadarWorkspace}>Reset radar workspace</button>
-                  <span>v5 RC · X Intelligence branch</span>
+                  <span>v5.1 RC · clarity + alerts + X</span>
                 </div>
               </div>
             ) : null}
@@ -1188,7 +1264,7 @@ export default function Home() {
         </div>
       </header>
 
-      <section className="hero">
+      <section className={view === 'scanner' && scan ? 'hero heroAfterScan' : 'hero'}>
         <div>
           <span className="overline">MARKET INTELLIGENCE TERMINAL</span>
           <h1>Trade the data.<br /><span>Not the emotion.</span></h1>
@@ -1206,7 +1282,7 @@ export default function Home() {
           </div>
           <div>
             <strong>RCXT Intelligence</strong>
-            <span>Risk-adjusted Score Engine 4.1</span>
+            <span>Risk-adjusted Score Engine 5.0</span>
             <small>No mock market data</small>
           </div>
         </div>
@@ -1228,7 +1304,8 @@ export default function Home() {
                   {activeDrawer === 'watchlist' ? 'Watchlist' :
                    activeDrawer === 'hidden' ? 'Hidden Coins' :
                    activeDrawer === 'history' ? 'Recent Scans' :
-                   activeDrawer === 'plans' ? 'Trade Plans' : 'System Health'}
+                   activeDrawer === 'plans' ? 'Trade Plans' :
+                   activeDrawer === 'alerts' ? 'Alert Center' : 'System Health'}
                 </h3>
               </div>
               <button onClick={closeDrawer} aria-label="Close drawer">×</button>
@@ -1317,6 +1394,19 @@ export default function Home() {
               </>
             ) : null}
 
+            {activeDrawer === 'alerts' ? (
+              <NotificationCenter
+                prefs={notificationPrefs}
+                onChange={saveNotificationPreferences}
+                liveMonitor={liveMonitor}
+                onToggleServerMonitor={liveMonitor.enabled ? disableLiveMonitor : enableLiveMonitor}
+                scoreTarget={alertScore}
+                onScoreTarget={(value)=>{setAlertScore(value);saveAlertRules({score:value})}}
+                marketCapTarget={alertMarketCap}
+                onMarketCapTarget={(value)=>{setAlertMarketCap(value);saveAlertRules({marketCap:value})}}
+              />
+            ) : null}
+
             {activeDrawer === 'system' ? (
               <div className="systemDrawerGrid">
                 <ServiceTile label="RCXT App" service={health?.services?.app} />
@@ -1324,9 +1414,9 @@ export default function Home() {
                 <ServiceTile label="DexScreener" service={health?.services?.dexscreener} />
                 <ServiceTile label="Charts / Tape" service={health?.services?.charts} />
                 <ServiceTile label="Supabase" service={health?.services?.supabase} />
-                <div className="systemMeta"><span>Score engine</span><b>{health?.scoreVersion || '4.1.0'}</b></div>
+                <div className="systemMeta"><span>Score engine</span><b>{health?.scoreVersion || '5.0.0'}</b></div>
                 <div className="systemMeta"><span>Secure writes</span><b>{health?.oidc?.available ? 'OIDC ACTIVE' : 'CHECKING'}</b></div>
-                <div className="systemMeta"><span>Scanner</span><b>5 seconds</b></div>
+                <div className="systemMeta"><span>Scanner</span><b>15 seconds</b></div>
                 <div className="systemMeta"><span>Radar</span><b>10 seconds</b></div>
               </div>
             ) : null}
@@ -1703,18 +1793,27 @@ export default function Home() {
 
               <BeginnerSnapshot scan={scan} />
 
-              <div className="metricGrid six">
-                <MetricCard label="Price" value={tinyUsd(scan.market.priceUsd)} />
-                <MetricCard label="Market Cap" value={compactUsd(scan.market.marketCap)} />
-                <MetricCard label="Liquidity" value={compactUsd(scan.market.liquidityUsd)} />
-                <MetricCard label="24H Volume" value={compactUsd(scan.market.volume.h24)} />
-                <MetricCard
-                  label="24H Change"
-                  value={percent(scan.market.priceChange.h24)}
-                  tone={scan.market.priceChange.h24 >= 0 ? 'positive' : 'negative'}
-                />
-                <MetricCard label="24H Buy %" value={`${scan.intelligence.buyPercent24h}%`} />
-              </div>
+              <details className="coreMetricsDisclosure">
+                <summary>
+                  <div>
+                    <span>MARKET DATA</span>
+                    <strong>{compactUsd(scan.market.marketCap)} MC · {percent(scan.market.priceChange.h24)} 24H · {compactUsd(scan.market.volume.h24)} VOL</strong>
+                  </div>
+                  <b>OPEN</b>
+                </summary>
+                <div className="metricGrid six">
+                  <MetricCard label="Price" value={tinyUsd(scan.market.priceUsd)} />
+                  <MetricCard label="Market Cap" value={compactUsd(scan.market.marketCap)} />
+                  <MetricCard label="Liquidity" value={scan.intelligence.liquidityReported === false ? 'N/A' : compactUsd(scan.market.liquidityUsd)} />
+                  <MetricCard label="24H Volume" value={compactUsd(scan.market.volume.h24)} />
+                  <MetricCard
+                    label="24H Change"
+                    value={percent(scan.market.priceChange.h24)}
+                    tone={scan.market.priceChange.h24 >= 0 ? 'positive' : 'negative'}
+                  />
+                  <MetricCard label="24H Buy %" value={`${scan.intelligence.buyPercent24h}%`} />
+                </div>
+              </details>
 
               <details className="advancedDisclosure">
                 <summary>
@@ -1759,7 +1858,7 @@ export default function Home() {
                   score={scan.intelligence.score}
                 />
               </article>
-              <XSocialIntel scan={scan} />
+              <XSocialIntel scan={scan} notificationsEnabled={notificationsEnabled} notificationPrefs={notificationPrefs} />
               <div className="analysisGrid">
                 <article className="panel scorePanel">
                   <PanelHeader eyebrow="SIGNAL ENGINE" title="Why the score moved" />
@@ -1922,10 +2021,15 @@ export default function Home() {
 
               <div className="proDetailGrid">
                 <article className="panel alertPanel">
-                  <PanelHeader eyebrow="ALERT ENGINE" title="Rules for this live scanner" />
-                  <div className="alertRules">
+                  <PanelHeader eyebrow="ALERT ENGINE" title="Quiet by default · fully configurable" />
+                  <button className="alertCenterLaunch" onClick={() => openDrawer('alerts')}>
+                    <span>{liveMonitor.enabled ? '24/7 ACTIVE' : '24/7 OFF'}</span>
+                    <strong>Open Notification Center</strong>
+                    <small>{notificationPrefs.cooldownMinutes}m anti-spam cooldown · key signal changes {notificationPrefs.signalChanges ? 'ON' : 'OFF'}</small>
+                  </button>
+                  <div className="alertRules compact">
                     <label>
-                      <span>Score crosses</span>
+                      <span>Score crosses {notificationPrefs.scoreCrossing ? '· ON' : '· OFF'}</span>
                       <input
                         value={alertScore}
                         onChange={(event) => {
@@ -1940,7 +2044,7 @@ export default function Home() {
                       />
                     </label>
                     <label>
-                      <span>Market cap crosses ($)</span>
+                      <span>Market cap crosses ($) {notificationPrefs.marketCapCrossing ? '· ON' : '· OFF'}</span>
                       <input
                         value={alertMarketCap}
                         onChange={(event) => {
@@ -1954,16 +2058,17 @@ export default function Home() {
                     <label className="ruleToggle">
                       <input
                         type="checkbox"
-                        checked={alertSignalChanges}
+                        checked={notificationPrefs.signalChanges}
                         onChange={(event) => {
                           setAlertSignalChanges(event.target.checked)
                           saveAlertRules({ signalChanges: event.target.checked })
+                          saveNotificationPreferences({...notificationPrefs,signalChanges:event.target.checked})
                         }}
                       />
                       <span>Signal-change alerts</span>
                     </label>
                   </div>
-                  <small className="panelHint">Alerts trigger while RCXT Radar is active. Add the PWA to your iPhone Home Screen for the best notification support.</small>
+                  <small className="panelHint">Scanner rules run while RCXT is open. Wallet-buy alerts can run in the background when 24/7 Live Monitor is active.</small>
                 </article>
 
                 <article className="panel journalPanel">
@@ -2075,6 +2180,7 @@ export default function Home() {
             walletAddress={wallet}
             onOpenToken={openRadarToken}
             notificationsEnabled={notificationsEnabled}
+            notificationPrefs={notificationPrefs}
             serverMonitor={liveMonitor}
             onToggleServerMonitor={liveMonitor.enabled ? disableLiveMonitor : enableLiveMonitor}
           />
@@ -2274,20 +2380,17 @@ function BeginnerSnapshot({ scan }) {
     EXTREME: 'Extreme risk',
   }[intel.risk] || 'Risk unknown'
 
-  const entryBlockers = []
-  if (intel.signal === 'WATCH') {
-    if (intel.ageHours != null && intel.ageHours < 0.25) entryBlockers.push('Pair is under 15 minutes old')
-    if (Number(intel.buyPercent1h ?? 50) < 46) entryBlockers.push('1h buy pressure is below 46%')
-    if (Number(intel.buyPercent1h ?? 50) > 80) entryBlockers.push('1h flow is unusually one-sided')
-    if (Number(scan?.market?.priceChange?.h1 || 0) < -5) entryBlockers.push('1h price momentum is too weak')
-    if (Number(scan?.market?.priceChange?.h6 || 0) < -8) entryBlockers.push('6h structure is too weak')
-    if (Number(scan?.market?.priceChange?.h24 || 0) > 150) entryBlockers.push('24h move is too extended')
-    if (!intel.contractVerified) entryBlockers.push('Contract checks are not fully verified')
-    if (Number(intel.setupScore || 0) < 64) entryBlockers.push('Setup score is below the entry threshold')
-    if (Number(intel.executionScore || 0) < 52) entryBlockers.push('Execution quality is below the entry threshold')
-  } else if (intel.signal === 'REDUCE' || intel.signal === 'SELL / AVOID') {
-    entryBlockers.push(...(negatives.length ? negatives : ['Current risk controls veto an entry']))
-  }
+  const entryBlockers = intel.signal === 'WATCH'
+    ? (Array.isArray(intel?.entryGate?.leanBuyMissing)
+        ? intel.entryGate.leanBuyMissing
+        : [])
+    : (intel.signal === 'REDUCE' || intel.signal === 'SELL / AVOID')
+      ? (negatives.length ? negatives : ['Current risk controls veto an entry'])
+      : []
+
+  const scoreCapReasons = Array.isArray(intel.scoreCaps)
+    ? intel.scoreCaps.slice(0, 3).map((item) => String(item?.reason || '').replaceAll('_', ' ').toLowerCase())
+    : []
 
   return (
     <article className="beginnerSnapshot">
@@ -2296,7 +2399,7 @@ function BeginnerSnapshot({ scan }) {
           <span>QUICK READ</span>
           <h3>{headline}</h3>
           <p>
-            RCXT {intel.score ?? '—'}/100 is the risk-adjusted tradability score. Opportunity {intel.opportunityScore ?? intel.setupScore ?? '—'}/100 tracks setup/momentum separately · {riskLabel}.
+            RCXT {intel.score ?? '—'}/100 measures tradability after risk caps. Opportunity {intel.opportunityScore ?? intel.setupScore ?? '—'}/100 tracks momentum, execution {intel.executionScore ?? '—'}/100 tracks how cleanly it can trade · {riskLabel}.
             Risk does not predict direction, and confidence is not the chance of profit.
           </p>
         </div>
@@ -2305,11 +2408,16 @@ function BeginnerSnapshot({ scan }) {
           <small>{intel.signal || 'WATCH'}</small>
         </div>
       </div>
-      <div className="beginnerDualRead">
+      <div className="beginnerDualRead three">
         <div>
           <span>OPPORTUNITY</span>
           <strong>{intel.opportunityScore ?? intel.setupScore ?? '—'}/100</strong>
           <small>{intel.opportunityLabel || 'Current setup'}</small>
+        </div>
+        <div>
+          <span>EXECUTION</span>
+          <strong>{intel.executionScore ?? '—'}/100</strong>
+          <small>{intel.liquidityReported === false ? 'Liquidity depth partly unknown' : 'Liquidity + activity quality'}</small>
         </div>
         <div className={'riskTone ' + String(intel.risk || '').toLowerCase()}>
           <span>RISK</span>
@@ -2317,6 +2425,13 @@ function BeginnerSnapshot({ scan }) {
           <small>{intel.directionalBias || 'NEUTRAL'} directional bias</small>
         </div>
       </div>
+
+      {Number(intel.scoreBeforeCaps) > Number(intel.score) && scoreCapReasons.length ? (
+        <div className="beginnerScoreExplain">
+          <b>WHY {intel.score ?? '—'}/100</b>
+          <span>Raw blend {intel.scoreBeforeCaps}/100 → capped by {scoreCapReasons.join(' · ')}.</span>
+        </div>
+      ) : null}
 
       {intel.opportunityLabel === 'HOT / HIGH RISK' ? (
         <div className="beginnerOpportunityNotice">
@@ -2341,7 +2456,16 @@ function BeginnerSnapshot({ scan }) {
       </div>
 
       {mcPlan?.available ? (
-        <div className="quickMcMap">
+        <details className="quickPlanDisclosure">
+          <summary>
+            <div>
+              <span>PLAN MAP</span>
+              <strong>{mcPlan.action || 'Scenario zones'}</strong>
+              <small>{compactUsd(mcPlan.current)} now · estimates, not guaranteed targets</small>
+            </div>
+            <b>OPEN</b>
+          </summary>
+          <div className="quickMcMap">
           <div className="quickMcMapHead">
             <div>
               <span>RCXT MC MAP</span>
@@ -2362,6 +2486,7 @@ function BeginnerSnapshot({ scan }) {
             Uses current market cap + recent volatility/risk. Advanced Data upgrades these zones with chart support/resistance when enough candles exist.
           </small>
         </div>
+        </details>
       ) : null}
       {entryBlockers.length ? (
         <div className="beginnerBlocker">
