@@ -36,8 +36,8 @@ function baseSecurity(){
   }
 }
 
-test('score engine version is 5.0.0',()=>{
-  assert.equal(SCORE_VERSION,'5.0.0')
+test('score engine version is 6.0.0-beta.1',()=>{
+  assert.equal(SCORE_VERSION,'6.0.0-beta.1')
 })
 
 test('resolved owner concentration is preferred when available',()=>{
@@ -294,4 +294,106 @@ test('WATCH exposes the final score gate when structure passes but risk-adjusted
   }else{
     assert.ok(['WATCH','LEAN BUY','BUY SETUP'].includes(result.signal))
   }
+})
+
+
+test('rugged external evidence vetoes an otherwise healthy setup',()=>{
+  const result=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    external:{
+      providerCount:1,
+      dangerRiskCount:1,
+      hardRiskFlags:['RUGCHECK_RUGGED'],
+      dataConflicts:[],
+      rugged:true,
+      evidenceScore:20,
+    },
+  })
+
+  assert.ok(result.score<=12)
+  assert.equal(result.signal,'SELL / AVOID')
+  assert.equal(result.risk,'EXTREME')
+  assert.ok(result.riskFlags.includes('EXTERNAL_RUGGED'))
+  assert.equal(result.securityEvidence.rugged,true)
+})
+
+test('authority disagreement lowers confidence and prevents contract verification',()=>{
+  const result=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    external:{
+      providerCount:2,
+      dangerRiskCount:0,
+      hardRiskFlags:[],
+      dataConflicts:['MINT_AUTHORITY_CONFLICT'],
+      rugged:false,
+      evidenceScore:50,
+      authority:{corroboratedSafe:false},
+    },
+  })
+
+  assert.equal(result.contractVerified,false)
+  assert.ok(result.confidence<=58)
+  assert.ok(result.riskFlags.includes('SECURITY_DATA_CONFLICT'))
+  assert.ok(result.score<=55)
+  assert.deepEqual(result.securityEvidence.conflicts,['MINT_AUTHORITY_CONFLICT'])
+})
+
+test('external holder concentration is used only when onchain concentration is unavailable',()=>{
+  const result=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    concentrationAvailable:false,
+    ownerConcentrationAvailable:false,
+    top1Percent:null,
+    top5Percent:null,
+    top10Percent:null,
+    externalConcentrationAvailable:true,
+    externalTop1Percent:18,
+    externalTop5Percent:37,
+    externalTop10Percent:59,
+    external:{
+      providerCount:1,
+      dangerRiskCount:0,
+      hardRiskFlags:[],
+      dataConflicts:[],
+      rugged:false,
+      evidenceScore:62,
+    },
+  })
+
+  assert.equal(result.concentration.available,true)
+  assert.equal(result.concentration.method,'RUGCHECK_TOP_HOLDERS')
+  assert.equal(result.concentration.top1Percent,18)
+  assert.equal(result.concentration.top10Percent,59)
+})
+
+test('very low Jupiter organic activity trims setup and execution without a hard structural veto',()=>{
+  const baseline=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    external:{
+      providerCount:1,
+      dangerRiskCount:0,
+      hardRiskFlags:[],
+      dataConflicts:[],
+      rugged:false,
+      evidenceScore:65,
+      jupiterOrganicScore:80,
+    },
+  })
+  const lowOrganic=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    external:{
+      providerCount:1,
+      dangerRiskCount:0,
+      hardRiskFlags:[],
+      dataConflicts:[],
+      rugged:false,
+      evidenceScore:65,
+      jupiterOrganicScore:8,
+    },
+  })
+
+  assert.ok(lowOrganic.setupScore<baseline.setupScore)
+  assert.ok(lowOrganic.executionScore<baseline.executionScore)
+  assert.ok(lowOrganic.riskFlags.includes('LOW_ORGANIC_ACTIVITY'))
+  assert.notEqual(lowOrganic.signal,'SELL / AVOID')
 })
