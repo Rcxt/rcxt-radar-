@@ -71,8 +71,42 @@ Built to answer the same market-cap questions users normally calculate manually:
 - projected ROI
 - configurable estimated trading-cost percentage
 - one-tap Copy Profit List
+- quick $20 / $40 / $100 position presets
+- one-tap use-current-market-cap entry
 
 The calculator uses market-cap ratios and explicitly warns that real fills vary with liquidity, fees, slippage, taxes, supply changes, and execution.
+
+## Decision Stack
+
+- combines RCXT core signal, chart trend, liquidity, and recent USD trade flow
+- labels overall evidence as STRONG CONFLUENCE / CONSTRUCTIVE / MIXED / DEFENSIVE / HIGH RISK
+- keeps confirming evidence and conflicts separate
+- deliberately does not convert confluence into a fake win probability
+
+## Exit Planner
+
+- configurable take-profit %
+- configurable scale-out %
+- configurable stop distance %
+- projected target position value
+- projected stop value
+- first scale-out value
+- runner value
+- shared inputs with the Profit List and Position Planner for consistent planning
+
+## Saved Trade Plans
+
+- persistent per-token plan stored locally on the device
+- position size
+- entry market cap
+- TP %
+- scale-out %
+- stop %
+- thesis
+- invalidation condition
+- one-tap Copy Plan
+- save timestamp
+- no automatic order execution
 
 ## Position Planner
 
@@ -155,6 +189,8 @@ The old hard-coded public test-wallet value was removed from the production fron
 ## Reliability notes
 
 - Chart/tape upstream calls have timeouts, rate limits, and short caches
+- GeckoTerminal chart/tape provider is included in /api/health with latency reporting
+- System Health drawer shows chart-provider status alongside Solana, DexScreener, and Supabase
 - Market scanner and Radar remain independent of chart-provider failure
 - AI failure falls back to deterministic analysis
 - challenge history failure does not affect wallet loading
