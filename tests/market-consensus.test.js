@@ -96,7 +96,7 @@ test('market consensus rewards close independent prices',()=>{
     geckoterminal:{available:true,priceUsd:0.00102,liquidityUsd:51000},
     jupiterPrice:{available:true,priceUsd:0.00099},
     helius:{available:true,priceUsd:0.00101},
-    birdeye:{available:false},
+    birdeye:{available:true,priceUsd:0.001005,liquidityUsd:50500},
   })
 
   assert.equal(result.priceProviderCount,4)
@@ -129,4 +129,19 @@ test('three-fold liquidity disagreement is recorded but not treated as price con
 
   assert.equal(result.liquidityConflict,true)
   assert.equal(result.priceConflict,false)
+})
+
+
+test('stale auxiliary Helius price cannot trigger live price conflict',()=>{
+  const result=buildMarketConsensus(pair(),{
+    geckoterminal:{available:true,priceUsd:0.00101,liquidityUsd:50000},
+    jupiterPrice:{available:true,priceUsd:0.00099},
+    helius:{available:true,priceUsd:0.0025},
+    birdeye:{available:false},
+  })
+
+  assert.equal(result.priceProviderCount,3)
+  assert.equal(result.priceConflict,false)
+  assert.equal(result.auxiliaryPrices.length,1)
+  assert.equal(result.auxiliaryPrices[0].source,'helius')
 })
