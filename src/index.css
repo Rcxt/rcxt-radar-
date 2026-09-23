@@ -2561,3 +2561,24 @@ input,select,textarea{font-size:16px}
 .tradePlanLibraryStats i{font-style:normal}
 .tradePlanStatsNote{display:block;color:#536474;font-size:7px;line-height:1.45;margin-top:8px}
 @media(max-width:480px){.tradePlanLibraryStats{grid-template-columns:1fr 1fr}}
+
+
+/* V4 portfolio stress lab */
+.portfolioStressPanel{margin-top:10px}
+.stressIntro{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:10px;margin-top:10px}
+.stressIntro p{margin:0;color:#627485;font-size:8px;line-height:1.5}
+.stressIntro>div{min-width:110px;border:1px solid #1c2a34;background:#091016;border-radius:9px;padding:9px}
+.stressIntro span{display:block;font-size:7px;color:#5d6f7f}.stressIntro b{display:block;font-size:10px;margin-top:4px}
+.stressGrid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-top:10px}
+.stressCard{border:1px solid #2b2226;background:linear-gradient(145deg,#100b0d,#090e12);border-radius:10px;padding:10px}
+.stressCard span{display:block;font-size:7px;color:#846a70}
+.stressCard strong{display:block;font-size:12px;margin-top:5px}
+.stressCard b{display:block;font-size:9px;margin-top:4px}
+.stressCard small{display:block;font-size:7px;color:#65565b;margin-top:3px;line-height:1.35}
+.stressNote{font-size:7px;color:#566676;line-height:1.45;margin:9px 0 0}
+@media(max-width:900px){.stressGrid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:650px){
+  .stressIntro{grid-template-columns:1fr 1fr}.stressIntro p{grid-column:1/-1}
+  .stressGrid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:420px){.stressGrid{grid-template-columns:1fr}}
