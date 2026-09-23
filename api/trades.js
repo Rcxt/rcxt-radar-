@@ -81,9 +81,16 @@ export default async function handler(req,res){
     const walletStats=new Map()
     for(const trade of trades){
       if(!trade.wallet) continue
-      const current=walletStats.get(trade.wallet)||{count:0,volume:0}
+      const current=walletStats.get(trade.wallet)||{count:0,volume:0,buyVolume:0,sellVolume:0,buyCount:0,sellCount:0}
       current.count+=1
       current.volume+=trade.volumeUsd
+      if(trade.kind==='buy'){
+        current.buyVolume+=trade.volumeUsd
+        current.buyCount+=1
+      }else{
+        current.sellVolume+=trade.volumeUsd
+        current.sellCount+=1
+      }
       walletStats.set(trade.wallet,current)
     }
     const wallets=new Set(walletStats.keys())
@@ -94,6 +101,42 @@ export default async function handler(req,res){
     const tinyTrades=trades.filter(trade=>trade.volumeUsd<5)
     const repeatWalletTrades=walletRows.filter(row=>row.count>=5).reduce((sum,row)=>sum+row.count,0)
     const avgToMedianSkew=medianSize>0?(totalVolume/Math.max(1,trades.length))/medianSize:0
+
+    const whaleWalletThreshold=Math.max(
+      whaleThreshold,
+      totalVolume>0?totalVolume*0.025:0,
+      750
+    )
+    const whaleWallets=walletRows
+      .map((row)=>{
+        const netFlow=row.buyVolume-row.sellVolume
+        const volumeShare=totalVolume>0?row.volume/totalVolume*100:0
+        const direction=
+          netFlow>Math.max(100,row.volume*0.2)?'ACCUMULATING':
+          netFlow<-Math.max(100,row.volume*0.2)?'DISTRIBUTING':'MIXED'
+        return {
+          wallet:row.wallet,
+          tradeCount:row.count,
+          buyCount:row.buyCount,
+          sellCount:row.sellCount,
+          buyVolumeUsd:Number(row.buyVolume.toFixed(2)),
+          sellVolumeUsd:Number(row.sellVolume.toFixed(2)),
+          totalVolumeUsd:Number(row.volume.toFixed(2)),
+          netFlowUsd:Number(netFlow.toFixed(2)),
+          volumeSharePercent:Number(volumeShare.toFixed(1)),
+          direction,
+          explorerUrl:'https://solscan.io/account/'+row.wallet,
+        }
+      })
+      .filter((row)=>row.totalVolumeUsd>=whaleWalletThreshold||row.volumeSharePercent>=5)
+      .sort((a,b)=>b.totalVolumeUsd-a.totalVolumeUsd)
+      .slice(0,10)
+
+    const whaleWalletBuyVolume=whaleWallets.reduce((sum,row)=>sum+row.buyVolumeUsd,0)
+    const whaleWalletSellVolume=whaleWallets.reduce((sum,row)=>sum+row.sellVolumeUsd,0)
+    const whaleWalletNetFlow=whaleWalletBuyVolume-whaleWalletSellVolume
+    const accumulatingWhales=whaleWallets.filter(row=>row.direction==='ACCUMULATING').length
+    const distributingWhales=whaleWallets.filter(row=>row.direction==='DISTRIBUTING').length
 
     const summary={
       sampleSize:trades.length,
@@ -119,6 +162,14 @@ export default async function handler(req,res){
       whaleSellCount:whaleSells.length,
       whaleBuyVolumeUsd:Number(whaleBuys.reduce((sum,trade)=>sum+trade.volumeUsd,0).toFixed(2)),
       whaleSellVolumeUsd:Number(whaleSells.reduce((sum,trade)=>sum+trade.volumeUsd,0).toFixed(2)),
+      whaleWalletThresholdUsd:Number(whaleWalletThreshold.toFixed(2)),
+      whaleWalletCount:whaleWallets.length,
+      accumulatingWhales,
+      distributingWhales,
+      whaleWalletBuyVolumeUsd:Number(whaleWalletBuyVolume.toFixed(2)),
+      whaleWalletSellVolumeUsd:Number(whaleWalletSellVolume.toFixed(2)),
+      whaleWalletNetFlowUsd:Number(whaleWalletNetFlow.toFixed(2)),
+      topWhaleVolumeSharePercent:whaleWallets[0]?.volumeSharePercent||0,
       topTradeSharePercent:totalVolume?Number((largestTrade/totalVolume*100).toFixed(1)):0,
     }
 
@@ -134,6 +185,9 @@ export default async function handler(req,res){
     if(summary.topWalletTradeSharePercent>=25&&summary.sampleSize>=30) flags.push('WALLET_ACTIVITY_CONCENTRATION')
     if(summary.topWalletVolumeSharePercent>=45&&summary.sampleSize>=15) flags.push('WALLET_VOLUME_CONCENTRATION')
     if(summary.averageToMedianSizeRatio>=20&&summary.sampleSize>=30) flags.push('TRADE_SIZE_SKEW')
+    if(summary.whaleWalletNetFlowUsd>Math.max(1000,totalVolume*0.12)&&summary.accumulatingWhales>=2) flags.push('MULTI_WHALE_ACCUMULATION')
+    if(summary.whaleWalletNetFlowUsd<-Math.max(1000,totalVolume*0.12)&&summary.distributingWhales>=2) flags.push('MULTI_WHALE_DISTRIBUTION')
+    if(summary.topWhaleVolumeSharePercent>=35&&summary.whaleWalletCount) flags.push('WHALE_FLOW_CONCENTRATED')
 
     const result={
       success:true,
@@ -141,6 +195,7 @@ export default async function handler(req,res){
       pairAddress:pair,
       generatedAt:new Date().toISOString(),
       summary:{...summary,flags},
+      whaleWallets,
       trades:trades.slice(0,35),
     }
     setCached(pair,result)
