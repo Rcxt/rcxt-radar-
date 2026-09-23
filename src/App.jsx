@@ -2419,14 +2419,14 @@ export default function Home() {
             <>
               <div className="walletRiskStrip">
                 <MetricCard label="Largest Position" value={portfolioStats.largestSymbol} />
-                <MetricCard label="Top Concentration" value={`${portfolioStats.concentration.toFixed(1)}%`} tone={portfolioStats.concentration > 50 ? 'negative' : ''} />
+                <MetricCard label="Top Concentration" value={`${fixed(portfolioStats.concentration,1,'0.0')}%`} tone={portfolioStats.concentration > 50 ? 'negative' : ''} />
                 <MetricCard label="High-Risk Positions" value={portfolioStats.highRisk} tone={portfolioStats.highRisk ? 'negative' : 'positive'} />
-                <MetricCard label="High-Risk Value" value={`${portfolioStats.highRiskValuePercent.toFixed(0)}%`} tone={portfolioStats.highRiskValuePercent >= 30 ? 'negative' : 'positive'} />
-                <MetricCard label="Low-Liq Value" value={`${portfolioStats.lowLiquidityValuePercent.toFixed(0)}%`} tone={portfolioStats.lowLiquidityValuePercent >= 35 ? 'negative' : ''} />
-                <MetricCard label="Unknown-Liq Value" value={`${portfolioStats.unknownLiquidityValuePercent.toFixed(0)}%`} tone={portfolioStats.unknownLiquidityValuePercent >= 50 ? 'negative' : ''} />
-                <MetricCard label="Weighted Score" value={portfolioStats.weightedScore == null ? '—' : portfolioStats.weightedScore.toFixed(0)} />
+                <MetricCard label="High-Risk Value" value={`${fixed(portfolioStats.highRiskValuePercent,0,'0')}%`} tone={portfolioStats.highRiskValuePercent >= 30 ? 'negative' : 'positive'} />
+                <MetricCard label="Low-Liq Value" value={`${fixed(portfolioStats.lowLiquidityValuePercent,0,'0')}%`} tone={portfolioStats.lowLiquidityValuePercent >= 35 ? 'negative' : ''} />
+                <MetricCard label="Unknown-Liq Value" value={`${fixed(portfolioStats.unknownLiquidityValuePercent,0,'0')}%`} tone={portfolioStats.unknownLiquidityValuePercent >= 50 ? 'negative' : ''} />
+                <MetricCard label="Weighted Score" value={portfolioStats.weightedScore == null ? '—' : fixed(portfolioStats.weightedScore,0)} />
                 <MetricCard label="Portfolio Risk" value={portfolioStats.portfolioRisk} tone={portfolioStats.portfolioRisk === 'HIGH' ? 'negative' : portfolioStats.portfolioRisk === 'LOWER' ? 'positive' : ''} />
-                <MetricCard label="Value in $10K+ Liq" value={`${portfolioStats.liquidPercent.toFixed(0)}%`} />
+                <MetricCard label="Value in $10K+ Liq" value={`${fixed(portfolioStats.liquidPercent,0,'0')}%`} />
                 <button className="toolButton walletExport" onClick={exportWalletCsv}>Export wallet CSV</button>
               </div>
 
@@ -2452,7 +2452,7 @@ export default function Home() {
                       <span>{scenario.label}</span>
                       <strong>{usd(scenario.endValue)}</strong>
                       <b className="negativeText">−{usd(scenario.loss)}</b>
-                      <small>{scenario.percentLoss.toFixed(1)}% of total portfolio</small>
+                      <small>{fixed(scenario.percentLoss,1,'0.0')}% of total portfolio</small>
                     </div>
                   ))}
                 </div>
@@ -2798,7 +2798,7 @@ function CalibrationStrip({ calibration, modelVersion, signal, score }) {
             <span>{row.horizon}</span>
             <strong>{row.directionalHitRate == null ? '—' : Math.round(row.directionalHitRate * 100) + '% direction hit'}</strong>
             <small>
-              avg {row.avgReturnPct == null ? '—' : (row.avgReturnPct >= 0 ? '+' : '') + row.avgReturnPct.toFixed(1) + '%'}
+              avg {row.avgReturnPct == null ? '—' : (row.avgReturnPct >= 0 ? '+' : '') + fixed(row.avgReturnPct,1) + '%'}
               {' · '}{row.samples} samples
             </small>
           </div>
@@ -2889,7 +2889,7 @@ function SnapshotDelta({ rows, current, modelVersion }) {
           const tone = value == null ? '' : value > 0 ? 'positive' : value < 0 ? 'negative' : ''
           const rendered = value == null
             ? '—'
-            : (value >= 0 ? '+' : '') + value.toFixed(unit === 'pts' ? 0 : 1) + unit
+            : (value >= 0 ? '+' : '') + fixed(value,unit === 'pts' ? 0 : 1,'0') + unit
           return (
             <div key={label}>
               <span>{label}</span>
@@ -3117,6 +3117,11 @@ function number(value, digits = 2) {
   })
 }
 
+function fixed(value, digits = 1, fallback = '—') {
+  const n = Number(value)
+  return Number.isFinite(n) ? n.toFixed(digits) : fallback
+}
+
 function usd(value) {
   return Number(value || 0).toLocaleString(undefined, {
     style: 'currency',
@@ -3158,7 +3163,9 @@ function isPumpFunToken(scan) {
 }
 
 function formatAge(hours) {
-  if (hours < 1) return `${Math.round(hours * 60)}m`
-  if (hours < 48) return `${hours.toFixed(1)}h`
-  return `${(hours / 24).toFixed(1)}d`
+  const n = Number(hours)
+  if (!Number.isFinite(n) || n < 0) return 'Unknown'
+  if (n < 1) return `${Math.round(n * 60)}m`
+  if (n < 48) return `${fixed(n,1)}h`
+  return `${fixed(n / 24,1)}d`
 }
