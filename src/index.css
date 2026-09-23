@@ -2929,3 +2929,109 @@ input,select,textarea{font-size:16px}
   .beginnerDualRead strong{font-size:14px}
   .beginnerOpportunityNotice{flex-direction:column;gap:5px}
 }
+
+
+/* RCXT market-cap scenario map */
+.quickMcMap{
+  margin-top:10px;
+  padding:11px;
+  border:1px solid #22313c;
+  background:linear-gradient(145deg,#0a1218,#081016);
+  border-radius:11px;
+}
+.quickMcMapHead,.marketCapMapHead{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+.quickMcMapHead span,.marketCapMapHead span{
+  display:block;
+  color:var(--cyan);
+  font-size:7px;
+  font-weight:900;
+  letter-spacing:.1em;
+}
+.quickMcMapHead strong,.marketCapMapHead strong{
+  display:block;
+  margin-top:4px;
+  font-size:11px;
+}
+.quickMcMapHead small,.marketCapMapHead small{
+  color:#607183;
+  font-size:7px;
+  text-align:right;
+}
+.quickMcMapGrid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:7px;
+  margin-top:10px;
+}
+.quickMcMapGrid>div,.marketCapMapGrid>div{
+  min-width:0;
+  border:1px solid #1b2832;
+  background:#080f14;
+  border-radius:9px;
+  padding:9px;
+}
+.quickMcMapGrid span,.marketCapMapGrid span{
+  display:block;
+  color:#617384;
+  font-size:6px;
+  font-weight:900;
+  letter-spacing:.08em;
+}
+.quickMcMapGrid b,.marketCapMapGrid b{
+  display:block;
+  margin-top:5px;
+  font-size:10px;
+  overflow-wrap:anywhere;
+}
+.quickMcMapGrid .entry b,.marketCapMapGrid .entry b{color:var(--cyan)}
+.quickMcMapGrid .positive b,.marketCapMapGrid .good b{color:var(--green)}
+.quickMcMapGrid .negative b,.marketCapMapGrid .bad b{color:var(--red)}
+.quickMcMapGrid .disabled,.marketCapMapGrid .disabled{border-style:dashed;opacity:.72}
+.quickMcMapGrid .disabled b,.marketCapMapGrid .disabled b{color:var(--red)}
+.quickMcMapNote{
+  display:block;
+  margin-top:8px;
+  color:#566878;
+  font-size:7px;
+  line-height:1.45;
+}
+
+.marketCapMapPanel{
+  margin-top:11px;
+  border:1px solid #243542;
+  background:linear-gradient(145deg,#0b141a,#080e13);
+  border-radius:12px;
+  padding:12px;
+}
+.marketCapMapGrid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:7px;
+  margin-top:11px;
+}
+.marketCapMapGrid small{
+  display:block;
+  margin-top:4px;
+  color:#536474;
+  font-size:6px;
+  line-height:1.35;
+}
+.marketCapMapPanel>p{
+  margin:9px 0 0;
+  color:#566878;
+  font-size:7px;
+  line-height:1.45;
+}
+
+@media(max-width:700px){
+  .quickMcMapGrid,.marketCapMapGrid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:430px){
+  .quickMcMapHead,.marketCapMapHead{flex-direction:column;gap:4px}
+  .quickMcMapHead small,.marketCapMapHead small{text-align:left}
+}

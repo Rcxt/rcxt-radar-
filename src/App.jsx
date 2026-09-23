@@ -2281,6 +2281,7 @@ function BeginnerSnapshot({ scan }) {
   const negatives = Array.isArray(intel.negatives) ? intel.negatives.slice(0, 3) : []
   const concentrationAvailable = Boolean(intel?.concentration?.available)
   const holderRpcMissing = scan?.security?.sources?.largestAccounts === false
+  const mcPlan = intel?.marketCapPlan || null
   const headline = intel.opportunityLabel === 'HOT / HIGH RISK'
     ? 'Hot momentum, high risk'
     : {
@@ -2362,6 +2363,30 @@ function BeginnerSnapshot({ scan }) {
         </div>
         <div><span>PAIR AGE</span><strong>{intel.ageHours == null ? 'Unknown' : formatAge(intel.ageHours)}</strong><small>{intel.marketState || 'Live market'}</small></div>
       </div>
+
+      {mcPlan?.available ? (
+        <div className="quickMcMap">
+          <div className="quickMcMapHead">
+            <div>
+              <span>RCXT MC MAP</span>
+              <strong>{mcPlan.action || 'Scenario zones'}</strong>
+            </div>
+            <small>estimates · not guaranteed targets</small>
+          </div>
+          <div className="quickMcMapGrid">
+            <div><span>NOW</span><b>{compactUsd(mcPlan.current)}</b></div>
+            <div className={mcPlan.entryLow == null ? 'disabled' : 'entry'}>
+              <span>BUY / ENTRY</span>
+              <b>{mcPlan.entryLow == null ? 'VETOED' : `${compactUsd(mcPlan.entryLow)}–${compactUsd(mcPlan.entryHigh)}`}</b>
+            </div>
+            <div className="positive"><span>TRIM / SELL</span><b>{mcPlan.trim1 == null ? '—' : compactUsd(mcPlan.trim1)}</b></div>
+            <div className="negative"><span>INVALIDATION</span><b>{compactUsd(mcPlan.invalidation)}</b></div>
+          </div>
+          <small className="quickMcMapNote">
+            Uses current market cap + recent volatility/risk. Advanced Data upgrades these zones with chart support/resistance when enough candles exist.
+          </small>
+        </div>
+      ) : null}
       {entryBlockers.length ? (
         <div className="beginnerBlocker">
           <b>{intel.signal === 'WATCH' ? 'WHY NOT A BUY YET' : 'WHY RCXT IS CAUTIOUS'}</b>

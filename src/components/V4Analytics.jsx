@@ -232,6 +232,64 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
     )
   )
 
+  const marketCapMap=useMemo(()=>{
+    const fallback=scan?.intelligence?.marketCapPlan || {}
+    const current=Number(scan?.market?.marketCap || fallback.current || 0)
+    const price=Number(scan?.market?.priceUsd || 0)
+    const structuralVeto=Boolean(
+      fallback?.available &&
+      fallback?.entryLow == null &&
+      String(fallback?.action || '').startsWith('NO ENTRY')
+    )
+    const toMc=(level)=>{
+      const value=Number(level)
+      if(!(current>0)||!(price>0)||!(value>0)) return null
+      return Math.round(current*(value/price))
+    }
+    const supports=(analytics?.levels?.support||[])
+      .map(toMc)
+      .filter((value)=>Number.isFinite(value)&&value>0&&value<current)
+      .sort((a,b)=>a-b)
+    const resistances=(analytics?.levels?.resistance||[])
+      .map(toMc)
+      .filter((value)=>Number.isFinite(value)&&value>current)
+      .sort((a,b)=>a-b)
+
+    const entryHigh=structuralVeto ? null : (supports.at(-1) ?? fallback.entryHigh ?? null)
+    const entryLow=structuralVeto ? null : (supports.at(-2) ?? fallback.entryLow ?? entryHigh)
+    const breakout=structuralVeto ? null : (resistances[0] ?? fallback.breakout ?? null)
+    const trim1=structuralVeto ? null : (resistances[1] ?? resistances[0] ?? fallback.trim1 ?? null)
+    const target2=structuralVeto ? null : (resistances[2] ?? fallback.target2 ?? null)
+    const stretch=structuralVeto ? null : (fallback.stretch ?? null)
+    const invalidation=supports.length
+      ? Math.round(supports[0]*0.97)
+      : Number(fallback.invalidation || 0) || null
+    const chartBased=supports.length>0||resistances.length>0
+
+    return {
+      available:current>0,
+      current,
+      action:fallback.action || 'SCENARIO MAP',
+      entryLow,
+      entryHigh,
+      breakout,
+      trim1,
+      target2,
+      stretch,
+      invalidation,
+      basis:chartBased
+        ? 'Chart support/resistance converted into market-cap levels'
+        : 'Recent volatility + risk scenario',
+      chartBased,
+      structuralVeto,
+    }
+  },[
+    scan?.market?.marketCap,
+    scan?.market?.priceUsd,
+    scan?.intelligence?.marketCapPlan,
+    analytics?.levels,
+  ])
+
   const reverseTarget=useMemo(()=>requiredMarketCapForValue({
     investment,
     entryMarketCap,
@@ -260,10 +318,11 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
         forecast: analytics.forecast,
         reasons: analytics.reasons,
         risks: analytics.risks,
+        marketCapMap,
       } : null,
       tape: tape?.summary || null,
     })
-  },[analytics,tape?.summary,onContext])
+  },[analytics,tape?.summary,onContext,marketCapMap])
 
   const checklist=useMemo(()=>buildExecutionChecklist({
     scan,
@@ -679,6 +738,33 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
               <div><span>Entry Quality</span><b>{entryQuality?.available?entryQuality.score+'/100':'—'}</b><small>{entryQuality?.available?entryQuality.label:'needs more evidence'}</small></div>
               <div><span>Structure R:R</span><b>{analytics.levels?.structureRiskReward?analytics.levels.structureRiskReward.toFixed(2)+'×':'—'}</b><small>nearest support → resistance</small></div>
             </div>
+
+            {marketCapMap.available ? (
+              <div className="marketCapMapPanel">
+                <div className="marketCapMapHead">
+                  <div>
+                    <span>RCXT MARKET CAP MAP</span>
+                    <strong>{marketCapMap.action}</strong>
+                  </div>
+                  <small>{marketCapMap.chartBased ? 'CHART-STRUCTURE BASED' : 'VOLATILITY ESTIMATE'}</small>
+                </div>
+                <div className="marketCapMapGrid">
+                  <div><span>NOW</span><b>{money(marketCapMap.current)}</b><small>Current market cap</small></div>
+                  <div className={marketCapMap.entryLow==null?'disabled':'entry'}>
+                    <span>BUY / ENTRY ZONE</span>
+                    <b>{marketCapMap.entryLow==null?'VETOED':money(marketCapMap.entryLow)+' – '+money(marketCapMap.entryHigh)}</b>
+                    <small>{marketCapMap.entryLow==null?'Structural risk blocks an entry estimate':'Pullback / support area'}</small>
+                  </div>
+                  <div><span>BREAKOUT MC</span><b>{marketCapMap.breakout==null?'—':money(marketCapMap.breakout)}</b><small>Nearest resistance / confirmation</small></div>
+                  <div className="good"><span>TRIM / SELL 1</span><b>{marketCapMap.trim1==null?'—':money(marketCapMap.trim1)}</b><small>First scale-out scenario</small></div>
+                  <div className="good"><span>TAKE PROFIT 2</span><b>{marketCapMap.target2==null?'—':money(marketCapMap.target2)}</b><small>Higher resistance / scenario</small></div>
+                  <div className="good"><span>STRETCH</span><b>{marketCapMap.stretch==null?'—':money(marketCapMap.stretch)}</b><small>High-volatility extension</small></div>
+                  <div className="bad"><span>INVALIDATION MC</span><b>{marketCapMap.invalidation==null?'—':money(marketCapMap.invalidation)}</b><small>Structure/risk failure area</small></div>
+                </div>
+                <p>{marketCapMap.basis}. These are scenario zones, not promised prices or automatic trade instructions.</p>
+              </div>
+            ) : null}
+
             {tape?.summary?(
               <div className="tradeTape">
                 <div className="tradeTapeHead">

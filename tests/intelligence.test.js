@@ -148,3 +148,33 @@ test('pumpfun missing AMM liquidity is treated as unknown instead of zero liquid
   assert.ok(!result.riskFlags.includes('LOW_LIQUIDITY_RATIO'))
   assert.notEqual(result.signal,'SELL / AVOID')
 })
+
+
+test('market-cap map produces deterministic scenario zones from live pair inputs',()=>{
+  const result=analyzePair(healthyPair(),baseSecurity())
+  const plan=result.marketCapPlan
+
+  assert.equal(plan.available,true)
+  assert.equal(plan.current,1000000)
+  assert.ok(plan.entryLow>0)
+  assert.ok(plan.entryHigh>=plan.entryLow)
+  assert.ok(plan.breakout>plan.current)
+  assert.ok(plan.trim1>=plan.breakout)
+  assert.ok(plan.target2>=plan.trim1)
+  assert.ok(plan.stretch>=plan.target2)
+  assert.ok(plan.invalidation<plan.current)
+  assert.match(plan.basis,/volatility/i)
+})
+
+test('hard structural danger vetoes entry market-cap estimates',()=>{
+  const result=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    freezeAuthority:'active-freeze-authority',
+  })
+
+  assert.equal(result.signal,'SELL / AVOID')
+  assert.equal(result.marketCapPlan.available,true)
+  assert.equal(result.marketCapPlan.entryLow,null)
+  assert.equal(result.marketCapPlan.entryHigh,null)
+  assert.match(result.marketCapPlan.action,/NO ENTRY/)
+})

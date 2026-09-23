@@ -18,6 +18,7 @@
   "release": "v4-final-functional-analytics",
   "releasedAt": "2026-09-22",
   "productionUrl": "https://rcxt-radar.vercel.app",
-  "note": "V4 source includes always-on wallet monitoring, web-push alerts, risk/direction separation, and Pump.fun bonding-curve liquidity-aware scoring.",
-  "backgroundMonitorEngine": "1.0.0"
+  "note": "V4 source includes always-on wallet monitoring, web-push alerts, score engine 4.2.1 risk/direction separation, Pump.fun bonding-curve liquidity-aware scoring, and market-cap scenario mapping.",
+  "backgroundMonitorEngine": "1.0.0",
+  "marketCapMapEngine": "1.0.0"
 }
