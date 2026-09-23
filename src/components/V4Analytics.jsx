@@ -361,7 +361,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
   }
 
   return (
-    <div className="v4Suite">
+    <div className="v4Suite" id="v4-market-lab">
       <article className="panel v4ChartPanel">
         <div className="v4PanelHead">
           <div><span>V4 MARKET LAB</span><h3>Real OHLCV chart + technical analytics</h3></div>
