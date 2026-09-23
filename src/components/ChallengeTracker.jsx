@@ -62,6 +62,26 @@ export default function ChallengeTracker({walletAddress='',walletData=null}){
   },[data?.rows,startedAt])
 
   const stats=useMemo(()=>challengeStats(current,scopedRows),[current,scopedRows])
+  const performance=useMemo(()=>{
+    const first=Number(scopedRows?.[0]?.totalValueUsd||0)
+    const latest=Number(current||scopedRows?.at(-1)?.totalValueUsd||0)
+    const values=(scopedRows||[]).map(row=>Number(row.totalValueUsd||0)).filter(Number.isFinite)
+    const changeUsd=first>0?latest-first:null
+    const changePct=first>0?((latest/first)-1)*100:null
+    const best=values.length?Math.max(...values):latest
+    const worst=values.length?Math.min(...values):latest
+    const next=Number(stats.nextMilestone||0)
+    return {
+      first,
+      latest,
+      changeUsd,
+      changePct,
+      best,
+      worst,
+      toNext:next>latest?next-latest:0,
+      snapshots:scopedRows?.length||0,
+    }
+  },[scopedRows,current,stats.nextMilestone])
 
   async function sync(){
     const target=address.trim()
@@ -129,6 +149,31 @@ export default function ChallengeTracker({walletAddress='',walletData=null}){
         <div><span>Drawdown</span><b className={stats.drawdownPercent<0?'bad':''}>{pct(stats.drawdownPercent)}</b></div>
       </div>
 
+      <div className="challengePerformance">
+        <div>
+          <span>Since tracker start</span>
+          <b className={performance.changePct==null?'':performance.changePct>=0?'good':'bad'}>
+            {performance.changePct==null?'—':pct(performance.changePct)}
+          </b>
+          <small>{performance.changeUsd==null?'No baseline yet':money(performance.changeUsd)+' equity change'}</small>
+        </div>
+        <div>
+          <span>Best tracked equity</span>
+          <b>{money(performance.best)}</b>
+          <small>{performance.snapshots} saved snapshots</small>
+        </div>
+        <div>
+          <span>Lowest tracked equity</span>
+          <b>{money(performance.worst)}</b>
+          <small>Measures drawdown history, not only gains</small>
+        </div>
+        <div>
+          <span>To next milestone</span>
+          <b>{money(performance.toNext)}</b>
+          <small>{stats.requiredMultiple?stats.requiredMultiple.toFixed(1)+'× remains to $50K':'Sync wallet for goal math'}</small>
+        </div>
+      </div>
+
       <div className="challengeProgress">
         <div><span>Log-scale progress</span><b>{stats.progress.toFixed(1)}%</b></div>
         <i><em style={{width:stats.progress+'%'}}/></i>
@@ -141,6 +186,13 @@ export default function ChallengeTracker({walletAddress='',walletData=null}){
       </div>
 
       <EquitySparkline rows={scopedRows} current={stats.current}/>
+
+      {stats.drawdownPercent <= -20 ? (
+        <div className="challengeRiskNotice">
+          <strong>Drawdown guard</strong>
+          <span>Equity is more than 20% below the tracked high-water mark. The challenge dashboard is flagging capital preservation—not asking you to trade bigger to catch up.</span>
+        </div>
+      ) : null}
 
       <div className="challengeFoot">
         <span>{scopedRows.length} challenge snapshots{startedAt?' · started '+new Date(startedAt).toLocaleDateString():''}</span>
