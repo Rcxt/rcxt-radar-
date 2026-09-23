@@ -273,12 +273,16 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
     if(chartTrend==='BEARISH'){strength-=1;warnings.push('Candle structure is bearish')}
     if(tapeNet>0&&tapeBuyPct>=55){strength+=1;positives.push('Recent USD flow favors buyers')}
     if(tapeNet<0&&tapeBuyPct<=45){strength-=1;warnings.push('Recent USD flow favors sellers')}
+    const tapeFlags=tape?.summary?.flags||[]
+    if(tapeFlags.includes('MICROTRADE_NOISE')){strength-=1;warnings.push('Recent activity is dominated by micro-trade noise')}
+    if(tapeFlags.includes('REPEAT_WALLET_CHURN')){strength-=1;warnings.push('Repeated wallets dominate recent transaction activity')}
+    if(tapeFlags.includes('WALLET_VOLUME_CONCENTRATION')){strength-=1;warnings.push('One wallet controls a large share of recent USD volume')}
     if(Number(scan?.market?.liquidityUsd||0)<5000){strength-=2;warnings.push('Liquidity is very thin')}
     if(scan?.intelligence?.risk==='EXTREME'){strength-=2;warnings.push('RCXT structural risk is extreme')}
 
     const label=strength>=4?'STRONG CONFLUENCE':strength>=2?'CONSTRUCTIVE':strength<=-3?'HIGH RISK':strength<=-1?'DEFENSIVE':'MIXED'
     return {label,strength,positives:positives.slice(0,4),warnings:warnings.slice(0,4)}
-  },[scan?.intelligence?.score,scan?.intelligence?.signal,scan?.intelligence?.risk,scan?.market?.liquidityUsd,analytics?.trend,tape?.summary?.netFlowUsd,tape?.summary?.buyVolumePercent])
+  },[scan?.intelligence?.score,scan?.intelligence?.signal,scan?.intelligence?.risk,scan?.market?.liquidityUsd,analytics?.trend,tape?.summary?.netFlowUsd,tape?.summary?.buyVolumePercent,tape?.summary?.flags])
 
   const exitPlan=useMemo(()=>{
     const position=Math.max(0,Number(investment||0))
