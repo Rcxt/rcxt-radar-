@@ -281,7 +281,7 @@ export default function Home() {
 
     const timer = setInterval(() => {
       runScan({ address: scan.address, silent: true })
-    }, 5000)
+    }, 15000)
 
     return () => clearInterval(timer)
   }, [autoRefresh, scan?.address, runScan])
@@ -1425,7 +1425,7 @@ export default function Home() {
                 onChange={(event) => setAutoRefresh(event.target.checked)}
               />
               <span />
-              5S AUTO
+              15S AUTO
             </label>
           </div>
 
@@ -1500,6 +1500,31 @@ export default function Home() {
                 <ScoreRing score={scan.intelligence.score} large />
               </div>
 
+              <BeginnerSnapshot scan={scan} />
+
+              <div className="metricGrid six">
+                <MetricCard label="Price" value={tinyUsd(scan.market.priceUsd)} />
+                <MetricCard label="Market Cap" value={compactUsd(scan.market.marketCap)} />
+                <MetricCard label="Liquidity" value={compactUsd(scan.market.liquidityUsd)} />
+                <MetricCard label="24H Volume" value={compactUsd(scan.market.volume.h24)} />
+                <MetricCard
+                  label="24H Change"
+                  value={percent(scan.market.priceChange.h24)}
+                  tone={scan.market.priceChange.h24 >= 0 ? 'positive' : 'negative'}
+                />
+                <MetricCard label="24H Buy %" value={`${scan.intelligence.buyPercent24h}%`} />
+              </div>
+
+              <details className="advancedDisclosure">
+                <summary>
+                  <div>
+                    <span>ADVANCED DATA</span>
+                    <strong>Open the full RCXT breakdown</strong>
+                    <small>Score model, contract details, validation, charts, whale flow, forecasts and trade tools.</small>
+                  </div>
+                  <b>OPEN</b>
+                </summary>
+                <div className="advancedDisclosureBody">
               <article className="scoreModelPanel">
                 <div className="scoreModelHead">
                   <div>
@@ -1533,20 +1558,6 @@ export default function Home() {
                   score={scan.intelligence.score}
                 />
               </article>
-
-              <div className="metricGrid six">
-                <MetricCard label="Price" value={tinyUsd(scan.market.priceUsd)} />
-                <MetricCard label="Market Cap" value={compactUsd(scan.market.marketCap)} />
-                <MetricCard label="Liquidity" value={compactUsd(scan.market.liquidityUsd)} />
-                <MetricCard label="24H Volume" value={compactUsd(scan.market.volume.h24)} />
-                <MetricCard
-                  label="24H Change"
-                  value={percent(scan.market.priceChange.h24)}
-                  tone={scan.market.priceChange.h24 >= 0 ? 'positive' : 'negative'}
-                />
-                <MetricCard label="24H Buy %" value={`${scan.intelligence.buyPercent24h}%`} />
-              </div>
-
               <article className="panel socialComingSoon">
                 <div className="comingSoonBadge">COMING SOON</div>
                 <div className="comingSoonMain">
@@ -1799,6 +1810,8 @@ export default function Home() {
                 walletEquity={Number(walletData?.portfolioTotalUsd || walletData?.portfolioTokenValueUsd || 0)}
                 onContext={setMarketContext}
               />
+                </div>
+              </details>
 
               <article className="panel aiPanel">
                 <div className="aiHeader">
@@ -1842,7 +1855,7 @@ export default function Home() {
 
               <div className="refreshLine">
                 <span className={autoRefresh ? 'pulse' : 'pulse paused'} />
-                {autoRefresh ? 'Auto-refreshing every 5 seconds' : 'Auto-refresh paused'}
+                {autoRefresh ? 'Auto-refreshing every 15 seconds' : 'Auto-refresh paused'}
                 {lastRefresh ? <small>Last update {lastRefresh.toLocaleTimeString()}</small> : null}
               </div>
             </>
@@ -2052,6 +2065,71 @@ function ScoreRing({ score, large = false }) {
         <span>/100</span>
       </div>
     </div>
+  )
+}
+
+
+function BeginnerSnapshot({ scan }) {
+  const intel = scan?.intelligence || {}
+  const positives = Array.isArray(intel.positives) ? intel.positives.slice(0, 3) : []
+  const negatives = Array.isArray(intel.negatives) ? intel.negatives.slice(0, 3) : []
+  const concentrationAvailable = Boolean(intel?.concentration?.available)
+  const holderRpcMissing = scan?.security?.sources?.largestAccounts === false
+  const headline = {
+    'BUY SETUP': 'Strong setup structure',
+    'LEAN BUY': 'Constructive setup',
+    WATCH: 'Wait for a cleaner setup',
+    REDUCE: 'Setup is weakening',
+    'SELL / AVOID': 'High-risk setup',
+  }[intel.signal] || 'Live setup read'
+  const riskLabel = {
+    LOWER: 'Lower relative risk',
+    MODERATE: 'Moderate risk',
+    HIGH: 'High risk',
+    EXTREME: 'Extreme risk',
+  }[intel.risk] || 'Risk unknown'
+
+  return (
+    <article className="beginnerSnapshot">
+      <div className="beginnerSnapshotHead">
+        <div>
+          <span>QUICK READ</span>
+          <h3>{headline}</h3>
+          <p>
+            RCXT score {intel.score ?? '—'}/100 · {intel.confidence ?? '—'}% model confidence · {riskLabel}.
+            Confidence describes data/model quality, not the chance of profit.
+          </p>
+        </div>
+        <div className="beginnerScore">
+          <strong>{intel.score ?? '—'}</strong><span>/100</span>
+          <small>{intel.signal || 'WATCH'}</small>
+        </div>
+      </div>
+      <div className="beginnerTiles">
+        <div><span>24H MOVE</span><strong className={Number(scan?.market?.priceChange?.h24 || 0) >= 0 ? 'positiveText' : 'negativeText'}>{percent(scan?.market?.priceChange?.h24)}</strong><small>Price direction</small></div>
+        <div><span>BUY PRESSURE</span><strong>{intel.buyPercent24h ?? '—'}%</strong><small>24h transaction mix</small></div>
+        <div><span>LIQUIDITY</span><strong>{compactUsd(scan?.market?.liquidityUsd)}</strong><small>{intel.liquidityToCapPercent ?? '—'}% of market cap</small></div>
+        <div><span>PAIR AGE</span><strong>{intel.ageHours == null ? 'Unknown' : formatAge(intel.ageHours)}</strong><small>{intel.marketState || 'Live market'}</small></div>
+      </div>
+      {!concentrationAvailable ? (
+        <div className="beginnerDataNotice">
+          <b>Holder data incomplete</b>
+          <span>{holderRpcMissing
+            ? 'Solana holder-concentration data was temporarily unavailable on this scan. RCXT does not assume it is safe and will retry automatically.'
+            : 'Holder-concentration data is not available for this token yet. RCXT does not treat missing data as a safety confirmation.'}</span>
+        </div>
+      ) : null}
+      <div className="beginnerReasons">
+        <div>
+          <span>GOOD SIGNS</span>
+          {(positives.length ? positives : ['No strong positive confirmation yet']).map((item) => <p key={'good-' + item}><i className="dot good" />{item}</p>)}
+        </div>
+        <div>
+          <span>WATCH OUT FOR</span>
+          {(negatives.length ? negatives : ['No major warning in the current snapshot']).map((item) => <p key={'risk-' + item}><i className="dot bad" />{item}</p>)}
+        </div>
+      </div>
+    </article>
   )
 }
 

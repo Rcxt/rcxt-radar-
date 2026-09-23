@@ -2647,3 +2647,62 @@ input,select,textarea{font-size:16px}
 }
 
 .calibrationCaution{display:block;margin-top:9px;font-size:7px;line-height:1.45;color:#556576}
+
+
+/* Beginner-first scanner shell */
+.beginnerSnapshot{
+  margin-top:12px;
+  border:1px solid #21313d;
+  border-radius:16px;
+  padding:16px;
+  background:linear-gradient(145deg,#0c151b,#080d12);
+}
+.beginnerSnapshotHead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.beginnerSnapshotHead>div:first-child>span{display:block;color:var(--green);font-size:8px;font-weight:900;letter-spacing:.12em}
+.beginnerSnapshotHead h3{margin:5px 0 6px;font-size:20px;letter-spacing:-.03em}
+.beginnerSnapshotHead p{margin:0;max-width:720px;color:#758698;font-size:9px;line-height:1.55}
+.beginnerScore{min-width:84px;text-align:right}
+.beginnerScore strong{font-size:30px;letter-spacing:-.05em}
+.beginnerScore>span{font-size:9px;color:#667587;margin-left:2px}
+.beginnerScore small{display:block;margin-top:3px;color:var(--green);font-size:7px;font-weight:900;letter-spacing:.08em}
+.beginnerTiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px}
+.beginnerTiles>div{border:1px solid #1a2731;background:#080e13;border-radius:10px;padding:11px;min-width:0}
+.beginnerTiles span{display:block;color:#617284;font-size:7px;letter-spacing:.08em}
+.beginnerTiles strong{display:block;margin-top:5px;font-size:13px;overflow-wrap:anywhere}
+.beginnerTiles small{display:block;margin-top:4px;color:#536274;font-size:7px;line-height:1.35}
+.beginnerDataNotice{display:flex;align-items:flex-start;gap:10px;margin-top:10px;padding:10px 11px;border:1px solid #514223;background:#18140b;border-radius:10px}
+.beginnerDataNotice b{flex:0 0 auto;color:var(--amber);font-size:8px;text-transform:uppercase;letter-spacing:.07em}
+.beginnerDataNotice span{color:#a59672;font-size:8px;line-height:1.45}
+.beginnerReasons{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.beginnerReasons>div{border-top:1px solid #18242e;padding-top:10px}
+.beginnerReasons>div>span{display:block;color:#647587;font-size:7px;font-weight:900;letter-spacing:.09em;margin-bottom:6px}
+.beginnerReasons p{display:flex;align-items:flex-start;gap:7px;margin:5px 0;color:#8b99a8;font-size:8px;line-height:1.4}
+.beginnerReasons .dot{margin-top:4px;flex:0 0 auto}
+.advancedDisclosure{margin-top:12px;border:1px solid #1d2a35;border-radius:14px;background:#080d12;overflow:hidden}
+.advancedDisclosure>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 15px;background:#0b1218}
+.advancedDisclosure>summary::-webkit-details-marker{display:none}
+.advancedDisclosure>summary span{display:block;color:var(--cyan);font-size:7px;font-weight:900;letter-spacing:.12em}
+.advancedDisclosure>summary strong{display:block;margin-top:4px;font-size:13px}
+.advancedDisclosure>summary small{display:block;margin-top:4px;color:#617183;font-size:8px;line-height:1.4}
+.advancedDisclosure>summary>b{flex:0 0 auto;border:1px solid #29404f;border-radius:999px;padding:6px 9px;color:#91a5b8;font-size:7px;letter-spacing:.08em}
+.advancedDisclosure[open]>summary>b{color:var(--green);border-color:#2d5a43}
+.advancedDisclosureBody{display:grid;gap:12px;padding:12px}
+.advancedDisclosureBody>.scoreModelPanel{margin-top:0}
+.advancedDisclosureBody>.socialComingSoon{margin-top:0}
+.advancedDisclosureBody>.analysisGrid,.advancedDisclosureBody>.proDetailGrid{margin-top:0}
+.beginnerMetrics{margin-top:10px}
+
+@media(max-width:620px){
+  .beginnerSnapshot{padding:13px;border-radius:13px}
+  .beginnerSnapshotHead h3{font-size:18px}
+  .beginnerSnapshotHead p{font-size:8px}
+  .beginnerScore{min-width:68px}.beginnerScore strong{font-size:26px}
+  .beginnerTiles{grid-template-columns:1fr 1fr}
+  .beginnerReasons{grid-template-columns:1fr}
+  .beginnerDataNotice{flex-direction:column;gap:5px}
+  .advancedDisclosure>summary{padding:13px}
+}
+@media(max-width:480px){
+  .contentStack{padding-bottom:calc(118px + env(safe-area-inset-bottom))!important}
+  .advancedDisclosureBody{padding:9px}
+}
