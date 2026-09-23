@@ -2373,3 +2373,26 @@ input,select,textarea{font-size:16px}
 .challengeRiskNotice span{font-size:8px;color:#8d6f74;line-height:1.5}
 @media(max-width:760px){.challengePerformance{grid-template-columns:1fr 1fr}}
 @media(max-width:480px){.challengePerformance{grid-template-columns:1fr}.challengeRiskNotice{flex-direction:column}}
+
+
+/* V4 saved trade plan */
+.tradePlanPanel{margin-top:10px}
+.tradePlanActions{display:flex;gap:7px;flex-wrap:wrap}
+.tradePlanGrid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:12px}
+.tradePlanGrid label,.tradePlanNotes label{display:grid;gap:5px}
+.tradePlanGrid span,.tradePlanNotes span{font-size:7px;color:#607082;letter-spacing:.06em}
+.tradePlanGrid input{min-height:42px;border:1px solid #22313c;background:#080f14;color:#d8e0e7;border-radius:9px;padding:0 10px}
+.tradePlanNotes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px}
+.tradePlanNotes textarea{min-height:96px;resize:vertical;border:1px solid #22313c;background:#080f14;color:#d8e0e7;border-radius:9px;padding:10px;line-height:1.45}
+.tradePlanFoot{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-top:9px;padding-top:9px;border-top:1px solid #18242d}
+.tradePlanFoot span{font-size:8px;color:#748496}.tradePlanFoot small{font-size:7px;color:#526172;text-align:right}
+@media(max-width:760px){
+  .tradePlanGrid{grid-template-columns:1fr 1fr}
+  .tradePlanNotes{grid-template-columns:1fr}
+}
+@media(max-width:480px){
+  .tradePlanGrid{grid-template-columns:1fr 1fr}
+  .tradePlanActions{width:100%}
+  .tradePlanActions .toolButton{flex:1}
+  .tradePlanFoot{align-items:flex-start;flex-direction:column}
+}
