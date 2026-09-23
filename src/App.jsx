@@ -1310,7 +1310,7 @@ export default function Home() {
 
                 <div className="commandFooter">
                   <button onClick={resetRadarWorkspace}>Reset radar workspace</button>
-                  <span>v6.0 · multi-source intelligence + Bubble Map</span>
+                  <span>v6.0.1 · simpler scanner + stability</span>
                 </div>
               </div>
             ) : null}
@@ -2518,7 +2518,7 @@ export default function Home() {
 
       <footer className="footer">
         <div>
-          <b>RCXT RADAR · v6.0.0</b>
+          <b>RCXT RADAR · v6.0.1</b>
           <span>Score engine v6.0.0 · Solana · DexScreener · GeckoTerminal · RugCheck · GoPlus</span>
         </div>
         <p>
