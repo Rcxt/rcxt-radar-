@@ -41,6 +41,7 @@ export default function ChallengeTracker({walletAddress='',walletData=null}){
   const [loading,setLoading]=useState(false)
   const [error,setError]=useState('')
   const [startedAt,setStartedAt]=useState(null)
+  const [autoSync,setAutoSync]=useState(false)
 
   useEffect(()=>{
     const saved=localStorage.getItem('rcxt-challenge-wallet-v1')||''
@@ -49,6 +50,7 @@ export default function ChallengeTracker({walletAddress='',walletData=null}){
     if(nextAddress){
       const savedStart=localStorage.getItem('rcxt-challenge-start-v1:'+nextAddress)
       setStartedAt(savedStart?Number(savedStart):null)
+      setAutoSync(localStorage.getItem('rcxt-challenge-auto-v1:'+nextAddress)==='enabled')
     }
   },[walletAddress])
 
@@ -114,6 +116,19 @@ export default function ChallengeTracker({walletAddress='',walletData=null}){
     }
   }
 
+  useEffect(()=>{
+    if(!autoSync||!address.trim()) return
+    const timer=setInterval(()=>{ sync() },300000)
+    return()=>clearInterval(timer)
+  },[autoSync,address])
+
+  function toggleAutoSync(){
+    const next=!autoSync
+    setAutoSync(next)
+    const target=address.trim()
+    if(target) localStorage.setItem('rcxt-challenge-auto-v1:'+target,next?'enabled':'disabled')
+  }
+
   function resetChallenge(){
     const target=address.trim()
     if(!target) return
@@ -124,7 +139,7 @@ export default function ChallengeTracker({walletAddress='',walletData=null}){
   }
 
   return (
-    <article className="panel challengePanel">
+    <article className="panel challengePanel" id="challenge-tracker">
       <div className="challengeHead">
         <div>
           <span>$5 → $50K CHALLENGE</span>
@@ -137,7 +152,11 @@ export default function ChallengeTracker({walletAddress='',walletData=null}){
       <div className="challengeSync">
         <input value={address} onChange={e=>setAddress(e.target.value)} placeholder="Paste challenge wallet address" aria-label="Challenge wallet address"/>
         <button className="primaryButton" onClick={sync} disabled={loading}>{loading?'SYNCING…':'SYNC WALLET'}</button>
+        <button className={autoSync?'toolButton active':'toolButton'} onClick={toggleAutoSync}>
+          {autoSync?'Auto Sync On':'Auto Sync Off'}
+        </button>
       </div>
+      <small className="challengeAutoHint">Auto sync refreshes wallet equity every 5 minutes while this page is open.</small>
       {error?<div className="v4Error">{error}</div>:null}
 
       <div className="challengeStats">
