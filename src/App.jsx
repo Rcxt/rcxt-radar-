@@ -1390,25 +1390,75 @@ export default function Home() {
                       }
                     />
                     <SecurityRow
-                      label="Largest account"
-                      good={scan.security?.concentrationAvailable && Number(scan.security?.top1Percent || 100) < 45}
-                      unknown={!scan.security?.concentrationAvailable}
+                      label="Concentration source"
+                      good={scan.intelligence?.concentration?.available}
+                      unknown={!scan.intelligence?.concentration?.available}
                       value={
-                        scan.security?.concentrationAvailable
-                          ? `${Number(scan.security.top1Percent).toFixed(1)}%`
+                        scan.intelligence?.concentration?.method === 'RESOLVED_TOKEN_ACCOUNT_OWNERS'
+                          ? 'Resolved owners'
+                          : scan.intelligence?.concentration?.method === 'TOKEN_ACCOUNTS'
+                            ? 'Token accounts'
+                            : 'Unavailable'
+                      }
+                    />
+                    <SecurityRow
+                      label={
+                        scan.intelligence?.concentration?.method === 'RESOLVED_TOKEN_ACCOUNT_OWNERS'
+                          ? 'Largest resolved owner'
+                          : 'Largest token account'
+                      }
+                      good={
+                        scan.intelligence?.concentration?.available &&
+                        Number(scan.intelligence?.concentration?.top1Percent || 100) < 45
+                      }
+                      unknown={!scan.intelligence?.concentration?.available}
+                      value={
+                        scan.intelligence?.concentration?.available
+                          ? `${Number(scan.intelligence.concentration.top1Percent).toFixed(1)}%`
                           : 'Unavailable'
                       }
                     />
                     <SecurityRow
-                      label="Top 10 accounts"
-                      good={scan.security?.concentrationAvailable && Number(scan.security?.top10Percent || 100) < 85}
-                      unknown={!scan.security?.concentrationAvailable}
+                      label={
+                        scan.intelligence?.concentration?.method === 'RESOLVED_TOKEN_ACCOUNT_OWNERS'
+                          ? 'Top 10 resolved owners'
+                          : 'Top 10 token accounts'
+                      }
+                      good={
+                        scan.intelligence?.concentration?.available &&
+                        Number(scan.intelligence?.concentration?.top10Percent || 100) < 85
+                      }
+                      unknown={!scan.intelligence?.concentration?.available}
                       value={
-                        scan.security?.concentrationAvailable
-                          ? `${Number(scan.security.top10Percent).toFixed(1)}%`
+                        scan.intelligence?.concentration?.available
+                          ? `${Number(scan.intelligence.concentration.top10Percent).toFixed(1)}%`
                           : 'Unavailable'
                       }
                     />
+                    {scan.intelligence?.concentration?.method === 'RESOLVED_TOKEN_ACCOUNT_OWNERS' ? (
+                      <>
+                        <SecurityRow
+                          label="Raw largest token acct"
+                          good={Number(scan.intelligence?.concentration?.accountTop1Percent || 100) < 45}
+                          unknown={scan.intelligence?.concentration?.accountTop1Percent == null}
+                          value={
+                            scan.intelligence?.concentration?.accountTop1Percent == null
+                              ? 'Unavailable'
+                              : `${Number(scan.intelligence.concentration.accountTop1Percent).toFixed(1)}%`
+                          }
+                        />
+                        <SecurityRow
+                          label="Resolved top owners"
+                          good={Number(scan.intelligence?.concentration?.uniqueResolvedOwners || 0) >= 5}
+                          unknown={!scan.intelligence?.concentration?.uniqueResolvedOwners}
+                          value={
+                            scan.intelligence?.concentration?.uniqueResolvedOwners
+                              ? String(scan.intelligence.concentration.uniqueResolvedOwners)
+                              : 'Unavailable'
+                          }
+                        />
+                      </>
+                    ) : null}
                     <SecurityRow
                       label="Liquidity / cap"
                       good={scan.intelligence.liquidityToCapPercent >= 8}
