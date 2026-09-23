@@ -1,6 +1,7 @@
 import { getBestPair } from '../lib/dexscreener.js'
 import { analyzePair } from '../lib/intelligence.js'
 import { getMintSecurity, looksLikeSolanaAddress } from '../lib/solana.js'
+import { getExternalSecurity, mergeSecurityEvidence } from '../lib/external-security.js'
 import { logTokenScan } from '../lib/supabase-log.js'
 import { rateLimit, applyRateHeaders } from '../lib/rate-limit.js'
 
@@ -26,9 +27,14 @@ export default async function handler(req, res) {
   const shouldPersist = String(getQuery(req, 'persist', '1')) !== '0'
 
   try {
-    const [pair,mintSecurity]=await Promise.all([getBestPair(address),getMintSecurity(address)])
+    const [pair,onchainSecurity,externalSecurity]=await Promise.all([
+      getBestPair(address),
+      getMintSecurity(address),
+      getExternalSecurity(address),
+    ])
     if (!pair) return res.status(404).json({ success:false, error:'No active DexScreener market found for this token.' })
 
+    const mintSecurity=mergeSecurityEvidence(onchainSecurity,externalSecurity)
     const intelligence=analyzePair(pair,mintSecurity)
     const rawLiquidity=pair?.liquidity?.usd
     const pumpFunMarket=String(pair?.dexId||'').toLowerCase()==='pumpfun'
