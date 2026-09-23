@@ -100,6 +100,9 @@ export default async function handler(req,res){
     socialProviders:{
       x:Boolean(process.env.X_BEARER_TOKEN)
     },
+    visualProviders:{
+      bubblemaps:{ enabled:true, mode:'direct-token-link', scoreInput:false }
+    },
     dataProviders:{
       core:{
         solanaRpc:true,
