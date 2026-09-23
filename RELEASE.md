@@ -159,9 +159,16 @@ The challenge is a measurement dashboard, not a promise or compounding strategy.
 
 The old hard-coded public test-wallet value was removed from the production frontend. Wallet addresses are user-entered and can be stored locally on the device instead of being shipped in public source code.
 
+## Score Engine 4.1 concentration upgrade
+
+- resolves owners behind the largest Solana token accounts when RPC data is available
+- uses resolved-owner concentration instead of raw token-account concentration for scoring when possible
+- retains raw token-account concentration for transparency and fallback
+- bumps the score-engine version so calibration data from the older concentration method is not mixed with 4.1 outcomes
+
 ## Existing v3 systems retained
 
-- RCXT Score Engine 4.0
+- RCXT Score Engine 4.1
 - Trench Mode
 - fresh/new-pair Radar
 - direct Pump.fun links

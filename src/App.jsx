@@ -831,7 +831,7 @@ export default function Home() {
           </div>
           <div>
             <strong>RCXT Intelligence</strong>
-            <span>Risk-adjusted Score Engine 4.0</span>
+            <span>Risk-adjusted Score Engine 4.1</span>
             <small>No mock market data</small>
           </div>
         </div>
@@ -904,7 +904,7 @@ export default function Home() {
                 <ServiceTile label="DexScreener" service={health?.services?.dexscreener} />
                 <ServiceTile label="Charts / Tape" service={health?.services?.charts} />
                 <ServiceTile label="Supabase" service={health?.services?.supabase} />
-                <div className="systemMeta"><span>Score engine</span><b>{health?.scoreVersion || '4.0.0'}</b></div>
+                <div className="systemMeta"><span>Score engine</span><b>{health?.scoreVersion || '4.1.0'}</b></div>
                 <div className="systemMeta"><span>Secure writes</span><b>{health?.oidc?.available ? 'OIDC ACTIVE' : 'CHECKING'}</b></div>
                 <div className="systemMeta"><span>Scanner</span><b>5 seconds</b></div>
                 <div className="systemMeta"><span>Radar</span><b>10 seconds</b></div>
@@ -1690,7 +1690,7 @@ export default function Home() {
       <footer className="footer">
         <div>
           <b>RCXT RADAR · v4.0.0 PRODUCTION</b>
-          <span>Score engine v4.0.0 · Solana · DexScreener · Supabase · Vercel</span>
+          <span>Score engine v4.1.0 · Solana · DexScreener · Supabase · Vercel</span>
         </div>
         <p>
           Signals are software-generated market intelligence, not guarantees or personalized financial advice.

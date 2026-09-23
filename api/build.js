@@ -6,7 +6,7 @@ export default async function handler(req,res){
     success:true,
     app:'RCXT Radar',
     version:'4.0.0',
-    scoreEngine:'4.0.0',
+    scoreEngine:'4.1.0',
     trenchEngine:'1.0.0',
     chartEngine:'1.0.0',
     forecastEngine:'1.0.0',
