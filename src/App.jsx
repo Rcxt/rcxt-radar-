@@ -1983,6 +1983,44 @@ export default function Home() {
                             : 'Partial'
                       }
                     />
+                    {scan.intelligence?.securityEvidence?.token2022?.detected ? (
+                      <>
+                        <SecurityRow
+                          label="Token-2022 controls"
+                          good={
+                            !scan.intelligence.securityEvidence.token2022.permanentDelegateActive &&
+                            !scan.intelligence.securityEvidence.token2022.defaultAccountFrozen &&
+                            !scan.intelligence.securityEvidence.token2022.nonTransferable &&
+                            !scan.intelligence.securityEvidence.token2022.paused
+                          }
+                          value={
+                            scan.intelligence.securityEvidence.token2022.nonTransferable
+                              ? 'Non-transferable'
+                              : scan.intelligence.securityEvidence.token2022.paused
+                                ? 'Paused'
+                                : scan.intelligence.securityEvidence.token2022.permanentDelegateActive
+                                  ? 'Permanent delegate'
+                                  : scan.intelligence.securityEvidence.token2022.defaultAccountFrozen
+                                    ? 'Defaults frozen'
+                                    : scan.intelligence.securityEvidence.token2022.transferHookActive
+                                      ? 'Transfer hook'
+                                      : 'No hard extension veto'
+                          }
+                        />
+                        {scan.intelligence.securityEvidence.token2022.transferFeeEnabled ? (
+                          <SecurityRow
+                            label="Transfer fee"
+                            good={Number(scan.intelligence.securityEvidence.token2022.transferFeeBasisPoints || 0) < 500}
+                            unknown={scan.intelligence.securityEvidence.token2022.transferFeeBasisPoints == null}
+                            value={
+                              scan.intelligence.securityEvidence.token2022.transferFeeBasisPoints == null
+                                ? 'Enabled'
+                                : `${(Number(scan.intelligence.securityEvidence.token2022.transferFeeBasisPoints) / 100).toFixed(2)}%`
+                            }
+                          />
+                        ) : null}
+                      </>
+                    ) : null}
                     <SecurityRow
                       label="Security sources"
                       good={Number(scan.intelligence?.securityEvidence?.providerCount || 0) >= 2}
