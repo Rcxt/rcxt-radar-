@@ -2403,3 +2403,23 @@ input,select,textarea{font-size:16px}
   .challengeSync{grid-template-columns:1fr}
   .challengeSync .primaryButton,.challengeSync .toolButton{width:100%}
 }
+
+
+/* V4 scanner snapshot delta */
+.snapshotDelta{border-top:1px solid #18232d;margin-top:12px;padding-top:12px}
+.snapshotDelta.empty{display:flex;justify-content:space-between;gap:12px;align-items:center}
+.snapshotDelta.empty>span,.snapshotDeltaHead span{font-size:7px;color:#647486;letter-spacing:.09em}
+.snapshotDelta.empty>small{font-size:7px;color:#536274}
+.snapshotDeltaHead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.snapshotDeltaHead strong{display:block;font-size:10px;margin-top:3px}
+.snapshotDeltaHead small{font-size:7px;color:#536274}
+.snapshotDeltaGrid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-top:9px}
+.snapshotDeltaGrid>div{border:1px solid #1a2630;background:#080e13;border-radius:9px;padding:8px}
+.snapshotDeltaGrid span{display:block;font-size:7px;color:#607082}
+.snapshotDeltaGrid b{display:block;font-size:10px;margin-top:4px}
+.snapshotDeltaGrid b.positive{color:var(--green)}
+.snapshotDeltaGrid b.negative{color:var(--red)}
+@media(max-width:560px){
+  .snapshotDeltaGrid{grid-template-columns:1fr 1fr}
+  .snapshotDeltaGrid>div:last-child{grid-column:1/-1}
+}
