@@ -2018,6 +2018,33 @@ export default function Home() {
                           : `${Math.round(Number(scan.intelligence.securityEvidence.evidenceScore))}/100`
                       }
                     />
+                    <SecurityRow
+                      label="Market sources"
+                      good={Number(scan.intelligence?.securityEvidence?.market?.priceProviderCount || 0) >= 3}
+                      unknown={!scan.intelligence?.securityEvidence?.market?.priceProviderCount}
+                      value={
+                        scan.intelligence?.securityEvidence?.market?.priceProviderCount
+                          ? `${scan.intelligence.securityEvidence.market.priceProviderCount} price source${scan.intelligence.securityEvidence.market.priceProviderCount === 1 ? '' : 's'}`
+                          : 'Dex only'
+                      }
+                    />
+                    <SecurityRow
+                      label="Price consensus"
+                      good={
+                        Number(scan.intelligence?.securityEvidence?.market?.priceProviderCount || 0) >= 2 &&
+                        !scan.intelligence?.securityEvidence?.market?.priceConflict
+                      }
+                      unknown={Number(scan.intelligence?.securityEvidence?.market?.priceProviderCount || 0) < 2}
+                      value={
+                        scan.intelligence?.securityEvidence?.market?.priceConflict
+                          ? `${Number(scan.intelligence?.securityEvidence?.market?.maxDeviationPercent || 0).toFixed(1)}% source spread`
+                          : scan.intelligence?.securityEvidence?.market?.priceAgreement
+                            ? 'Strong agreement'
+                            : Number(scan.intelligence?.securityEvidence?.market?.priceProviderCount || 0) >= 2
+                              ? 'Within tolerance'
+                              : 'Needs corroboration'
+                      }
+                    />
                     {scan.security?.external?.rugcheck?.available ? (
                       <SecurityRow
                         label="RugCheck"
@@ -2052,14 +2079,18 @@ export default function Home() {
                             ? 'Token accounts'
                             : scan.intelligence?.concentration?.method === 'RUGCHECK_TOP_HOLDERS'
                               ? 'RugCheck holders'
-                              : 'Unavailable'
+                              : scan.intelligence?.concentration?.method === 'GOPLUS_TOP_HOLDERS'
+                                ? 'GoPlus holders'
+                                : scan.intelligence?.concentration?.method === 'BIRDEYE_TOP_HOLDERS'
+                                  ? 'Birdeye holders'
+                                  : 'Unavailable'
                       }
                     />
                     <SecurityRow
                       label={
                         scan.intelligence?.concentration?.method === 'RESOLVED_TOKEN_ACCOUNT_OWNERS'
                           ? 'Largest resolved owner'
-                          : scan.intelligence?.concentration?.method === 'RUGCHECK_TOP_HOLDERS'
+                          : ['RUGCHECK_TOP_HOLDERS','GOPLUS_TOP_HOLDERS','BIRDEYE_TOP_HOLDERS'].includes(scan.intelligence?.concentration?.method)
                             ? 'Largest external holder'
                             : 'Largest token account'
                       }
@@ -2067,18 +2098,18 @@ export default function Home() {
                         scan.intelligence?.concentration?.available &&
                         Number(scan.intelligence?.concentration?.top1Percent || 100) < 45
                       }
-                      unknown={!scan.intelligence?.concentration?.available}
+                      unknown={!scan.intelligence?.concentration?.available || scan.intelligence?.concentration?.top1Percent == null}
                       value={
-                        scan.intelligence?.concentration?.available
-                          ? `${Number(scan.intelligence.concentration.top1Percent).toFixed(1)}%`
-                          : 'Unavailable'
+                        scan.intelligence?.concentration?.top1Percent == null
+                          ? 'Unavailable'
+                          : `${Number(scan.intelligence.concentration.top1Percent).toFixed(1)}%`
                       }
                     />
                     <SecurityRow
                       label={
                         scan.intelligence?.concentration?.method === 'RESOLVED_TOKEN_ACCOUNT_OWNERS'
                           ? 'Top 10 resolved owners'
-                          : scan.intelligence?.concentration?.method === 'RUGCHECK_TOP_HOLDERS'
+                          : ['RUGCHECK_TOP_HOLDERS','GOPLUS_TOP_HOLDERS','BIRDEYE_TOP_HOLDERS'].includes(scan.intelligence?.concentration?.method)
                             ? 'Top 10 external holders'
                             : 'Top 10 token accounts'
                       }
