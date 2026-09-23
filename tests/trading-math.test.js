@@ -47,6 +47,34 @@ test('profit ladder contains only targets above entry and ascending',()=>{
   }
 })
 
+test('profit ladder returns no incomplete rows when investment is blank or zero',()=>{
+  const blank=buildProfitLadder({
+    investment:'',
+    entryMarketCap:12000,
+    estimatedCostsPercent:1,
+  })
+  const zero=buildProfitLadder({
+    investment:0,
+    entryMarketCap:12000,
+    estimatedCostsPercent:1,
+  })
+
+  assert.deepEqual(blank,[])
+  assert.deepEqual(zero,[])
+})
+
+test('every profit ladder row contains finite projection fields',()=>{
+  const rows=buildProfitLadder({
+    investment:20,
+    entryMarketCap:12000,
+    estimatedCostsPercent:1,
+  })
+  assert.ok(rows.length>0)
+  assert.ok(rows.every(row=>Number.isFinite(row.multiple)))
+  assert.ok(rows.every(row=>Number.isFinite(row.netValue)))
+  assert.ok(rows.every(row=>Number.isFinite(row.netProfit)))
+})
+
 test('challenge stats calculate high-water drawdown safely',()=>{
   const stats=challengeStats(8,[
     {totalValueUsd:5},
