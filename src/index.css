@@ -2396,3 +2396,10 @@ input,select,textarea{font-size:16px}
   .tradePlanActions .toolButton{flex:1}
   .tradePlanFoot{align-items:flex-start;flex-direction:column}
 }
+
+.challengeAutoHint{display:block;margin-top:6px;font-size:7px;color:#576779}
+.challengeSync{grid-template-columns:minmax(0,1fr) auto auto}
+@media(max-width:560px){
+  .challengeSync{grid-template-columns:1fr}
+  .challengeSync .primaryButton,.challengeSync .toolButton{width:100%}
+}
