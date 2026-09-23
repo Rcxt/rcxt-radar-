@@ -2605,3 +2605,24 @@ input,select,textarea{font-size:16px}
   .rugGuardGrid{grid-template-columns:1fr}
   .rugGuardStatus{text-align:left}
 }
+
+
+/* V4 whale wallet detection */
+.whaleWalletPanel{margin-top:12px;border-top:1px solid #19252e;padding-top:12px}
+.whaleWalletHead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.whaleWalletHead>div:first-child>span{display:block;font-size:7px;color:#6d7d8d;letter-spacing:.1em}
+.whaleWalletHead>div:first-child>strong{display:block;font-size:11px;margin-top:3px}
+.whaleNet{text-align:right}.whaleNet span{display:block;font-size:7px;color:#5b6b7b}.whaleNet b{display:block;font-size:12px;margin-top:3px}
+.whaleSummaryGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:9px}
+.whaleSummaryGrid>div{border:1px solid #1d2a34;background:#091016;border-radius:9px;padding:9px}
+.whaleSummaryGrid span{display:block;font-size:7px;color:#5d6d7d}.whaleSummaryGrid b{display:block;font-size:10px;margin-top:4px}
+.whaleWalletList{display:grid;gap:6px;margin-top:9px}
+.whaleWalletList a{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid #1b2832;background:#080f14;border-radius:10px;padding:9px 10px;text-decoration:none;color:#cfd8df}
+.whaleWalletList a:hover{border-color:#345063}
+.whaleWalletList strong{display:block;font-size:9px}.whaleWalletList span{display:block;font-size:7px;color:#607182;margin-top:3px}
+.whaleWalletNumbers{text-align:right}.whaleWalletNumbers b{display:block;font-size:9px}.whaleWalletNumbers small{display:block;font-size:7px;margin-top:3px}
+.whaleWalletPanel>p,.whaleEmpty{display:block;font-size:7px;color:#526273;line-height:1.45;margin-top:8px}
+@media(max-width:560px){
+  .whaleSummaryGrid{grid-template-columns:1fr 1fr}
+  .whaleWalletHead{flex-direction:column}.whaleNet{text-align:left}
+}
