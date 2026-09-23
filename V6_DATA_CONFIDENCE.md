@@ -13,6 +13,13 @@ V6 changes the scoring philosophy from **one market feed + heuristics** to **fac
    - Largest token accounts
    - Resolved owner concentration
    - Public RPC remains the final fallback
+   - Native Token-2022 extension inspection when parsed extension state is exposed by RPC:
+     - transfer fees
+     - permanent delegate
+     - transfer hook
+     - frozen-by-default accounts
+     - non-transferable / paused state
+     - mint close authority
 
 2. **DexScreener — primary fast market feed**
    - Price
@@ -80,6 +87,8 @@ V6 changes the scoring philosophy from **one market feed + heuristics** to **fac
 - Jupiter suspicious status is strong caution evidence but is **not** mislabeled as a confirmed rug.
 - External holder concentration is used only when stronger on-chain owner/account concentration is unavailable.
 - Token-2022 transfer fees reduce execution quality.
+- A permanent delegate, non-transferable mint, paused mint or frozen-by-default account state is treated as structural danger for meme-token execution.
+- Transfer hooks are caution evidence because custom logic executes on transfers; they are not automatically labeled a rug.
 - Mutable metadata and high creator concentration reduce safety.
 - Organic activity can strengthen or weaken setup quality; it cannot guarantee direction.
 - RCXT score, setup, execution, safety, data quality and confidence remain separate axes. None is a probability of profit.
