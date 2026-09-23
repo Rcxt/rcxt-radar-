@@ -152,3 +152,16 @@ Weights should move based on those measured outcomes, not intuition alone.
 - Helius is only called when a key exists; it also becomes an RPC fallback.
 - Birdeye calls remain disabled even when a key is present until the matching enable flag is set. This prevents accidental CU burn during 15-second scanner refreshes.
 - Helius fungible price is stored as auxiliary evidence and cannot by itself trigger a price-source conflict.
+
+
+## Holder-cluster investigation
+
+RCXT exposes a **Bubble Map** action for every scanned Solana token. It opens the exact token in Bubblemaps V2.
+
+Bubblemaps is deliberately treated as a visual forensic tool rather than a numeric score input:
+- bubble size represents holder share,
+- links expose historical wallet relationships,
+- clusters can reveal related-holder patterns that raw concentration percentages miss,
+- visual patterns still require interpretation and are not automatically labeled malicious by RCXT.
+
+This keeps the deterministic RCXT score auditable while giving the trader a deeper holder-network investigation path.
