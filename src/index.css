@@ -1760,6 +1760,7 @@ button{touch-action:manipulation}
   white-space:nowrap;
 }
 .toolButton:hover,.toolLink:hover,.toolButton.active{border-color:#3d6277;color:#dff6ff;background:#0e1820}
+.bubbleMapButton{border-color:#31576b;color:#bfefff;background:#0b1720}
 .watchButton,.compareButton{
   border:1px solid #26323e!important;
   background:#0c1218!important;
@@ -2801,8 +2802,9 @@ input,select,textarea{font-size:16px}
   }
 }
 @media(max-width:480px){
-  .scanQuickActions{display:grid;grid-template-columns:1fr 1fr auto}
+  .scanQuickActions{display:grid;grid-template-columns:1fr 1fr}
   .scanQuickActions>.toolButton{width:100%;justify-content:center}
+  .scanMoreActions{width:100%}
   .scanMoreActions>summary{min-width:70px;width:100%}
   .scanMoreActions>div{right:0}
   .beginnerBlocker,.chartHistoryNotice{flex-direction:column;gap:5px}
