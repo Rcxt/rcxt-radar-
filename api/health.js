@@ -28,14 +28,33 @@ async function testDex() {
   }
 }
 
+async function testCharts() {
+  const started = Date.now()
+  try {
+    const response = await fetch('https://api.geckoterminal.com/api/v2/networks/solana/new_pools?page=1', {
+      headers: { accept:'application/json', 'user-agent':'RCXT-Radar/4.0' },
+      signal: AbortSignal.timeout(3500),
+    })
+    const json = await response.json()
+    return {
+      ok: response.ok && Array.isArray(json?.data),
+      latencyMs: Date.now()-started,
+      provider: 'GeckoTerminal',
+    }
+  } catch {
+    return { ok:false, latencyMs:Date.now()-started, provider:'GeckoTerminal' }
+  }
+}
+
 export default async function handler(req,res){
   if(req.method!=='GET') return res.status(405).json({success:false,error:'Method not allowed'})
 
   const started=Date.now()
-  const [solana,dexscreener,supabase]=await Promise.all([
+  const [solana,dexscreener,supabase,charts]=await Promise.all([
     testSolana(),
     testDex(),
     checkPersistenceHealth(),
+    testCharts(),
   ])
 
   const services={
@@ -43,6 +62,7 @@ export default async function handler(req,res){
     solana,
     dexscreener,
     supabase,
+    charts,
   }
 
   const healthy=Object.values(services).every((item)=>item.ok)
@@ -54,7 +74,7 @@ export default async function handler(req,res){
     checkedAt:new Date().toISOString(),
     scoreVersion:SCORE_VERSION,
     services,
-    refresh:{radarSeconds:10,scannerSeconds:5},
+    refresh:{radarSeconds:10,scannerSeconds:5,chartsSeconds:30,tradeTapeSeconds:30},
     ai:{mode:'multi-model-gateway-with-deterministic-fallback'},
     oidc:{available:Boolean(req.headers?.['x-vercel-oidc-token'])},
     socialProviders:{
