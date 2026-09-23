@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import {
   beginnerMarketExplanation,
   breakEvenMarketCap,
+  buildEntryQuality,
   buildExecutionChecklist,
   buildProfitLadder,
   positionPlan,
@@ -233,6 +234,12 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
     positionSize:riskPlan.positionSize,
   }),[scan,analytics,tape?.summary,riskPlan.positionSize])
 
+  const entryQuality=useMemo(()=>buildEntryQuality({
+    scan,
+    analytics,
+    tape:tape?.summary,
+  }),[scan,analytics,tape?.summary])
+
   const liquidityBurden=useMemo(()=>{
     const liquidity=Number(scan?.market?.liquidityUsd||0)
     if(!liquidity||!riskPlan.positionSize) return null
@@ -308,7 +315,8 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
         scan.intelligence?.safetyScore,
         scan.intelligence?.dataQualityScore,
       ].map(v=>v??'—').join(' / '),
-      a?.available?'Chart: '+a.trend+' · '+(a.regime?.structure||'—')+' · RSI '+(a.indicators?.rsi14??'—')+' · ATR '+(a.indicators?.atrPercent??'—')+'%':'Chart: unavailable',
+      a?.available?'Chart: '+a.trend+' · '+(a.regime?.structure||'—')+' / '+(a.regime?.phase||'—')+' · RSI '+(a.indicators?.rsi14??'—')+' · ATR '+(a.indicators?.atrPercent??'—')+'% · VWAP '+(a.indicators?.vwapDistancePercent??'—')+'%':'Chart: unavailable',
+      entryQuality?.available?'Entry Quality: '+entryQuality.score+'/100 '+entryQuality.label:'Entry Quality: unavailable',
       a?.available?'Support '+tiny(a.levels?.nearestSupport)+' · Resistance '+tiny(a.levels?.nearestResistance)+' · Structure R:R '+(a.levels?.structureRiskReward??'—')+'x':'',
       tapeSummary?'Trade tape: '+money(tapeSummary.netFlowUsd)+' net flow · '+tapeSummary.buyVolumePercent+'% buy volume · '+tapeSummary.uniqueWallets+' wallets':'Trade tape: unavailable',
       checklist?.knownCount?'Checklist: '+checklist.passCount+'/'+checklist.knownCount+' checks passing ('+checklist.readinessPercent+'%)':'Checklist: unavailable',
@@ -392,6 +400,9 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
               <div><span>Max Drawdown</span><b className="bad">{pct(analytics.indicators?.maxDrawdown)}</b></div>
               <div><span>Data Quality</span><b>{analytics.dataQuality}%</b><small>{analytics.sampleSize} candles</small></div>
               <div><span>Structure</span><b>{analytics.regime?.structure||'—'}</b><small>{analytics.regime?.volatility||'—'} volatility</small></div>
+              <div><span>Market phase</span><b>{analytics.regime?.phase||'—'}</b><small>{analytics.indicators?.bollingerWidthPercent==null?'—':analytics.indicators.bollingerWidthPercent+'%'} band width</small></div>
+              <div><span>VWAP position</span><b className={Number(analytics.indicators?.vwapDistancePercent||0)>=0?'good':'bad'}>{analytics.indicators?.vwapDistancePercent==null?'—':pct(analytics.indicators.vwapDistancePercent)}</b><small>vs recent volume-weighted value</small></div>
+              <div><span>Entry Quality</span><b>{entryQuality?.available?entryQuality.score+'/100':'—'}</b><small>{entryQuality?.available?entryQuality.label:'needs more evidence'}</small></div>
               <div><span>Structure R:R</span><b>{analytics.levels?.structureRiskReward?analytics.levels.structureRiskReward.toFixed(2)+'×':'—'}</b><small>nearest support → resistance</small></div>
             </div>
             {tape?.summary?(
