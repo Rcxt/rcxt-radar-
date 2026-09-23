@@ -207,3 +207,86 @@ The old hard-coded public test-wallet value was removed from the production fron
 Production: https://rcxt-radar.vercel.app
 
 Rollback branch: `release/v4.0.0`
+
+
+## Final v4 hardening additions
+
+### Whale Wallet Detection
+- sampled public trade-wallet aggregation
+- per-wallet buy USD / sell USD / net flow
+- trade count and sampled-volume share
+- ACCUMULATING / DISTRIBUTING / MIXED behavior labels
+- multi-whale accumulation and distribution flags
+- whale-flow concentration flag
+- Solscan links for public wallet inspection
+- whale context can support or weaken Entry Quality, but cannot override core RCXT structural risk
+
+### Supply Whale Detection
+- resolves largest Solana token accounts to owner wallets when RPC data permits
+- top resolved owner percentages
+- counts owner wallets holding at least 5% of supply
+- Solscan links
+- kept separate from active trade-whale flow
+
+### Trade Quality / Manipulation Analytics
+- micro-trade noise percentage
+- tiny-trade percentage
+- repeat-wallet churn
+- top-wallet trade share
+- top-wallet USD-volume share
+- average-to-median trade-size skew
+- Rug / Manipulation Guard consumes these anomalies as evidence
+
+### Score Calibration v2
+- Setup / Execution / Safety / Data Quality stored as first-class scan columns
+- market state and risk-flag count stored per scan
+- forward outcomes grouped by score-engine version
+- 10-point score-bucket calibration
+- signal + risk + horizon segmentation
+- average and median realized return
+- directional hit rate
+- observation-delay tracking
+- component-score/forward-return correlation views
+- conservative UI sample thresholds before statistics are interpreted
+- score history now includes component-score deltas
+
+### Entry / Execution Analytics
+- Entry Quality score is separate from RCXT Score and Trench Score
+- VWAP location
+- volatility-band width / compression / expansion
+- support/resistance geometry
+- recent USD flow quality
+- whale distribution / concentration penalties
+- saved per-token Trade Plan
+- Exit Planner
+- reverse target market-cap calculator
+- break-even market-cap calculator
+- execution checklist
+
+### Challenge Risk Analytics
+- max drawdown
+- recovery needed to regain high-water mark
+- 24h equity change when enough snapshots exist
+- equity volatility
+- drawdown guard
+- challenge remains a measurement dashboard, not a compounding instruction
+
+### Reliability Gates
+- Node 22 CI
+- unit tests for trading math and market analytics
+- regression tests for whale-flow effects
+- production build runs tests before Vite compilation
+- GitHub CI validates every main/release push
+- Supabase writes remain OIDC-authenticated
+- GeckoTerminal chart/tape health monitored separately
+- build identity endpoint reports exact live Git SHA and engine versions
+
+## Final-launch condition
+
+The final v4 repository is considered launch-ready only when:
+1. GitHub CI passes on the exact final SHA.
+2. Vercel deploys that exact SHA successfully.
+3. /api/build reports the same SHA.
+4. health, scanner, chart, trades, wallet, challenge, calibration, persistence and runtime logs pass production smoke tests.
+
+At the time this release note was updated, Vercel was refusing additional builds because the project had reached its build-rate limit. The current production build remains on the prior safe READY deployment until the limit resets or the plan limit changes.
