@@ -5,6 +5,7 @@ import WalletActivity from './components/WalletActivity.jsx'
 import XSocialIntel from './components/XSocialIntel.jsx'
 import NotificationCenter from './components/NotificationCenter.jsx'
 import DetailSection from './components/DetailSection.jsx'
+import SectionBoundary from './components/SectionBoundary.jsx'
 import {
   DEFAULT_NOTIFICATION_PREFS,
   normalizeNotificationPrefs,
@@ -2303,11 +2304,13 @@ export default function Home() {
               </div>
 
               </DetailSection>
-              <V4AnalyticsSuite
-                scan={scan}
-                walletEquity={Number(walletData?.portfolioTotalUsd || walletData?.portfolioTokenValueUsd || 0)}
-                onContext={setMarketContext}
-              />
+              <SectionBoundary name="Market Lab">
+                <V4AnalyticsSuite
+                  scan={scan}
+                  walletEquity={Number(walletData?.portfolioTotalUsd || walletData?.portfolioTokenValueUsd || 0)}
+                  onContext={setMarketContext}
+                />
+              </SectionBoundary>
                 </div>
               </details>
 
@@ -2392,7 +2395,9 @@ export default function Home() {
 
           {walletError ? <ErrorBox text={walletError} /> : null}
 
-          <ChallengeTracker walletAddress={wallet} walletData={walletData} />
+          <SectionBoundary name="$5 → $50K Challenge">
+            <ChallengeTracker walletAddress={wallet} walletData={walletData} />
+          </SectionBoundary>
           <WalletActivity
             walletAddress={wallet}
             onOpenToken={openRadarToken}
