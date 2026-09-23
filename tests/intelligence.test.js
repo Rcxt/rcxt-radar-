@@ -528,3 +528,57 @@ test('transfer-fee evidence reduces execution quality',()=>{
   assert.ok(taxed.executionScore<baseline.executionScore)
   assert.ok(taxed.riskFlags.includes('TRANSFER_FEE_ENABLED'))
 })
+
+
+test('permanent delegate is structural danger for meme-token execution',()=>{
+  const result=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    token2022:true,
+    permanentDelegate:'11111111111111111111111111111111',
+    external:{providerCount:0,dataConflicts:[],hardRiskFlags:[],softRiskFlags:[]},
+  })
+
+  assert.ok(result.riskFlags.includes('PERMANENT_DELEGATE_ACTIVE'))
+  assert.ok(result.score<=30)
+  assert.equal(result.signal,'SELL / AVOID')
+  assert.equal(result.contractVerified,false)
+})
+
+test('Token-2022 transfer fee reduces execution without being called a rug',()=>{
+  const baseline=analyzePair(healthyPair(),baseSecurity())
+  const result=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    token2022:true,
+    transferFeeEnabled:true,
+    transferFeeBasisPoints:750,
+  })
+
+  assert.ok(result.executionScore<baseline.executionScore)
+  assert.ok(result.riskFlags.includes('TOKEN2022_TRANSFER_FEE'))
+  assert.equal(result.securityEvidence.token2022.transferFeeBasisPoints,750)
+  assert.ok(!result.riskFlags.includes('EXTERNAL_RUGGED'))
+})
+
+test('non-transferable Token-2022 mint is a hard execution veto',()=>{
+  const result=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    token2022:true,
+    nonTransferable:true,
+  })
+
+  assert.ok(result.score<=8)
+  assert.ok(result.riskFlags.includes('NON_TRANSFERABLE_TOKEN'))
+  assert.equal(result.signal,'SELL / AVOID')
+})
+
+test('transfer hook is caution evidence and caps aggressive promotion',()=>{
+  const result=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    token2022:true,
+    transferHookProgramId:'Vote111111111111111111111111111111111111111',
+  })
+
+  assert.ok(result.riskFlags.includes('TRANSFER_HOOK_ACTIVE'))
+  assert.ok(result.score<=60)
+  assert.notEqual(result.signal,'BUY SETUP')
+})
