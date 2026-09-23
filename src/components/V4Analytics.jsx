@@ -91,6 +91,8 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
   const [riskPercent,setRiskPercent]=useState('1')
   const [stopDistance,setStopDistance]=useState('15')
   const [accountValue,setAccountValue]=useState(walletEquity?String(walletEquity):'')
+  const [takeProfitPercent,setTakeProfitPercent]=useState('50')
+  const [scaleOutPercent,setScaleOutPercent]=useState('25')
 
   useEffect(()=>{
     setEntryMarketCap(scan?.market?.marketCap?String(Math.round(scan.market.marketCap)):'')
@@ -203,6 +205,42 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
     return {label:'MIXED',tone:'mid',text:'At least one layer is neutral or watch-only. Confirmation is incomplete.'}
   },[analytics?.available,analytics?.trend,scan?.intelligence?.signal])
 
+  const decisionSummary=useMemo(()=>{
+    const score=Number(scan?.intelligence?.score||0)
+    const signal=String(scan?.intelligence?.signal||'WATCH')
+    const chartTrend=analytics?.trend||'UNKNOWN'
+    const tapeNet=Number(tape?.summary?.netFlowUsd||0)
+    const tapeBuyPct=Number(tape?.summary?.buyVolumePercent||50)
+    let strength=0
+    const positives=[]
+    const warnings=[]
+
+    if(['BUY SETUP','LEAN BUY'].includes(signal)){strength+=2;positives.push('Core RCXT signal is constructive')}
+    if(['REDUCE','SELL / AVOID'].includes(signal)){strength-=2;warnings.push('Core RCXT signal is defensive')}
+    if(score>=75){strength+=1;positives.push('RCXT score is strong')}
+    if(score<50){strength-=1;warnings.push('RCXT score is weak')}
+    if(chartTrend==='BULLISH'){strength+=1;positives.push('Candle structure is bullish')}
+    if(chartTrend==='BEARISH'){strength-=1;warnings.push('Candle structure is bearish')}
+    if(tapeNet>0&&tapeBuyPct>=55){strength+=1;positives.push('Recent USD flow favors buyers')}
+    if(tapeNet<0&&tapeBuyPct<=45){strength-=1;warnings.push('Recent USD flow favors sellers')}
+    if(Number(scan?.market?.liquidityUsd||0)<5000){strength-=2;warnings.push('Liquidity is very thin')}
+    if(scan?.intelligence?.risk==='EXTREME'){strength-=2;warnings.push('RCXT structural risk is extreme')}
+
+    const label=strength>=4?'STRONG CONFLUENCE':strength>=2?'CONSTRUCTIVE':strength<=-3?'HIGH RISK':strength<=-1?'DEFENSIVE':'MIXED'
+    return {label,strength,positives:positives.slice(0,4),warnings:warnings.slice(0,4)}
+  },[scan?.intelligence?.score,scan?.intelligence?.signal,scan?.intelligence?.risk,scan?.market?.liquidityUsd,analytics?.trend,tape?.summary?.netFlowUsd,tape?.summary?.buyVolumePercent])
+
+  const exitPlan=useMemo(()=>{
+    const position=Math.max(0,Number(investment||0))
+    const tp=Math.max(0,Number(takeProfitPercent||0))
+    const scale=Math.max(0,Math.min(100,Number(scaleOutPercent||0)))
+    const stop=Math.max(0,Number(stopDistance||0))
+    const targetValue=position*(1+tp/100)
+    const stopValue=position*(1-stop/100)
+    const firstScaleValue=targetValue*(scale/100)
+    const runnerValue=targetValue-firstScaleValue
+    return {position,tp,scale,stop,targetValue,stopValue,firstScaleValue,runnerValue}
+  },[investment,takeProfitPercent,scaleOutPercent,stopDistance])
   async function copyProfitList(){
     if(!ladder.length) return
     const lines=[
@@ -312,10 +350,74 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
         </article>
       </div>
 
+      <div className="v4TwoCol">
+        <article className="panel decisionPanel">
+          <div className="v4PanelHead"><div><span>DECISION STACK</span><h3>RCXT + chart + tape confluence</h3></div></div>
+          <div className={'decisionBadge '+decisionSummary.label.replaceAll(' ','-').toLowerCase()}>{decisionSummary.label}</div>
+          <div className="decisionColumns">
+            <div><span>CONFIRMING</span>{(decisionSummary.positives.length?decisionSummary.positives:['No strong confirmation yet']).map(item=><p key={item}>+ {item}</p>)}</div>
+            <div><span>CONFLICTS / RISKS</span>{(decisionSummary.warnings.length?decisionSummary.warnings:['No major conflict detected']).map(item=><p key={item}>− {item}</p>)}</div>
+          </div>
+          <small>This combines independent layers; it is not a probability of profit.</small>
+        </article>
+
+        <article className="panel exitPlannerPanel">
+          <div className="v4PanelHead"><div><span>EXIT PLANNER</span><h3>Plan the trade before the trade plans you</h3></div></div>
+          <div className="plannerInputs">
+            <label><span>TP target %</span><input inputMode="decimal" value={takeProfitPercent} onChange={e=>setTakeProfitPercent(e.target.value)}/></label>
+            <label><span>Scale out %</span><input inputMode="decimal" value={scaleOutPercent} onChange={e=>setScaleOutPercent(e.target.value)}/></label>
+            <label><span>Stop %</span><input inputMode="decimal" value={stopDistance} onChange={e=>setStopDistance(e.target.value)}/></label>
+          </div>
+          <div className="plannerResults">
+            <div><span>Target value</span><b>{money(exitPlan.targetValue)}</b></div>
+            <div><span>Stop value</span><b>{money(exitPlan.stopValue)}</b></div>
+            <div><span>Take off at TP</span><b>{money(exitPlan.firstScaleValue)}</b><small>{exitPlan.scale}% scale</small></div>
+            <div><span>Runner</span><b>{money(exitPlan.runnerValue)}</b></div>
+          </div>
+          <p>Simple planning math only. Real fills can differ because of liquidity, slippage, fees, taxes, and fast price changes.</p>
+        </article>
+      </div>
+
       <article className="panel profitLadderPanel">
         <div className="v4PanelHead">
           <div><span>PROFIT LIST</span><h3>Instant “what if it hits…” market-cap math</h3></div>
           <button className="toolButton" onClick={copyProfitList}>Copy profit list</button>
+        </div>
+        <div className="quickProfitPresets">
+          {[20,40,100].map(value=>(
+            <button key={value} onClick={()=>setInvestment(String(value))}>{'
+          <label><span>Position ($)</span><input inputMode="decimal" value={investment} onChange={e=>setInvestment(e.target.value)}/></label>
+          <label><span>Entry MC ($)</span><input inputMode="decimal" value={entryMarketCap} onChange={e=>setEntryMarketCap(e.target.value)}/></label>
+          <label><span>Custom target MC</span><input inputMode="decimal" value={customTarget} onChange={e=>setCustomTarget(e.target.value)} placeholder="100000"/></label>
+          <label><span>Est. total costs %</span><input inputMode="decimal" value={estimatedCosts} onChange={e=>setEstimatedCosts(e.target.value)}/></label>
+        </div>
+        {customProjection?(
+          <div className="customProfitResult">
+            <span>Custom target</span><strong>{money(customProjection.netValue)}</strong>
+            <b>{money(customProjection.netProfit)} est. P/L · {customProjection.multiple.toFixed(2)}× MC</b>
+          </div>
+        ):null}
+        <div className="profitTableWrap">
+          <table className="profitTable">
+            <thead><tr><th>Target MC</th><th>MC multiple</th><th>Position value</th><th>Est. P/L</th><th>ROI</th></tr></thead>
+            <tbody>
+              {ladder.map(row=>(
+                <tr key={row.targetMarketCap}>
+                  <td>{money(row.targetMarketCap)}</td><td>{row.multiple.toFixed(2)}×</td><td>{money(row.netValue)}</td>
+                  <td className={row.netProfit>=0?'positiveText':'negativeText'}>{money(row.netProfit)}</td><td>{pct(row.roiPercent,0)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="profitNote">MC-ratio math assumes comparable supply. Real fills differ with slippage, liquidity, fees, taxes, supply changes, and execution.</p>
+      </article>
+    </div>
+  )
+}
++value+' position'}</button>
+          ))}
+          {scan?.market?.marketCap ? <button onClick={()=>setEntryMarketCap(String(Math.round(scan.market.marketCap)))}>Use live MC</button> : null}
         </div>
         <div className="profitInputs">
           <label><span>Position ($)</span><input inputMode="decimal" value={investment} onChange={e=>setInvestment(e.target.value)}/></label>
