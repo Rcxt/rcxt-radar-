@@ -970,7 +970,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
           <div className="plannerResults">
             <div><span>Risk budget</span><b>{money(riskPlan.riskBudget)}</b></div>
             <div><span>Max position</span><b>{money(riskPlan.positionSize)}</b></div>
-            <div><span>% of account</span><b>{riskPlan.positionPercent.toFixed(1)}%</b></div>
+            <div><span>% of account</span><b>{fixed(riskPlan.positionPercent,1,'0.0')}%</b></div>
             <div><span>Liquidity burden</span><b className={liquidityBurden?.label==='LOW'?'good':liquidityBurden?.label==='MODERATE'?'mid':'bad'}>{liquidityBurden?fixed(liquidityBurden.percent,2)+'%':'—'}</b><small>{liquidityBurden?.label||'No liquidity data'}</small></div>
           </div>
           <p>Uses your chosen stop distance. Liquidity burden compares planned position size with reported pool liquidity. Real losses can exceed the estimate because of slippage or failed exits.</p>
