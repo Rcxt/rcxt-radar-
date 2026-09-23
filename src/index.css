@@ -2645,3 +2645,5 @@ input,select,textarea{font-size:16px}
   .supplyWhaleHead small{text-align:left}
   .supplyWhaleList{grid-template-columns:1fr}
 }
+
+.calibrationCaution{display:block;margin-top:9px;font-size:7px;line-height:1.45;color:#556576}
