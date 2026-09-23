@@ -78,7 +78,22 @@ export default async function handler(req,res){
     const largestBuy=buys.reduce((max,trade)=>Math.max(max,trade.volumeUsd),0)
     const largestSell=sells.reduce((max,trade)=>Math.max(max,trade.volumeUsd),0)
     const largestTrade=Math.max(largestBuy,largestSell)
-    const wallets=new Set(trades.map(trade=>trade.wallet).filter(Boolean))
+    const walletStats=new Map()
+    for(const trade of trades){
+      if(!trade.wallet) continue
+      const current=walletStats.get(trade.wallet)||{count:0,volume:0}
+      current.count+=1
+      current.volume+=trade.volumeUsd
+      walletStats.set(trade.wallet,current)
+    }
+    const wallets=new Set(walletStats.keys())
+    const walletRows=[...walletStats.entries()].map(([wallet,stats])=>({wallet,...stats}))
+    const topWalletByCount=walletRows.reduce((best,row)=>row.count>(best?.count||0)?row:best,null)
+    const topWalletByVolume=walletRows.reduce((best,row)=>row.volume>(best?.volume||0)?row:best,null)
+    const microTrades=trades.filter(trade=>trade.volumeUsd<1)
+    const tinyTrades=trades.filter(trade=>trade.volumeUsd<5)
+    const repeatWalletTrades=walletRows.filter(row=>row.count>=5).reduce((sum,row)=>sum+row.count,0)
+    const avgToMedianSkew=medianSize>0?(totalVolume/Math.max(1,trades.length))/medianSize:0
 
     const summary={
       sampleSize:trades.length,
@@ -93,6 +108,12 @@ export default async function handler(req,res){
       largestBuyUsd:Number(largestBuy.toFixed(2)),
       largestSellUsd:Number(largestSell.toFixed(2)),
       uniqueWallets:wallets.size,
+      microTradePercent:trades.length?Number((microTrades.length/trades.length*100).toFixed(1)):0,
+      tinyTradePercent:trades.length?Number((tinyTrades.length/trades.length*100).toFixed(1)):0,
+      repeatWalletTradePercent:trades.length?Number((repeatWalletTrades/trades.length*100).toFixed(1)):0,
+      topWalletTradeSharePercent:trades.length&&topWalletByCount?Number((topWalletByCount.count/trades.length*100).toFixed(1)):0,
+      topWalletVolumeSharePercent:totalVolume&&topWalletByVolume?Number((topWalletByVolume.volume/totalVolume*100).toFixed(1)):0,
+      averageToMedianSizeRatio:Number(avgToMedianSkew.toFixed(1)),
       whaleThresholdUsd:Number(whaleThreshold.toFixed(2)),
       whaleBuyCount:whaleBuys.length,
       whaleSellCount:whaleSells.length,
@@ -108,6 +129,11 @@ export default async function handler(req,res){
     if(summary.whaleBuyVolumeUsd>summary.whaleSellVolumeUsd*1.5&&summary.whaleBuyCount) flags.push('WHALE_BUY_PRESSURE')
     if(summary.topTradeSharePercent>=35) flags.push('TOP_TRADE_CONCENTRATED')
     if(summary.uniqueWallets<=5&&summary.sampleSize>=15) flags.push('LOW_WALLET_DIVERSITY')
+    if(summary.microTradePercent>=60&&summary.sampleSize>=30) flags.push('MICROTRADE_NOISE')
+    if(summary.repeatWalletTradePercent>=55&&summary.sampleSize>=30) flags.push('REPEAT_WALLET_CHURN')
+    if(summary.topWalletTradeSharePercent>=25&&summary.sampleSize>=30) flags.push('WALLET_ACTIVITY_CONCENTRATION')
+    if(summary.topWalletVolumeSharePercent>=45&&summary.sampleSize>=15) flags.push('WALLET_VOLUME_CONCENTRATION')
+    if(summary.averageToMedianSizeRatio>=20&&summary.sampleSize>=30) flags.push('TRADE_SIZE_SKEW')
 
     const result={
       success:true,
