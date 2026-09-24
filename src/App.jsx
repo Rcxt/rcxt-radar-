@@ -1387,7 +1387,7 @@ export default function Home() {
           <span className="overline">MARKET INTELLIGENCE TERMINAL</span>
           <h1>Trade the data.<br /><span>Not the emotion.</span></h1>
           <p>
-            Live Solana wallet tracking, contract-risk checks, order-flow analysis,
+            Multichain token scanning, Solana wallet tracking, contract-risk checks, order-flow analysis,
             deterministic trade signals, and an AI analyst that explains the setup.
           </p>
         </div>
@@ -1807,7 +1807,7 @@ export default function Home() {
             <div><span>03</span><b>Order Flow</b><small>Buy/sell pressure</small></div>
             <div><span>04</span><b>Momentum</b><small>5m → 24h structure</small></div>
             <div><span>05</span><b>Maturity</b><small>Pair-age risk</small></div>
-            <div><span>06</span><b>Contract</b><small>Mint + freeze authority</small></div>
+            <div><span>06</span><b>Contract</b><small>Chain-specific controls</small></div>
           </div>
         </section>
       )}
