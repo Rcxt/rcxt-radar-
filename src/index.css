@@ -3654,3 +3654,19 @@ body { overflow: visible; overscroll-behavior-y: auto; }
 .fatalDetails{margin-top:12px;border-top:1px solid #1b2933;padding-top:10px}
 .fatalDetails summary{cursor:pointer;color:#617587;font-size:8px}
 .fatalDetails code{display:block;margin-top:8px;color:#8d9bab;font-size:8px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
+
+
+/* V6.1 multichain scanner */
+.scanBar.multiChain{grid-template-columns:minmax(132px,.34fr) minmax(0,1fr) auto}
+.chainSelect{
+  min-width:0;border:1px solid #1c2a35;background:#0b1218;color:#aebac6;border-radius:9px;
+  padding:0 30px 0 10px;font-size:9px;font-weight:800;outline:none;appearance:none;
+  background-image:linear-gradient(45deg,transparent 50%,#687b8c 50%),linear-gradient(135deg,#687b8c 50%,transparent 50%);
+  background-position:calc(100% - 14px) 50%,calc(100% - 10px) 50%;background-size:4px 4px,4px 4px;background-repeat:no-repeat
+}
+.chainSelect:focus{border-color:#365a70;color:#e5edf5}
+.chainExplorerLink{border-color:#3b3a59;color:#cfc8ff;background:#11101c}
+@media(max-width:620px){
+  .scanBar.multiChain{grid-template-columns:1fr}
+  .chainSelect{min-height:44px;font-size:16px;padding-left:11px}
+}
