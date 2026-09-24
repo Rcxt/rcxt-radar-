@@ -162,7 +162,7 @@ export default async function handler(req,res){
       buyVolumeUsd:Number(buyVolume.toFixed(2)),
       sellVolumeUsd:Number(sellVolume.toFixed(2)),
       netFlowUsd:Number((buyVolume-sellVolume).toFixed(2)),
-      buyVolumePercent:totalVolume?Number((buyVolume/totalVolume*100).toFixed(1)):50,
+      buyVolumePercent:totalVolume?Number((buyVolume/totalVolume*100).toFixed(1)):null,
       averageTradeUsd:trades.length?Number((totalVolume/trades.length).toFixed(2)):0,
       medianTradeUsd:Number(medianSize.toFixed(2)),
       largestBuyUsd:Number(largestBuy.toFixed(2)),
