@@ -23,6 +23,12 @@ function wait(ms){
 const cache=new Map()
 const addressPattern=/^[1-9A-HJ-NP-Za-km-z]{32,44}$/
 
+function finiteOrNull(value){
+  if(value===null||value===undefined||value==='') return null
+  const number=Number(value)
+  return Number.isFinite(number)?number:null
+}
+
 function cached(key){
   const hit=cache.get(key)
   return hit&&Date.now()-hit.time<CACHE_TTL?hit.value:null
@@ -138,9 +144,10 @@ export default async function handler(req,res){
           address:event.primaryMint,
           symbol:pair?.baseToken?.symbol||null,
           name:pair?.baseToken?.name||null,
-          priceUsd:Number(pair?.priceUsd||0)||null,
-          marketCap:Number(pair?.marketCap||pair?.fdv||0)||null,
-          liquidityUsd:Number(pair?.liquidity?.usd||0)||null,
+          priceUsd:finiteOrNull(pair?.priceUsd),
+          marketCap:finiteOrNull(pair?.marketCap),
+          fdv:finiteOrNull(pair?.fdv),
+          liquidityUsd:finiteOrNull(pair?.liquidity?.usd),
           dex:pair?.dexId||null,
           pairAddress:pair?.pairAddress||null,
           url:pair?.url||null,
