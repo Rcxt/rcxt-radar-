@@ -1778,7 +1778,7 @@ export default function Home() {
                     <ScoreRing score={item.intelligence.score} />
                     <div>
                       <small>RCXT RISK-ADJUSTED SCORE</small>
-                      <b>{item.intelligence.grade} · {item.intelligence.confidence}% confidence</b>
+                      <b>{item.intelligence.grade} · {item.intelligence.confidence}% evidence confidence</b>
                     </div>
                   </div>
                   <ScoreAxes intelligence={item.intelligence} compact />
@@ -2723,7 +2723,7 @@ function ScanVerdict({ scan }) {
         </div>
         <div className="scanVerdictScore">
           <strong>{intel.score ?? '—'}<small>/100</small></strong>
-          <span>{intel.confidence ?? '—'}% confidence</span>
+          <span>{intel.confidence ?? '—'}% evidence confidence</span>
           <em>{intel.risk || 'UNKNOWN'} risk</em>
         </div>
       </div>
