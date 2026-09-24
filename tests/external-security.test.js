@@ -261,7 +261,7 @@ test('GoPlus and Birdeye add independent authority votes',()=>{
   assert.equal(merged.sources.birdeye,true)
 })
 
-test('GoPlus blacklist is preserved as hard structural evidence',()=>{
+test('GoPlus blacklist capability is caution evidence, not an automatic structural veto',()=>{
   const merged=mergeSecurityEvidence(onchainSafe(),{
     rugcheck:{available:false},
     jupiter:{available:false},
@@ -276,8 +276,9 @@ test('GoPlus blacklist is preserved as hard structural evidence',()=>{
     birdeye:{available:false},
   })
 
-  assert.ok(merged.external.hardRiskFlags.includes('GOPLUS_BLACKLIST'))
-  assert.ok(merged.external.dangerRiskCount>=1)
+  assert.ok(merged.external.softRiskFlags.includes('GOPLUS_BLACKLIST_CAPABILITY'))
+  assert.ok(!merged.external.hardRiskFlags.includes('GOPLUS_BLACKLIST'))
+  assert.equal(merged.external.dangerRiskCount,0)
 })
 
 test('Jupiter audit isSus false is not treated as suspicious',()=>{
@@ -311,6 +312,10 @@ test('normalizes GoPlus EVM honeypot, taxes and holder evidence',()=>{
         transfer_pausable:'0',
         is_proxy:'1',
         is_mintable:'0',
+        slippage_modifiable:'1',
+        personal_slippage_modifiable:'0',
+        is_anti_whale:'1',
+        anti_whale_modifiable:'1',
         buy_tax:'0.02',
         sell_tax:'0.04',
         holder_count:'400',
@@ -327,6 +332,10 @@ test('normalizes GoPlus EVM honeypot, taxes and holder evidence',()=>{
   assert.equal(normalized.openSource,true)
   assert.equal(normalized.honeypot,false)
   assert.equal(normalized.proxy,true)
+  assert.equal(normalized.slippageModifiable,true)
+  assert.equal(normalized.personalSlippageModifiable,false)
+  assert.equal(normalized.antiWhale,true)
+  assert.equal(normalized.antiWhaleModifiable,true)
   assert.equal(normalized.buyTaxPercent,2)
   assert.equal(normalized.sellTaxPercent,4)
   assert.equal(normalized.top1Percent,12)
@@ -349,6 +358,7 @@ test('EVM GoPlus hard danger is preserved without Solana authority assumptions',
       model:'evm',
       openSource:true,
       honeypot:true,
+      cannotBuy:true,
       cannotSellAll:true,
       hiddenOwner:true,
       blacklistActive:false,
@@ -361,8 +371,57 @@ test('EVM GoPlus hard danger is preserved without Solana authority assumptions',
   assert.equal(merged.external.providerCount,2)
   assert.ok(merged.external.providers.includes('evm-rpc'))
   assert.ok(merged.external.hardRiskFlags.includes('GOPLUS_HONEYPOT'))
-  assert.ok(merged.external.hardRiskFlags.includes('GOPLUS_CANNOT_SELL'))
+  assert.ok(merged.external.hardRiskFlags.includes('GOPLUS_CANNOT_BUY'))
   assert.ok(merged.external.hardRiskFlags.includes('GOPLUS_HIDDEN_OWNER'))
+  assert.ok(merged.external.softRiskFlags.includes('GOPLUS_CANNOT_SELL_ALL'))
   assert.equal(merged.external.authority.mint.votes.length,0)
   assert.equal(merged.external.authority.freeze.votes.length,0)
+})
+
+
+test('cannot-sell-all alone is an execution caution rather than a honeypot verdict',()=>{
+  const merged=mergeSecurityEvidence({
+    available:true,
+    securityModel:'evm-token',
+    source:'evm-rpc',
+    contractCodePresent:true,
+  },{
+    rugcheck:{available:false},
+    jupiter:{available:false},
+    birdeye:{available:false},
+    goplus:{
+      available:true,
+      model:'evm',
+      openSource:true,
+      cannotSellAll:true,
+      honeypot:false,
+      cannotBuy:false,
+      malicious:false,
+      hiddenOwner:false,
+      ownerChangeBalance:false,
+      selfDestruct:false,
+      gasAbuse:false,
+    },
+  })
+
+  assert.ok(merged.external.softRiskFlags.includes('GOPLUS_CANNOT_SELL_ALL'))
+  assert.ok(!merged.external.hardRiskFlags.includes('GOPLUS_CANNOT_SELL'))
+  assert.equal(merged.external.dangerRiskCount,0)
+})
+
+test('GoPlus gas abuse is preserved as hard danger evidence',()=>{
+  const merged=mergeSecurityEvidence({
+    available:true,
+    securityModel:'evm-token',
+    source:'evm-rpc',
+    contractCodePresent:true,
+  },{
+    rugcheck:{available:false},
+    jupiter:{available:false},
+    birdeye:{available:false},
+    goplus:{available:true,model:'evm',gasAbuse:true},
+  })
+
+  assert.ok(merged.external.hardRiskFlags.includes('GOPLUS_GAS_ABUSE'))
+  assert.ok(merged.external.dangerRiskCount>=1)
 })
