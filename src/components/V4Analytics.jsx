@@ -788,7 +788,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
 
             </DetailSection>
             {marketCapMap.available ? (
-              <DetailSection title="Market-cap map" description="Entry, breakout and invalidation scenarios">
+              <DetailSection id="rcxt-plan-map" title="Market-cap map" description="Entry, breakout and invalidation scenarios">
               <div className="marketCapMapPanel">
                 <div className="marketCapMapHead">
                   <div>
@@ -1190,7 +1190,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
       </article>
 </DetailSection>
 
-      <DetailSection title="Profit calculator" description="What your position could be worth at each market cap">
+      <DetailSection id="rcxt-profit-list" title="Profit calculator" description="What your position could be worth at each market cap">
 <article className="panel profitLadderPanel">
         <div className="v4PanelHead">
           <div><span>PROFIT LIST</span><h3>Instant “what if it hits…” market-cap math</h3></div>
