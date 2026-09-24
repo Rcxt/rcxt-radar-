@@ -392,7 +392,7 @@ export default function Home() {
     const requestId = ++liveRequestIdRef.current
 
     try {
-      const response = await fetch(`/api/live?address=${encodeURIComponent(target)}&chain=${encodeURIComponent(selectedChain)}`, {
+      const response = await fetch(`/api/scan?address=${encodeURIComponent(target)}&chain=${encodeURIComponent(selectedChain)}&mode=live&persist=0`, {
         cache:'no-store',
       })
       const data = await response.json()
