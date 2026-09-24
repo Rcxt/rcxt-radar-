@@ -73,6 +73,10 @@ export default async function handler(req,res){
     try{body=JSON.parse(body)}catch{return res.status(400).json({success:false,error:'Invalid JSON'})}
   }
 
+  let bodySize=0
+  try{bodySize=JSON.stringify(body||{}).length}catch{return res.status(400).json({success:false,error:'Invalid request payload'})}
+  if(bodySize>150_000) return res.status(413).json({success:false,error:'Request too large'})
+
   const scan=body?.scan
   const social=body?.social || null
   const marketContext=body?.marketContext || null
@@ -156,7 +160,7 @@ export default async function handler(req,res){
   }
 
   const analysis=mode==='social'?fallbackSocialAnalysis(scan,social):fallbackAnalysis(scan,social,mode)
-  const fallbackModel=mode==='social'?'deterministic-x-social-v5':'deterministic-fallback-v5'
+  const fallbackModel=mode==='social'?'deterministic-x-social-v5':'deterministic-fallback-v6.1'
   await logAiAnalysis(
     {scan,model:fallbackModel,analysis,social},
     req.headers?.['x-vercel-oidc-token']
