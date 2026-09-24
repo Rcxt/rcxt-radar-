@@ -28,6 +28,27 @@ function tiny(value){
   return '$'+n.toPrecision(5)
 }
 
+function planChain(scan){
+  return String(scan?.chain?.id||'solana').toLowerCase()
+}
+
+function planStorageKey(scan){
+  const chain=planChain(scan)
+  const raw=String(scan?.address||'')
+  const address=chain==='solana'?raw:raw.toLowerCase()
+  return 'rcxt-trade-plan:'+chain+':'+address
+}
+
+function legacyPlanStorageKey(scan){
+  return 'rcxt-trade-plan:'+String(scan?.address||'')
+}
+
+function tokenUrl(scan){
+  const params=new URLSearchParams({token:String(scan?.address||'')})
+  params.set('chain',planChain(scan))
+  return '/?'+params.toString()
+}
+
 function pct(value,digits=1){
   const n=Number(value)
   return Number.isFinite(n)?(n>=0?'+':'')+n.toFixed(digits)+'%':'—'
@@ -122,9 +143,21 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
 
   useEffect(()=>{
     setEntryMarketCap(scan?.market?.marketCap?String(Math.round(scan.market.marketCap)):'')
+    setPlanThesis('')
+    setPlanInvalidation('')
+    setPlanSavedAt(null)
+    setPlanAlerts(false)
+    setPlanStatus('DRAFT')
+    setPlanEnteredAt(null)
+    setPlanClosedAt(null)
+    setPlanExitMarketCap(null)
+    setPlanExitValue(null)
+    setPlanExitPnl(null)
     if(!scan?.address) return
     try{
-      const saved=JSON.parse(localStorage.getItem('rcxt-trade-plan:'+scan.address)||'null')
+      const primary=localStorage.getItem(planStorageKey(scan))
+      const legacy=planChain(scan)==='solana'?localStorage.getItem(legacyPlanStorageKey(scan)):null
+      const saved=JSON.parse(primary||legacy||'null')
       if(saved){
         if(saved.investment!=null) setInvestment(String(saved.investment))
         if(saved.entryMarketCap!=null) setEntryMarketCap(String(saved.entryMarketCap))
@@ -141,20 +174,11 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
         setPlanExitMarketCap(saved.exitMarketCap??null)
         setPlanExitValue(saved.exitValue??null)
         setPlanExitPnl(saved.exitPnl??null)
-      }else{
-        setPlanThesis('')
-        setPlanInvalidation('')
-        setPlanSavedAt(null)
-        setPlanAlerts(false)
-        setPlanStatus('DRAFT')
-        setPlanEnteredAt(null)
-        setPlanClosedAt(null)
-        setPlanExitMarketCap(null)
-        setPlanExitValue(null)
-        setPlanExitPnl(null)
       }
-    }catch{}
-  },[scan?.address])
+    }catch{
+      // Malformed storage must never leave the previous token's plan visible.
+    }
+  },[scan?.address,scan?.chain?.id])
 
   useEffect(()=>{
     if(walletEquity>0) setAccountValue(String(Number(walletEquity).toFixed(2)))
@@ -543,17 +567,17 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
         const registration=await navigator.serviceWorker.ready
         await registration.showNotification(title,{
           body,
-          tag:'rcxt-plan-'+scan?.address,
+          tag:'rcxt-plan-'+planChain(scan)+'-'+scan?.address,
           renotify:true,
-          data:{url:'/?token='+encodeURIComponent(scan?.address||'')},
+          data:{url:tokenUrl(scan)},
         })
         return
       }
-      const alert = new Notification(title,{body,tag:'rcxt-plan-'+scan?.address})
+      const alert = new Notification(title,{body,tag:'rcxt-plan-'+planChain(scan)+'-'+scan?.address})
       alert.onclick = () => {
         alert.close()
         window.focus()
-        window.location.assign('/?token=' + encodeURIComponent(scan?.address || ''))
+        window.location.assign(tokenUrl(scan))
       }
     }catch{}
   }
@@ -572,7 +596,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
 
     if(scan?.address){
       try{
-        const key='rcxt-trade-plan:'+scan.address
+        const key=planStorageKey(scan)
         const existing=JSON.parse(localStorage.getItem(key)||'null')
         if(existing){
           localStorage.setItem(key,JSON.stringify({...existing,planAlerts:next}))
@@ -586,6 +610,8 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
       token:scan?.token?.symbol||'TOKEN',
       name:scan?.token?.name||'',
       address:scan?.address||'',
+      chain:planChain(scan),
+      chainLabel:scan?.chain?.label||planChain(scan),
       investment:Number(investment||0),
       entryMarketCap:Number(entryMarketCap||0),
       takeProfitPercent:Number(takeProfitPercent||0),
@@ -609,7 +635,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
     if(!scan?.address) return null
     const payload=planPayload(overrides)
     try{
-      localStorage.setItem('rcxt-trade-plan:'+scan.address,JSON.stringify(payload))
+      localStorage.setItem(planStorageKey(scan),JSON.stringify(payload))
       setPlanSavedAt(payload.savedAt)
       window.dispatchEvent(new CustomEvent('rcxt-trade-plan-updated',{detail:payload}))
       return payload
