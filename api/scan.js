@@ -1,4 +1,4 @@
-import { getBestPair, resolveDexChain } from '../lib/dexscreener.js'
+import { getBestPair, hasMeaningfulChainAmbiguity, resolveDexChainCandidates } from '../lib/dexscreener.js'
 import { analyzePair } from '../lib/intelligence.js'
 import { getMintSecurity, looksLikeSolanaAddress } from '../lib/solana.js'
 import { getEvmSecurity } from '../lib/evm-security.js'
@@ -37,7 +37,24 @@ export default async function handler(req, res) {
   }
 
   if (!chain) {
-    chain = looksLikeSolanaAddress(rawAddress) ? getChain('solana') : await resolveDexChain(rawAddress)
+    if (looksLikeSolanaAddress(rawAddress)) {
+      chain=getChain('solana')
+    } else {
+      const candidates=await resolveDexChainCandidates(rawAddress)
+      if(hasMeaningfulChainAmbiguity(candidates)){
+        return res.status(409).json({
+          success:false,
+          error:'This contract has meaningful markets on multiple supported chains. Select the network manually so RCXT does not score the wrong deployment.',
+          chainCandidates:candidates.slice(0,5).map((candidate)=>({
+            id:candidate.chain.id,
+            label:candidate.chain.label,
+            liquidityUsd:candidate.liquidityUsd,
+            volume24hUsd:candidate.volume24hUsd,
+          })),
+        })
+      }
+      chain=candidates[0]?.chain||null
+    }
   }
   if (!chain) {
     return res.status(404).json({ success:false, error:'Could not identify an active supported chain for this contract. Select the chain manually.' })
