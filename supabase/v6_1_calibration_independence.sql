@@ -112,3 +112,21 @@ group by chain_family, score_version,
   signal, risk, horizon;
 
 alter view public.score_calibration_clean set (security_invoker = true);
+
+
+create or replace view public.score_component_outcomes_chain_clean
+with (security_invoker=true) as
+select
+  chain_family,
+  score_version,
+  horizon,
+  count(*)::integer as setup_samples,
+  round(corr(setup_score::double precision, return_pct::double precision)::numeric,4) as setup_return_corr,
+  count(*)::integer as execution_samples,
+  round(corr(execution_score::double precision, return_pct::double precision)::numeric,4) as execution_return_corr,
+  count(*)::integer as safety_samples,
+  round(corr(safety_score::double precision, return_pct::double precision)::numeric,4) as safety_return_corr,
+  count(*)::integer as data_quality_samples,
+  round(corr(data_quality_score::double precision, return_pct::double precision)::numeric,4) as data_quality_return_corr
+from public.score_calibration_clean
+group by chain_family, score_version, horizon;
