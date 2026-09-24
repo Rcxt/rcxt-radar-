@@ -3670,3 +3670,42 @@ body { overflow: visible; overscroll-behavior-y: auto; }
   .scanBar.multiChain{grid-template-columns:1fr}
   .chainSelect{min-height:44px;font-size:16px;padding-left:11px}
 }
+
+.scanVerdictQuickTools{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:5px;
+  margin:0 0 10px auto;
+  width:100%;
+  max-width:110px;
+}
+.scanVerdictQuickTools button{
+  appearance:none;
+  border:1px solid #294656;
+  border-radius:8px;
+  background:#0c171e;
+  color:#b9d9e8;
+  min-height:27px;
+  padding:5px 8px;
+  font:inherit;
+  font-size:7px;
+  font-weight:900;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  cursor:pointer;
+}
+.scanVerdictQuickTools button:first-child{
+  border-color:#355e70;
+  color:#7fe0ff;
+}
+.scanVerdictQuickTools button:last-child{
+  border-color:#315644;
+  color:#7ce8a7;
+}
+.scanVerdictQuickTools button:active{transform:translateY(1px)}
+#rcxt-plan-map,#rcxt-profit-list{scroll-margin-top:96px}
+
+@media(max-width:620px){
+  .scanVerdictQuickTools{max-width:104px;margin-bottom:9px}
+  .scanVerdictQuickTools button{min-height:28px;font-size:7px;padding:5px 6px}
+}
