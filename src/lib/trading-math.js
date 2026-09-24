@@ -214,7 +214,8 @@ export function buildExecutionChecklist({scan,analytics,tape,positionSize=0}){
   const marketM5=optionalNumber(scan?.market?.priceChange?.m5)
   const flowNet=tape?optionalNumber(tape?.netFlowUsd):null
   const flowBuyPct=tape?optionalNumber(tape?.buyVolumePercent):null
-  const flowKnown=Number(tape?.sampleSize||0)>0&&flowNet!==null&&flowBuyPct!==null
+  const tapeHasSample=Boolean(tape)&&(tape?.sampleSize==null||Number(tape.sampleSize)>0)
+  const flowKnown=tapeHasSample&&flowNet!==null&&flowBuyPct!==null
   const chaseValue=chartAvailable?chartM15:marketM5
 
   const items=[
@@ -338,7 +339,7 @@ export function buildEntryQuality({scan,analytics,tape}){
     if(atrPct>=18){score-=8;warnings.push('Per-candle volatility is extreme')}
   }
 
-  if(tape&&Number(tape?.sampleSize||0)>0&&optionalNumber(tape?.netFlowUsd)!==null&&optionalNumber(tape?.buyVolumePercent)!==null){
+  if(tape&&(tape?.sampleSize==null||Number(tape.sampleSize)>0)&&optionalNumber(tape?.netFlowUsd)!==null&&optionalNumber(tape?.buyVolumePercent)!==null){
     evidence+=1
     const net=Number(tape.netFlowUsd)
     const buyPct=Number(tape.buyVolumePercent)
@@ -462,7 +463,7 @@ export function buildRugRiskChecklist({scan,tape}){
   const priceKnown=h1!==null||h24!==null
   add('price-structure','Price stretch',!priceKnown?'unknown':((h1!==null&&h1>150)||(h24!==null&&h24>1000))?'warning':(h1!==null&&h1<-40)?'critical':((h1!==null&&h1>60)||(h24!==null&&h24>400))?'watch':'pass',!priceKnown?'1h/24h momentum data is unavailable.':`Price change: 1h ${h1==null?'—':(h1>=0?'+':'')+h1.toFixed(1)+'%'} · 24h ${h24==null?'—':(h24>=0?'+':'')+h24.toFixed(1)+'%'}.`,'measured')
 
-  if(tape&&Number(tape?.sampleSize||0)>0){
+  if(tape&&(tape?.sampleSize==null||Number(tape.sampleSize)>0)){
     const manipulationFlags=['MICROTRADE_NOISE','REPEAT_WALLET_CHURN','WALLET_ACTIVITY_CONCENTRATION','WALLET_VOLUME_CONCENTRATION','TRADE_SIZE_SKEW','WHALE_FLOW_CONCENTRATED','MULTI_WHALE_DISTRIBUTION'].filter(flag=>tapeFlags.includes(flag))
     add('trade-quality','Recent trade quality',manipulationFlags.length>=3?'critical':manipulationFlags.length?'warning':'pass',manipulationFlags.length?manipulationFlags.map(flag=>flag.replaceAll('_',' ').toLowerCase()).join(' · '):'No major recent tape-quality anomaly was detected in the sampled trades.','measured')
   }else{
