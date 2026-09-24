@@ -6,6 +6,12 @@ import { rateLimit, applyRateHeaders } from '../lib/rate-limit.js'
 
 const WRAPPED_SOL = 'So11111111111111111111111111111111111111112'
 
+function finiteOrNull(value){
+  if(value===null||value===undefined||value==='') return null
+  const number=Number(value)
+  return Number.isFinite(number)?number:null
+}
+
 function getQuery(req, name, fallback = '') {
   try {
     const url = new URL(req.url || '/', 'https://rcxt.local')
@@ -39,10 +45,13 @@ export default async function handler(req,res){
 
     const holdings=snapshot.holdings.map((holding)=>{
       const pair=pairs.get(holding.mint)
-      const priceUsd=Number(pair?.priceUsd||0)
-      const valueUsd=holding.balance*priceUsd
-      if (priceUsd > 0) pricedTokenCount += 1
-      portfolioTokenValueUsd+=valueUsd
+      const priceUsd=finiteOrNull(pair?.priceUsd)
+      const priced=priceUsd!==null&&priceUsd>0
+      const valueUsd=priced?holding.balance*priceUsd:null
+      if (priced) {
+        pricedTokenCount += 1
+        portfolioTokenValueUsd+=valueUsd
+      }
 
       const intelligence=pair?analyzePair(pair,null):null
       const liquidityReported=intelligence?.liquidityReported !== false
@@ -53,20 +62,22 @@ export default async function handler(req,res){
         symbol:pair?.baseToken?.symbol||null,
         priceUsd,
         valueUsd,
-        marketCap:Number(pair?.marketCap||0),
-        liquidityUsd:pair && liquidityReported ? Number(pair?.liquidity?.usd||0) : null,
+        marketCap:finiteOrNull(pair?.marketCap),
+        liquidityUsd:pair && liquidityReported ? finiteOrNull(pair?.liquidity?.usd) : null,
         liquidityReported:pair ? liquidityReported : false,
         liquiditySource:intelligence?.liquiditySource||null,
-        change24h:Number(pair?.priceChange?.h24||0),
-        volume24h:Number(pair?.volume?.h24||0),
+        change24h:finiteOrNull(pair?.priceChange?.h24),
+        volume24h:finiteOrNull(pair?.volume?.h24),
         pairUrl:pair?.url||null,
         intelligence
       }
-    }).sort((a,b)=>b.valueUsd-a.valueUsd)
+    }).sort((a,b)=>Number(b.valueUsd||0)-Number(a.valueUsd||0))
 
-    const solPriceUsd=Number(solPair?.priceUsd||0)
-    const solValueUsd=snapshot.solBalance*solPriceUsd
-    const portfolioTotalUsd=portfolioTokenValueUsd+solValueUsd
+    const solPriceUsd=finiteOrNull(solPair?.priceUsd)
+    const solValueUsd=solPriceUsd!==null&&solPriceUsd>0?snapshot.solBalance*solPriceUsd:null
+    const unpricedTokenCount=holdings.length-pricedTokenCount
+    const portfolioValuationComplete=unpricedTokenCount===0&&(snapshot.solBalance<=0||solValueUsd!==null)
+    const portfolioTotalUsd=portfolioTokenValueUsd+Number(solValueUsd||0)
 
     const result={
       success:true,
@@ -77,6 +88,8 @@ export default async function handler(req,res){
       solValueUsd,
       tokenCount:holdings.length,
       pricedTokenCount,
+      unpricedTokenCount,
+      portfolioValuationComplete,
       portfolioTokenValueUsd,
       portfolioTotalUsd,
       holdings,
