@@ -65,6 +65,9 @@ export default function Home() {
   const activeScanAddressRef = useRef('')
   const activeScanChainRef = useRef('auto')
   const scanRequestIdRef = useRef(0)
+  const liveRequestIdRef = useRef(0)
+  const liveInFlightRef = useRef(false)
+  const silentScanInFlightRef = useRef(false)
   const walletRequestIdRef = useRef(0)
   const monitorRequestIdRef = useRef(0)
   const runScanRef = useRef(null)
@@ -79,6 +82,7 @@ export default function Home() {
   const [scanError, setScanError] = useState('')
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [lastRefresh, setLastRefresh] = useState(null)
+  const [lastVerifiedRefresh, setLastVerifiedRefresh] = useState(null)
 
   const [aiAnalysis, setAiAnalysis] = useState('')
   const [aiModel, setAiModel] = useState('')
@@ -290,6 +294,8 @@ export default function Home() {
     if (!target) return
     const selectedChain = String(chain ?? (silent ? activeScanChainRef.current : scanChain) ?? 'auto').toLowerCase()
     if (silent && activeScanAddressRef.current !== target) return
+    if (silent && silentScanInFlightRef.current) return
+    if (silent) silentScanInFlightRef.current = true
     const requestId=++scanRequestIdRef.current
     if (!silent) {
       activeScanAddressRef.current = target
@@ -323,7 +329,9 @@ export default function Home() {
         }
         return data.scan
       })
-      setLastRefresh(new Date())
+      const verifiedAt = new Date()
+      setLastRefresh(verifiedAt)
+      setLastVerifiedRefresh(verifiedAt)
 
       try {
         const notes = JSON.parse(localStorage.getItem(NOTES_KEY) || '{}')
@@ -368,9 +376,57 @@ export default function Home() {
       setScanError(error.message)
       if (!silent) setScan(null)
     } finally {
+      if (silent) silentScanInFlightRef.current = false
       if (!silent && requestId===scanRequestIdRef.current && activeScanAddressRef.current === target) setScanLoading(false)
     }
   }, [tokenAddress, scanChain, notificationsEnabled, alertScore, alertMarketCap, notificationPrefs])
+
+  const runLiveRefresh = useCallback(async ({ address, chain } = {}) => {
+    const target = String(address || '').trim()
+    const selectedChain = String(chain || activeScanChainRef.current || 'auto').toLowerCase()
+    if (!target || liveInFlightRef.current) return
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+    if (activeScanAddressRef.current !== target) return
+
+    liveInFlightRef.current = true
+    const requestId = ++liveRequestIdRef.current
+
+    try {
+      const response = await fetch(`/api/scan?address=${encodeURIComponent(target)}&chain=${encodeURIComponent(selectedChain)}&mode=live&persist=0`, {
+        cache:'no-store',
+      })
+      const data = await response.json()
+      if (
+        requestId !== liveRequestIdRef.current ||
+        activeScanAddressRef.current !== target ||
+        !response.ok ||
+        !data?.success ||
+        !data?.snapshot
+      ) return
+
+      const snapshot = data.snapshot
+      setScan((previous) => {
+        if (!previous || previous.address !== snapshot.address) return previous
+        const previousChain = String(previous?.chain?.id || '').toLowerCase()
+        const snapshotChain = String(snapshot?.chain?.id || '').toLowerCase()
+        if (previousChain && snapshotChain && previousChain !== snapshotChain) return previous
+
+        return {
+          ...previous,
+          token:{ ...previous.token, ...snapshot.token },
+          market:{ ...previous.market, ...snapshot.market },
+          trading:{ ...previous.trading, ...snapshot.trading },
+          pair:{ ...previous.pair, ...snapshot.pair },
+        }
+      })
+      setLastRefresh(new Date())
+    } catch {
+      // The live lane is best-effort. Keep the last verified scan on screen if
+      // the lightweight market request has a transient failure.
+    } finally {
+      if (requestId === liveRequestIdRef.current) liveInFlightRef.current = false
+    }
+  }, [])
 
   useEffect(() => { runScanRef.current = runScan }, [runScan])
 
@@ -433,9 +489,23 @@ export default function Home() {
   useEffect(() => {
     if (!autoRefresh || !scan?.address) return
 
+    const target = {
+      address:scan.address,
+      chain:scan?.chain?.id || activeScanChainRef.current,
+    }
+    runLiveRefresh(target)
+    const timer = setInterval(() => runLiveRefresh(target), 3000)
+
+    return () => clearInterval(timer)
+  }, [autoRefresh, scan?.address, scan?.chain?.id, runLiveRefresh])
+
+  useEffect(() => {
+    if (!autoRefresh || !scan?.address) return
+
     const timer = setInterval(() => {
-      runScan({ address: scan.address, chain:scan?.chain?.id || activeScanChainRef.current, silent: true })
-    }, 15000)
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      runScan({ address:scan.address, chain:scan?.chain?.id || activeScanChainRef.current, silent:true })
+    }, 10000)
 
     return () => clearInterval(timer)
   }, [autoRefresh, scan?.address, scan?.chain?.id, runScan])
@@ -1864,7 +1934,7 @@ export default function Home() {
                 onChange={(event) => setAutoRefresh(event.target.checked)}
               />
               <span />
-              15S AUTO
+              3S LIVE
             </label>
           </div>
 
@@ -2505,16 +2575,17 @@ export default function Home() {
                   </div>
                 ) : (
                   <p className="aiEmpty">
-                    The deterministic score is already live. Run the AI layer for a second-pass
-                    explanation of the signal, contradictions, and invalidation conditions.
+                    The deterministic score is automatically re-verified in the background. Run the AI layer
+                    for a second-pass explanation of the signal, contradictions, and invalidation conditions.
                   </p>
                 )}
               </article>
 
               <div className="refreshLine">
                 <span className={autoRefresh ? 'pulse' : 'pulse paused'} />
-                {autoRefresh ? 'Auto-refreshing every 15 seconds' : 'Auto-refresh paused'}
-                {lastRefresh ? <small>Last update {lastRefresh.toLocaleTimeString()}</small> : null}
+                {autoRefresh ? 'Live market ~3s · verified score ~10s' : 'Auto-refresh paused'}
+                {lastRefresh ? <small>Live {lastRefresh.toLocaleTimeString()}</small> : null}
+                {lastVerifiedRefresh ? <small>Verified {lastVerifiedRefresh.toLocaleTimeString()}</small> : null}
               </div>
             </>
           ) : (
