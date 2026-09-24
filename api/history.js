@@ -34,6 +34,10 @@ export default async function handler(req,res){
   if(req.method!=='GET') return res.status(405).json({success:false,error:'Method not allowed'})
 
   const calibration=getQuery(req,'calibration')==='1'
+  const calibrationFamily=String(getQuery(req,'family','solana')).trim().toLowerCase()
+  if(calibration&&!['solana','evm'].includes(calibrationFamily)){
+    return res.status(400).json({success:false,error:'Unsupported calibration family.'})
+  }
   const limited=rateLimit(req,{
     key:calibration?'calibration':'history',
     limit:calibration?20:30,
@@ -57,7 +61,13 @@ export default async function handler(req,res){
       const data=await response.json()
       if(!response.ok||!data?.ok) throw new Error(data?.error||'Calibration service unavailable')
 
-      const rows=(data.summary||data.rows||[]).map(row=>({
+      const chainSummary=Array.isArray(data.chainSummary)?data.chainSummary:[]
+      const chainBuckets=Array.isArray(data.chainBuckets)?data.chainBuckets:[]
+      const chainComponents=Array.isArray(data.chainComponents)?data.chainComponents:[]
+
+      const rows=chainSummary
+        .filter(row=>String(row.chain_family||'')===calibrationFamily)
+        .map(row=>({
         scoreVersion:row.score_version,
         signal:row.signal,
         horizon:row.horizon,
@@ -67,7 +77,9 @@ export default async function handler(req,res){
         avgDelayMinutes:row.avg_delay_minutes==null?null:Number(row.avg_delay_minutes),
       }))
 
-      const buckets=(data.buckets||[]).map(row=>({
+      const buckets=chainBuckets
+        .filter(row=>String(row.chain_family||'')===calibrationFamily)
+        .map(row=>({
         scoreVersion:row.score_version,
         scoreBucketMin:Number(row.score_bucket_min||0),
         scoreBucketMax:Number(row.score_bucket_max||0),
@@ -81,7 +93,9 @@ export default async function handler(req,res){
         avgAbsDelayMinutes:row.avg_abs_delay_minutes==null?null:Number(row.avg_abs_delay_minutes),
       }))
 
-      const components=(data.components||[]).map(row=>({
+      const components=chainComponents
+        .filter(row=>String(row.chain_family||'')===calibrationFamily)
+        .map(row=>({
         scoreVersion:row.score_version,
         horizon:row.horizon,
         setupSamples:Number(row.setup_samples||0),
@@ -106,7 +120,8 @@ export default async function handler(req,res){
 
       return res.status(200).json({
         success:true,
-        samplePolicy:data.samplePolicy||'clean-complete-components-with-timing-window',
+        samplePolicy:data.samplePolicy||'independent-chain-token-time-buckets-with-timing-window',
+        chainFamily:calibrationFamily,
         totalSamples:rows.reduce((sum,row)=>sum+row.samples,0),
         rawTotalSamples:rawRows.reduce((sum,row)=>sum+row.samples,0),
         rows,
