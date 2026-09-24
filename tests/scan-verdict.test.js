@@ -19,9 +19,10 @@ function baseScan(){
       negatives:[],
       entryGate:{leanBuyMissing:[]},
       securityEvidence:{
+        providerCount:2,
         rugged:false,
         dangerRiskCount:0,
-        market:{priceProviderCount:2,priceConflict:false},
+        market:{priceProviderCount:2,priceConflict:false,liquidityConflict:false},
       },
     },
   }
@@ -31,7 +32,7 @@ test('simple verdict returns YES when current entry gates pass',()=>{
   const result=deriveScanVerdict(baseScan())
   assert.equal(result.verdict,'YES')
   assert.equal(result.checks.find(row=>row.label==='Contract')?.value,'PASS')
-  assert.equal(result.checks.find(row=>row.label==='Price sources')?.value,'AGREE')
+  assert.equal(result.checks.find(row=>row.label==='Market sources')?.value,'AGREE')
 })
 
 test('simple verdict returns WAIT when confirmation is incomplete',()=>{
@@ -58,5 +59,30 @@ test('price conflict prevents YES even when score signal is constructive',()=>{
   scan.intelligence.securityEvidence.market.priceConflict=true
   const result=deriveScanVerdict(scan)
   assert.equal(result.verdict,'WAIT')
-  assert.equal(result.checks.find(row=>row.label==='Price sources')?.value,'CONFLICT')
+  assert.equal(result.checks.find(row=>row.label==='Market sources')?.value,'PRICE CONFLICT')
+})
+
+
+test('one live price source cannot produce YES',()=>{
+  const scan=baseScan()
+  scan.intelligence.securityEvidence.market.priceProviderCount=1
+  scan.market.consensus.priceProviderCount=1
+  const result=deriveScanVerdict(scan)
+  assert.equal(result.verdict,'WAIT')
+  assert.equal(result.checks.find(row=>row.label==='Market sources')?.value,'PARTIAL')
+})
+
+test('one security source cannot produce YES',()=>{
+  const scan=baseScan()
+  scan.intelligence.securityEvidence.providerCount=1
+  const result=deriveScanVerdict(scan)
+  assert.equal(result.verdict,'WAIT')
+})
+
+test('liquidity-source conflict cannot produce YES',()=>{
+  const scan=baseScan()
+  scan.intelligence.securityEvidence.market.liquidityConflict=true
+  const result=deriveScanVerdict(scan)
+  assert.equal(result.verdict,'WAIT')
+  assert.equal(result.checks.find(row=>row.label==='Market sources')?.value,'LIQ CONFLICT')
 })
