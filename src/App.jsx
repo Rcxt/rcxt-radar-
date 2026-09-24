@@ -23,6 +23,17 @@ const ALERT_DEDUPE_KEY = 'rcxt-alert-dedupe-v2'
 const WATCH_KEY = 'rcxt-watchlist-v1'
 const RULES_KEY = 'rcxt-alert-rules-v1'
 const NOTES_KEY = 'rcxt-token-notes-v1'
+
+function itemChainId(item, fallback = 'solana') {
+  return String(item?.chain?.id || item?.chain || fallback || 'solana').toLowerCase()
+}
+
+function assetKey(item, fallback = 'solana') {
+  const chain = itemChainId(item, fallback)
+  const rawAddress = String(item?.address || item?.mint || '')
+  const address = chain === 'solana' ? rawAddress : rawAddress.toLowerCase()
+  return `${chain}:${address}`
+}
 const SCAN_CHAIN_OPTIONS = [{ id:'auto', label:'Auto-detect' }, ...listChains().map((chain)=>({ id:chain.id, label:chain.label }))]
 
 function urlBase64ToUint8Array(base64String) {
@@ -834,9 +845,11 @@ export default function Home() {
   }
 
   function openRadarToken(item) {
+    const chain = itemChainId(item,'solana')
     navigateView('scanner')
     setTokenAddress(item.address)
-    runScan({ address: item.address })
+    setScanChain(chain)
+    runScan({ address:item.address, chain })
   }
 
   function hideCoin(item) {
@@ -957,13 +970,17 @@ export default function Home() {
   function toggleWatch(item) {
     const address = item?.address || item?.mint
     if (!address) return
+    const chain = itemChainId(item,'solana')
+    const key = assetKey({address,chain})
 
     setWatchlist((current) => {
-      const exists = current.some((coin) => coin.address === address)
+      const exists = current.some((coin) => assetKey(coin) === key)
       const next = exists
-        ? current.filter((coin) => coin.address !== address)
+        ? current.filter((coin) => assetKey(coin) !== key)
         : [{
             address,
+            chain,
+            chainLabel:item?.chain?.label || item?.chainLabel || chain,
             symbol: item?.symbol || item?.token?.symbol || 'TOKEN',
             name: item?.name || item?.token?.name || 'Unknown',
             addedAt: Date.now(),
@@ -977,16 +994,18 @@ export default function Home() {
   function toggleCompare(item) {
     const address = item?.address || item?.mint
     if (!address) return
+    const chain = itemChainId(item,'solana')
+    const key = assetKey({address,chain})
 
     setCompare((current) => {
-      if (current.some((coin) => coin.address === address)) {
-        return current.filter((coin) => coin.address !== address)
+      if (current.some((coin) => assetKey(coin) === key)) {
+        return current.filter((coin) => assetKey(coin) !== key)
       }
       if (current.length >= 4) {
         setNotificationStatus('Compare supports up to 4 tokens at once.')
         return current
       }
-      return [...current, { ...item, address }]
+      return [...current, { ...item, address, chain }]
     })
   }
 
@@ -1046,8 +1065,8 @@ export default function Home() {
     [hiddenCoins],
   )
 
-  const watchAddresses = useMemo(
-    () => new Set(watchlist.map((coin) => coin.address)),
+  const watchKeys = useMemo(
+    () => new Set(watchlist.map((coin) => assetKey(coin))),
     [watchlist],
   )
 
@@ -1413,8 +1432,8 @@ export default function Home() {
             {activeDrawer === 'watchlist' ? (
               <div className="drawerList">
                 {watchlist.length ? watchlist.map((coin) => (
-                  <button key={coin.address} onClick={() => openRadarToken(coin)}>
-                    <div><strong>{coin.symbol}</strong><span>{coin.name}</span></div>
+                  <button key={assetKey(coin)} onClick={() => openRadarToken(coin)}>
+                    <div><strong>{coin.symbol}</strong><span>{coin.name} · {coin.chainLabel || itemChainId(coin)}</span></div>
                     <small>{shortAddress(coin.address, 5)} →</small>
                   </button>
                 )) : <EmptyDrawer text="Nothing watched yet. Tap ☆ on a radar card or scanner." />}
@@ -1441,8 +1460,8 @@ export default function Home() {
             {activeDrawer === 'history' ? (
               <div className="drawerList">
                 {history.length ? history.map((entry, index) => (
-                  <button key={`${entry.address}-${index}`} onClick={() => openHistoryScan(entry)}>
-                    <div><strong>{entry.symbol || 'TOKEN'}</strong><span>{entry.signal || 'Saved scan'}</span></div>
+                  <button key={`${entry.chain || 'solana'}:${entry.address}-${index}`} onClick={() => openHistoryScan(entry)}>
+                    <div><strong>{entry.symbol || 'TOKEN'}</strong><span>{entry.chainLabel || entry.chain || 'solana'} · {entry.signal || 'Saved scan'}</span></div>
                     <small>{entry.score ?? '—'}/100 →</small>
                   </button>
                 )) : <EmptyDrawer text="No recent scans yet. Manual token scans appear here." />}
@@ -1635,9 +1654,9 @@ export default function Home() {
               {watchlist.length ? (
                 <div className="watchGrid">
                   {watchlist.map((coin) => (
-                    <button key={coin.address} onClick={() => openRadarToken(coin)}>
+                    <button key={assetKey(coin)} onClick={() => openRadarToken(coin)}>
                       <strong>{coin.symbol}</strong>
-                      <span>{coin.name}</span>
+                      <span>{coin.name} · {coin.chainLabel || itemChainId(coin)}</span>
                       <small>{shortAddress(coin.address, 4)}</small>
                     </button>
                   ))}
@@ -1687,17 +1706,17 @@ export default function Home() {
                     <span className="rank">#{String(index + 1).padStart(2, '0')}</span>
                     <div className="radarTopActions">
                       <button
-                        className={watchAddresses.has(item.address) ? 'watchButton active' : 'watchButton'}
+                        className={watchKeys.has(assetKey(item,'solana')) ? 'watchButton active' : 'watchButton'}
                         onClick={(event) => {
                           event.stopPropagation()
                           toggleWatch(item)
                         }}
-                        aria-label={watchAddresses.has(item.address) ? `Remove ${item.symbol} from watchlist` : `Watch ${item.symbol}`}
+                        aria-label={watchKeys.has(assetKey(item,'solana')) ? `Remove ${item.symbol} from watchlist` : `Watch ${item.symbol}`}
                       >
-                        {watchAddresses.has(item.address) ? '★' : '☆'}
+                        {watchKeys.has(assetKey(item,'solana')) ? '★' : '☆'}
                       </button>
                       <button
-                        className={compare.some((coin) => coin.address === item.address) ? 'compareButton active' : 'compareButton'}
+                        className={compare.some((coin) => assetKey(coin) === assetKey(item,'solana')) ? 'compareButton active' : 'compareButton'}
                         onClick={(event) => {
                           event.stopPropagation()
                           toggleCompare(item)
@@ -1845,8 +1864,8 @@ export default function Home() {
             <>
               <ScanVerdict scan={scan} />
               <div className="scanQuickActions">
-                <button className={watchAddresses.has(scan.address) ? 'toolButton active' : 'toolButton'} onClick={() => toggleWatch(scan)}>
-                  {watchAddresses.has(scan.address) ? '★ Watching' : '☆ Watch'}
+                <button className={watchKeys.has(assetKey(scan)) ? 'toolButton active' : 'toolButton'} onClick={() => toggleWatch(scan)}>
+                  {watchKeys.has(assetKey(scan)) ? '★ Watching' : '☆ Watch'}
                 </button>
                 <button className="toolButton" onClick={() => navigator.clipboard?.writeText(scan.address)}>Copy CA</button>
                 {scan?.chain?.id === 'solana' ? (
