@@ -220,7 +220,7 @@ export default async function handler(req,res){
     refresh:{radarSeconds:10,scannerSeconds:15,chartsSeconds:30,tradeTapeSeconds:30,walletOpenSeconds:15,walletBackgroundSeconds:30},
     build:{
       app:'RCXT Radar',
-      version:'6.1.0-rc.1',
+      version:'6.1.0',
       scoreEngine:SCORE_VERSION,
       trenchEngine:'1.0.0',
       chartEngine:'1.0.0',
