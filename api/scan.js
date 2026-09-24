@@ -18,6 +18,16 @@ function getQuery(req, name, fallback = '') {
   }
 }
 
+function finiteOrNull(value) {
+  if (value === null || value === undefined || value === '') return null
+  const number = Number(value)
+  return Number.isFinite(number) ? number : null
+}
+
+function sumKnown(a,b) {
+  return a === null || b === null ? null : a + b
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ success:false, error:'Method not allowed' })
 
@@ -98,8 +108,18 @@ export default async function handler(req, res) {
     const liquidityReported=pumpFunMarket
       ? rawLiquidityFinite&&Number(rawLiquidity)>0
       : rawLiquidityFinite
-    const buys={m5:Number(pair?.txns?.m5?.buys||0),h1:Number(pair?.txns?.h1?.buys||0),h6:Number(pair?.txns?.h6?.buys||0),h24:Number(pair?.txns?.h24?.buys||0)}
-    const sells={m5:Number(pair?.txns?.m5?.sells||0),h1:Number(pair?.txns?.h1?.sells||0),h6:Number(pair?.txns?.h6?.sells||0),h24:Number(pair?.txns?.h24?.sells||0)}
+    const buys={
+      m5:finiteOrNull(pair?.txns?.m5?.buys),
+      h1:finiteOrNull(pair?.txns?.h1?.buys),
+      h6:finiteOrNull(pair?.txns?.h6?.buys),
+      h24:finiteOrNull(pair?.txns?.h24?.buys),
+    }
+    const sells={
+      m5:finiteOrNull(pair?.txns?.m5?.sells),
+      h1:finiteOrNull(pair?.txns?.h1?.sells),
+      h6:finiteOrNull(pair?.txns?.h6?.sells),
+      h24:finiteOrNull(pair?.txns?.h24?.sells),
+    }
     const scan={
       address,
       chain:{
@@ -112,18 +132,35 @@ export default async function handler(req, res) {
       },
       token:{name:pair?.baseToken?.name||'Unknown',symbol:pair?.baseToken?.symbol||'UNKNOWN',address},
       market:{
-        priceUsd:Number(pair?.priceUsd||0),priceNative:Number(pair?.priceNative||0),
-        marketCap:Number(pair?.marketCap||0),fdv:Number(pair?.fdv||0),
-        liquidityUsd:liquidityReported?Number(rawLiquidity):null,
+        priceUsd:finiteOrNull(pair?.priceUsd),
+        priceNative:finiteOrNull(pair?.priceNative),
+        marketCap:finiteOrNull(pair?.marketCap),
+        fdv:finiteOrNull(pair?.fdv),
+        liquidityUsd:liquidityReported?finiteOrNull(rawLiquidity):null,
         liquidityReported,
         liquiditySource:intelligence.liquiditySource||null,
-        volume:{m5:Number(pair?.volume?.m5||0),h1:Number(pair?.volume?.h1||0),h6:Number(pair?.volume?.h6||0),h24:Number(pair?.volume?.h24||0)},
-        priceChange:{m5:Number(pair?.priceChange?.m5||0),h1:Number(pair?.priceChange?.h1||0),h6:Number(pair?.priceChange?.h6||0),h24:Number(pair?.priceChange?.h24||0)},
+        volume:{
+          m5:finiteOrNull(pair?.volume?.m5),
+          h1:finiteOrNull(pair?.volume?.h1),
+          h6:finiteOrNull(pair?.volume?.h6),
+          h24:finiteOrNull(pair?.volume?.h24),
+        },
+        priceChange:{
+          m5:finiteOrNull(pair?.priceChange?.m5),
+          h1:finiteOrNull(pair?.priceChange?.h1),
+          h6:finiteOrNull(pair?.priceChange?.h6),
+          h24:finiteOrNull(pair?.priceChange?.h24),
+        },
         consensus:marketEvidence
       },
       trading:{
         buys,sells,
-        transactions:{m5:buys.m5+sells.m5,h1:buys.h1+sells.h1,h6:buys.h6+sells.h6,h24:buys.h24+sells.h24},
+        transactions:{
+          m5:sumKnown(buys.m5,sells.m5),
+          h1:sumKnown(buys.h1,sells.h1),
+          h6:sumKnown(buys.h6,sells.h6),
+          h24:sumKnown(buys.h24,sells.h24),
+        },
         buyPercent:intelligence.buyPercent24h
       },
       security:mintSecurity,
