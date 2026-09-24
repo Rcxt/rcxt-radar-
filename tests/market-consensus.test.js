@@ -119,7 +119,7 @@ test('market consensus flags material price disagreement',()=>{
   assert.ok(result.maxDeviationPercent>=12)
 })
 
-test('three-fold liquidity disagreement is recorded but not treated as price conflict',()=>{
+test('different liquidity scopes are not mislabeled as a provider conflict',()=>{
   const result=buildMarketConsensus(pair(),{
     geckoterminal:{available:true,priceUsd:0.00101,liquidityUsd:180000},
     birdeye:{available:true,priceUsd:0.001,liquidityUsd:52000},
@@ -127,8 +127,11 @@ test('three-fold liquidity disagreement is recorded but not treated as price con
     helius:{available:false},
   })
 
-  assert.equal(result.liquidityConflict,true)
+  assert.equal(result.liquidityConflict,false)
+  assert.equal(result.liquidityComparableProviderCount,1)
   assert.equal(result.priceConflict,false)
+  assert.ok(result.liquidity.some(row=>row.scope==='selected-pair'))
+  assert.ok(result.liquidity.some(row=>row.scope==='token-total'))
 })
 
 
