@@ -1,3 +1,4 @@
+import { getChain } from '../lib/chains.js'
 import { rateLimit, applyRateHeaders } from '../lib/rate-limit.js'
 import { analyzeCandles } from '../lib/market-analytics.js'
 
@@ -19,9 +20,9 @@ function cacheSet(key,value){
   if(chartCache.size>120) chartCache.delete(chartCache.keys().next().value)
 }
 
-async function fetchCandles(pairAddress,interval){
+async function fetchCandles(pairAddress,interval,chain){
   const config=INTERVALS[interval]||INTERVALS['5m']
-  const url=new URL(`https://api.geckoterminal.com/api/v2/networks/solana/pools/${encodeURIComponent(pairAddress)}/ohlcv/${config.timeframe}`)
+  const url=new URL(`https://api.geckoterminal.com/api/v2/networks/${encodeURIComponent(chain.geckoterminal)}/pools/${encodeURIComponent(pairAddress)}/ohlcv/${config.timeframe}`)
   url.searchParams.set('aggregate',String(config.aggregate))
   url.searchParams.set('limit',String(config.limit))
   url.searchParams.set('currency','usd')
@@ -73,7 +74,7 @@ export default async function handler(req,res){
   }
   if(!INTERVALS[interval]) return res.status(400).json({success:false,error:'Unsupported chart interval.'})
 
-  const key=`${pairAddress}:${interval}`
+  const key=`${chain.id}:${pairAddress}:${interval}`
   const cached=cacheGet(key)
   if(cached){
     res.setHeader('X-RCXT-Cache','HIT')
@@ -82,9 +83,9 @@ export default async function handler(req,res){
   }
 
   try{
-    const {candles,meta,config}=await fetchCandles(pairAddress,interval)
+    const {candles,meta,config}=await fetchCandles(pairAddress,interval,chain)
     const analytics=analyzeCandles(candles,{intervalMinutes:config.minutes})
-    const result={success:true,provider:'GeckoTerminal',pairAddress,interval,generatedAt:new Date().toISOString(),meta,count:candles.length,candles,analytics}
+    const result={success:true,provider:'GeckoTerminal',chain:chain.id,pairAddress,interval,generatedAt:new Date().toISOString(),meta,count:candles.length,candles,analytics}
     cacheSet(key,result)
     res.setHeader('X-RCXT-Cache','MISS')
     res.setHeader('Cache-Control','public, s-maxage=8, stale-while-revalidate=20')
