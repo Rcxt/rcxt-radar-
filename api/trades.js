@@ -61,7 +61,7 @@ export default async function handler(req,res){
     const response=await fetch(url,{
       headers:{
         accept:'application/json;version=20230203',
-        'user-agent':'RCXT-Radar/4.0',
+        'user-agent':'RCXT-Radar/6.1',
       },
       signal:AbortSignal.timeout(5000),
     })
@@ -142,7 +142,7 @@ export default async function handler(req,res){
           netFlowUsd:Number(netFlow.toFixed(2)),
           volumeSharePercent:Number(volumeShare.toFixed(1)),
           direction,
-          explorerUrl:'https://solscan.io/account/'+row.wallet,
+          explorerUrl:chain.accountExplorer ? chain.accountExplorer+row.wallet : null,
         }
       })
       .filter((row)=>row.totalVolumeUsd>=whaleWalletThreshold||row.volumeSharePercent>=5)
