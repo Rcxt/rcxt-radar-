@@ -224,7 +224,7 @@ export default function Home() {
       window.removeEventListener('rcxt-trade-plan-updated', handleUpdate)
       window.removeEventListener('storage', handleUpdate)
     }
-  }, [scan?.chain?.family])
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -273,7 +273,7 @@ export default function Home() {
       active = false
       clearInterval(timer)
     }
-  }, [])
+  }, [scan?.chain?.family])
 
   useEffect(() => {
     if (view !== 'radar') return
