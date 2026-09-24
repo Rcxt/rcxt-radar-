@@ -174,7 +174,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
     async function load(){
       setLoading(true);setError('')
       try{
-        const response=await fetch('/api/chart?pair='+encodeURIComponent(pair)+'&interval='+encodeURIComponent(interval),{cache:'no-store'})
+        const response=await fetch('/api/chart?pair='+encodeURIComponent(pair)+'&chain='+encodeURIComponent(scan?.chain?.id||'solana')+'&interval='+encodeURIComponent(interval),{cache:'no-store'})
         const data=await response.json()
         if(!response.ok||!data?.success) throw new Error(data?.error||'Chart unavailable')
         if(active) setChart(data)
@@ -185,7 +185,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
     load()
     const timer=setInterval(load,30000)
     return()=>{active=false;clearInterval(timer)}
-  },[scan?.pair?.pairAddress,interval])
+  },[scan?.pair?.pairAddress,scan?.chain?.id,interval])
 
   useEffect(()=>{
     let active=true
@@ -194,7 +194,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
 
     async function loadTape(){
       try{
-        const response=await fetch('/api/trades?pair='+encodeURIComponent(pair),{cache:'no-store'})
+        const response=await fetch('/api/trades?pair='+encodeURIComponent(pair)+'&chain='+encodeURIComponent(scan?.chain?.id||'solana'),{cache:'no-store'})
         const data=await response.json()
         if(response.ok&&data?.success&&active) setTape(data)
       }catch{}
@@ -203,7 +203,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
     loadTape()
     const timer=setInterval(loadTape,30000)
     return()=>{active=false;clearInterval(timer)}
-  },[scan?.pair?.pairAddress])
+  },[scan?.pair?.pairAddress,scan?.chain?.id])
 
   const ladder=useMemo(()=>buildProfitLadder({
     investment,
@@ -928,7 +928,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
                 </a>
               ))}
             </div>
-            <p>Supply-whale data comes from public Solana token-account ownership resolution. It does not identify the person or entity controlling a wallet.</p>
+            <p>Supply concentration uses the strongest available chain-specific source. On Solana RCXT can resolve token-account owners; EVM scans use external holder evidence when available. It does not identify the person or entity controlling a wallet.</p>
           </div>
         ) : null}
 
@@ -942,7 +942,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
           <div><span>DATA PROVENANCE</span><h3>Know what is measured vs calculated</h3></div>
         </div>
         <div className="provenanceGrid">
-          <div><b>MEASURED</b><strong>Market / wallet / trades</strong><p>DexScreener prices and liquidity, GeckoTerminal candles/trades, Solana wallet and mint data.</p></div>
+          <div><b>MEASURED</b><strong>Market / wallet / trades</strong><p>DexScreener prices/liquidity, GeckoTerminal candles/trades, and chain-specific contract/security evidence.</p></div>
           <div><b>COMPUTED</b><strong>RCXT / Trench / Entry Quality</strong><p>Deterministic formulas derived from measured inputs. Useful for comparison, not a guaranteed outcome.</p></div>
           <div><b>ESTIMATED</b><strong>Forecast ranges / profit scenarios</strong><p>Volatility and market-cap scenarios. They are not promised future prices or probabilities.</p></div>
         </div>
