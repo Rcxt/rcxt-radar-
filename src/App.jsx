@@ -2738,18 +2738,37 @@ function ScoreRing({ score, large = false }) {
 
 
 function openScannerTool(id, fallbackId = '') {
-  const target = document.getElementById(id) || (fallbackId ? document.getElementById(fallbackId) : null)
-  if (!target) return
-
-  if (target.tagName === 'DETAILS') target.open = true
-  let parent = target.parentElement
-  while (parent) {
-    if (parent.tagName === 'DETAILS') parent.open = true
-    parent = parent.parentElement
+  const openTree = (target) => {
+    if (!target) return
+    if (target.tagName === 'DETAILS') target.open = true
+    let parent = target.parentElement
+    while (parent) {
+      if (parent.tagName === 'DETAILS') parent.open = true
+      parent = parent.parentElement
+    }
   }
 
+  const target = document.getElementById(id)
+  if (target) {
+    openTree(target)
+    requestAnimationFrame(() => target.scrollIntoView({ behavior:'smooth', block:'start' }))
+    return
+  }
+
+  const fallback = fallbackId ? document.getElementById(fallbackId) : null
+  if (!fallback) return
+  openTree(fallback)
+  const firstDetails = fallback.querySelector('details')
+  if (firstDetails) firstDetails.open = true
+
   requestAnimationFrame(() => {
-    target.scrollIntoView({ behavior:'smooth', block:'start' })
+    const lateTarget = document.getElementById(id)
+    if (lateTarget) {
+      openTree(lateTarget)
+      lateTarget.scrollIntoView({ behavior:'smooth', block:'start' })
+    } else {
+      fallback.scrollIntoView({ behavior:'smooth', block:'start' })
+    }
   })
 }
 
