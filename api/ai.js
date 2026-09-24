@@ -80,7 +80,9 @@ export default async function handler(req,res){
   const mode=requestedMode==='beginner'?'beginner':requestedMode==='social'?'social':'pro'
   if(!scan?.address||!scan?.intelligence) return res.status(400).json({success:false,error:'Scan data is required.'})
 
+  const chainLabel=String(scan?.chain?.label || scan?.chain?.id || 'Solana')
   const compact={
+    chain:scan.chain || {id:'solana',label:'Solana',family:'solana'},
     token:scan.token,
     market:scan.market,
     trading:scan.trading,
@@ -93,11 +95,11 @@ export default async function handler(req,res){
   }
 
   const beginnerSystem=[
-    "You are RCXT Radar's beginner-friendly Solana market explainer.",
+    `You are RCXT Radar's beginner-friendly market explainer for a ${chainLabel} token.`,
     'Analyze only the supplied token snapshot. Use plain language a brand-new trader can understand.',
     'Avoid unexplained jargon. If you use a term like liquidity, RSI, slippage, or market cap, explain it in a few words.',
     'Never claim certainty, guaranteed profit, a win probability, insider information, or exact future prices.',
-    'The deterministic RCXT v5 signal is the source of truth. Explain scoreBeforeCaps, scoreCaps, and entryGate when they materially explain the displayed score or WATCH state.',
+    'The deterministic RCXT v6.1 signal is the source of truth. Explain scoreBeforeCaps, scoreCaps, entryGate, and chain-specific security evidence when they materially explain the displayed result.',
     'Risk and direction are separate: a very young or thin-liquidity token can be extremely risky while momentum is still bullish.',
     'Never describe liquidity risk or pair age alone as proof price will fall. If liquidityReported is false, treat liquidity as unknown.',
     'When candle analytics are supplied, explain chart bias, RSI, support/resistance, volatility, and forecast ranges in plain language.',
@@ -109,16 +111,16 @@ export default async function handler(req,res){
   ].join('\n')
 
   const proSystem=[
-    "You are RCXT Radar's market analyst. Analyze only the supplied Solana token snapshot.",
+    `You are RCXT Radar's market analyst. Analyze only the supplied ${chainLabel} token snapshot.`,
     'Be concise, skeptical, and practical. Never claim certainty, guaranteed profit, insider knowledge, or future prices.',
-    'The deterministic RCXT v5 signal is the source of truth. It separates directional opportunity/setup from execution risk, safety, data quality, and explicit score caps/entry gates.',
+    'The deterministic RCXT v6.1 signal is the source of truth. It separates directional opportunity/setup from execution risk, chain-specific contract safety, data quality, and explicit score caps/entry gates.',
     'Risk is not the same as direction. If liquidityReported is false, explain that the liquidity field is unavailable rather than assuming zero.',
     'Social data is lower-trust supporting evidence because it can be manipulated. Never let social momentum override contract, liquidity, execution, or market-structure risk.',
     'Explain contradictions explicitly. A high social score with weak setup/execution is hype risk, not confirmation.',
     'Use supplied candle regime, support/resistance, forecast ranges, and live trade tape as additional evidence.',
     'If chart/trade-tape evidence conflicts with the RCXT signal, explicitly call that out and lower conviction.',
     'Forecast bands are volatility scenarios, not exact price predictions.',
-    'Treat preliminary/unverified contract or concentration data as a limitation.',
+    'Treat preliminary/unverified contract or concentration data as a limitation. On EVM chains, discuss honeypot, source verification, proxy behavior, taxes and owner controls when supplied; do not describe them as Solana mint/freeze authorities.',
     'Use exactly four short sections: SIGNAL, WHY, INVALIDATION, RISK.'
   ].join('\n')
 
