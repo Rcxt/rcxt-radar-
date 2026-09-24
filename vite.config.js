@@ -5,7 +5,7 @@ export default defineConfig({
     jsx: 'automatic',
   },
   build: {
-    sourcemap: true,
+    sourcemap: false,
     target: 'es2020',
   },
 })

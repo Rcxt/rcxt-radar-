@@ -5,11 +5,15 @@ import WalletActivity from './components/WalletActivity.jsx'
 import XSocialIntel from './components/XSocialIntel.jsx'
 import NotificationCenter from './components/NotificationCenter.jsx'
 import DetailSection from './components/DetailSection.jsx'
+import SectionBoundary from './components/SectionBoundary.jsx'
+import { deriveScanVerdict } from './lib/scan-verdict.js'
+import { listChains } from '../lib/chains.js'
 import {
   DEFAULT_NOTIFICATION_PREFS,
   normalizeNotificationPrefs,
   shouldNotifySignalTransition,
 } from './lib/notification-prefs.js'
+import { criticalStructureFlags } from './lib/risk-policy.js'
 
 const WALLET_KEY = 'rcxt-wallet-address-v1'
 const HISTORY_KEY = 'rcxt-scan-history-v1'
@@ -21,6 +25,34 @@ const WATCH_KEY = 'rcxt-watchlist-v1'
 const RULES_KEY = 'rcxt-alert-rules-v1'
 const NOTES_KEY = 'rcxt-token-notes-v1'
 
+function itemChainId(item, fallback = 'solana') {
+  return String(item?.chain?.id || item?.chain || fallback || 'solana').toLowerCase()
+}
+
+function assetKey(item, fallback = 'solana') {
+  const chain = itemChainId(item, fallback)
+  const rawAddress = String(item?.address || item?.mint || '')
+  const address = chain === 'solana' ? rawAddress : rawAddress.toLowerCase()
+  return `${chain}:${address}`
+}
+
+function tokenDeepLink(item, fallback = 'solana') {
+  const address=String(item?.address||item?.mint||'')
+  if(!address) return '/'
+  const params=new URLSearchParams({token:address,chain:itemChainId(item,fallback)})
+  return '/?'+params.toString()
+}
+
+function readStoredJson(key, fallback) {
+  try {
+    const raw=localStorage.getItem(key)
+    return raw==null ? fallback : JSON.parse(raw)
+  } catch {
+    return fallback
+  }
+}
+const SCAN_CHAIN_OPTIONS = [{ id:'auto', label:'Auto-detect' }, ...listChains().map((chain)=>({ id:chain.id, label:chain.label }))]
+
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4)
   const base64 = (base64String + padding).replaceAll('-', '+').replaceAll('_', '/')
@@ -31,12 +63,17 @@ function urlBase64ToUint8Array(base64String) {
 export default function Home() {
   const [view, setView] = useState('radar')
   const activeScanAddressRef = useRef('')
+  const activeScanChainRef = useRef('auto')
+  const scanRequestIdRef = useRef(0)
+  const walletRequestIdRef = useRef(0)
+  const monitorRequestIdRef = useRef(0)
   const runScanRef = useRef(null)
   const [radar, setRadar] = useState([])
   const [radarLoading, setRadarLoading] = useState(true)
   const [radarError, setRadarError] = useState('')
 
   const [tokenAddress, setTokenAddress] = useState('')
+  const [scanChain, setScanChain] = useState('auto')
   const [scan, setScan] = useState(null)
   const [scanLoading, setScanLoading] = useState(false)
   const [scanError, setScanError] = useState('')
@@ -118,27 +155,27 @@ export default function Home() {
     loadRadar()
 
     try {
-      const saved = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]')
+      const saved = readStoredJson(HISTORY_KEY, [])
       if (Array.isArray(saved)) setHistory(saved.slice(0, 12))
 
-      const hidden = JSON.parse(localStorage.getItem(HIDDEN_KEY) || '[]')
+      const hidden = readStoredJson(HIDDEN_KEY, [])
       if (Array.isArray(hidden)) setHiddenCoins(hidden.filter((item) => item?.address))
 
       const notifySaved = localStorage.getItem(NOTIFY_KEY) === 'enabled'
       setNotificationsEnabled(notifySaved && typeof Notification !== 'undefined' && Notification.permission === 'granted')
 
       const savedNotificationPrefs = normalizeNotificationPrefs(
-        JSON.parse(localStorage.getItem(NOTIFY_PREFS_KEY) || '{}')
+        readStoredJson(NOTIFY_PREFS_KEY, {})
       )
       setNotificationPrefs(savedNotificationPrefs)
 
-      const savedWatchlist = JSON.parse(localStorage.getItem(WATCH_KEY) || '[]')
+      const savedWatchlist = readStoredJson(WATCH_KEY, [])
       if (Array.isArray(savedWatchlist)) setWatchlist(savedWatchlist.filter((item) => item?.address).slice(0, 50))
 
       const savedWallet = localStorage.getItem(WALLET_KEY) || ''
       if (savedWallet) setWallet(savedWallet)
 
-      const savedRules = JSON.parse(localStorage.getItem(RULES_KEY) || '{}')
+      const savedRules = readStoredJson(RULES_KEY, {})
       if (Number.isFinite(Number(savedRules.score))) setAlertScore(Number(savedRules.score))
       if (savedRules.marketCap != null) setAlertMarketCap(String(savedRules.marketCap))
       if (
@@ -157,13 +194,20 @@ export default function Home() {
   useEffect(() => {
     function loadTradePlans() {
       try {
-        const plans = []
+        const plansByAsset = new Map()
         for (let index = 0; index < localStorage.length; index += 1) {
           const key = localStorage.key(index)
           if (!key?.startsWith('rcxt-trade-plan:')) continue
-          const plan = JSON.parse(localStorage.getItem(key) || 'null')
-          if (plan?.address) plans.push(plan)
+          const plan = readStoredJson(key, null)
+          if (!plan?.address) continue
+          const normalized={...plan,chain:itemChainId(plan,'solana')}
+          const identity=assetKey(normalized)
+          const current=plansByAsset.get(identity)
+          if(!current||Number(normalized.savedAt||0)>=Number(current.savedAt||0)){
+            plansByAsset.set(identity,normalized)
+          }
         }
+        const plans=[...plansByAsset.values()]
         plans.sort((a,b) => Number(b.savedAt || 0) - Number(a.savedAt || 0))
         setTradePlans(plans.slice(0, 100))
       } catch {
@@ -208,7 +252,8 @@ export default function Home() {
 
     async function loadCalibration() {
       try {
-        const response = await fetch('/api/history?calibration=1', { cache: 'no-store' })
+        const family=scan?.chain?.family||'solana'
+        const response = await fetch('/api/history?calibration=1&family='+encodeURIComponent(family), { cache: 'no-store' })
         const data = await response.json()
         if (active && response.ok && data?.success) {
           setCalibration({
@@ -216,6 +261,7 @@ export default function Home() {
             rows: data.rows || [],
             buckets: data.buckets || [],
             components: data.components || [],
+            chainFamily: data.chainFamily || family,
           })
         }
       } catch {}
@@ -227,7 +273,7 @@ export default function Home() {
       active = false
       clearInterval(timer)
     }
-  }, [])
+  }, [scan?.chain?.family])
 
   useEffect(() => {
     if (view !== 'radar') return
@@ -239,11 +285,16 @@ export default function Home() {
     return () => clearInterval(timer)
   }, [view, loadRadar])
 
-  const runScan = useCallback(async ({ address, silent = false } = {}) => {
+  const runScan = useCallback(async ({ address, chain, silent = false } = {}) => {
     const target = String(address ?? tokenAddress).trim()
     if (!target) return
+    const selectedChain = String(chain ?? (silent ? activeScanChainRef.current : scanChain) ?? 'auto').toLowerCase()
     if (silent && activeScanAddressRef.current !== target) return
-    if (!silent) activeScanAddressRef.current = target
+    const requestId=++scanRequestIdRef.current
+    if (!silent) {
+      activeScanAddressRef.current = target
+      activeScanChainRef.current = selectedChain
+    }
 
     if (!silent) {
       setScanLoading(true)
@@ -255,14 +306,15 @@ export default function Home() {
 
     try {
       const persist = silent ? '0' : '1'
-      const response = await fetch(`/api/scan?address=${encodeURIComponent(target)}&persist=${persist}`, {
+      const response = await fetch(`/api/scan?address=${encodeURIComponent(target)}&chain=${encodeURIComponent(selectedChain)}&persist=${persist}`, {
         cache: 'no-store',
       })
       const data = await response.json()
-      if (activeScanAddressRef.current !== target) return
+      if (requestId!==scanRequestIdRef.current || activeScanAddressRef.current !== target) return
       if (!response.ok || !data.success) throw new Error(data.error || 'Scan failed')
 
       setTokenAddress(target)
+      activeScanChainRef.current = data.scan?.chain?.id || selectedChain
       setScan((previous) => {
         if (silent && previous?.address === data.scan.address) {
           maybeNotifySignalChange(previous, data.scan)
@@ -275,18 +327,19 @@ export default function Home() {
 
       try {
         const notes = JSON.parse(localStorage.getItem(NOTES_KEY) || '{}')
-        setTokenNote(notes[data.scan.address] || '')
+        const noteKey = `${data.scan?.chain?.id || 'solana'}:${String(data.scan.address).toLowerCase()}`
+        setTokenNote(notes[noteKey] || notes[data.scan.address] || '')
       } catch {
         setTokenNote('')
       }
 
       if (!silent) {
         try {
-          const historyResponse = await fetch(`/api/history?address=${encodeURIComponent(target)}`, { cache: 'no-store' })
+          const historyResponse = await fetch(`/api/history?address=${encodeURIComponent(target)}&chain=${encodeURIComponent(data.scan?.chain?.id || selectedChain)}`, { cache: 'no-store' })
           const historyData = await historyResponse.json()
-          if (activeScanAddressRef.current === target && historyResponse.ok && historyData?.success) setScoreHistory(historyData.rows || [])
+          if (requestId===scanRequestIdRef.current && activeScanAddressRef.current === target && historyResponse.ok && historyData?.success) setScoreHistory(historyData.rows || [])
         } catch {
-          if (activeScanAddressRef.current === target) setScoreHistory([])
+          if (requestId===scanRequestIdRef.current && activeScanAddressRef.current === target) setScoreHistory([])
         }
 
         const entry = {
@@ -295,13 +348,15 @@ export default function Home() {
           name: data.scan.token.name,
           score: data.scan.intelligence.score,
           signal: data.scan.intelligence.signal,
+          chain: data.scan?.chain?.id || selectedChain,
+          chainLabel: data.scan?.chain?.label || data.scan?.chain?.id || selectedChain,
           time: Date.now(),
         }
 
         setHistory((current) => {
           const next = [
             entry,
-            ...current.filter((item) => item.address !== entry.address),
+            ...current.filter((item) => !(item.address === entry.address && (item.chain || 'solana') === (entry.chain || 'solana'))),
           ].slice(0, 12)
 
           localStorage.setItem(HISTORY_KEY, JSON.stringify(next))
@@ -309,13 +364,13 @@ export default function Home() {
         })
       }
     } catch (error) {
-      if (activeScanAddressRef.current !== target) return
+      if (requestId!==scanRequestIdRef.current || activeScanAddressRef.current !== target) return
       setScanError(error.message)
       if (!silent) setScan(null)
     } finally {
-      if (!silent && activeScanAddressRef.current === target) setScanLoading(false)
+      if (!silent && requestId===scanRequestIdRef.current && activeScanAddressRef.current === target) setScanLoading(false)
     }
-  }, [tokenAddress, notificationsEnabled, alertScore, alertMarketCap, notificationPrefs])
+  }, [tokenAddress, scanChain, notificationsEnabled, alertScore, alertMarketCap, notificationPrefs])
 
   useEffect(() => { runScanRef.current = runScan }, [runScan])
 
@@ -327,22 +382,30 @@ export default function Home() {
   }
 
   useEffect(() => {
-    function openLinkedToken(value) {
+    function openLinkedToken(value, chainValue = 'auto') {
       const address = String(value || '').trim()
-      if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)) return false
+      const valid = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address) || /^0x[a-fA-F0-9]{40}$/.test(address)
+      if (!valid) return false
+      const nextChain = String(chainValue || 'auto').toLowerCase()
       setActiveDrawer('')
       setMenuOpen(false)
       setView('scanner')
       setTokenAddress(address)
-      window.history.replaceState(null, '', '/?token=' + encodeURIComponent(address))
+      setScanChain(nextChain)
+      const params = new URLSearchParams({ token:address })
+      if (nextChain !== 'auto') params.set('chain',nextChain)
+      window.history.replaceState(null, '', '/?' + params.toString())
       window.scrollTo({ top: 0, behavior: 'instant' })
-      runScanRef.current?.({ address })
+      runScanRef.current?.({ address, chain:nextChain })
       return true
     }
-    const fromUrl = () => openLinkedToken(new URLSearchParams(window.location.search).get('token'))
+    const fromUrl = () => {
+      const params=new URLSearchParams(window.location.search)
+      return openLinkedToken(params.get('token'),params.get('chain')||'auto')
+    }
     const onMessage = (event) => {
       if (event.data?.type !== 'RCXT_OPEN_TOKEN') return
-      if (openLinkedToken(event.data.token)) event.ports?.[0]?.postMessage({ opened: true })
+      if (openLinkedToken(event.data.token,event.data.chain||'auto')) event.ports?.[0]?.postMessage({ opened: true })
     }
     fromUrl()
     window.addEventListener('popstate', fromUrl)
@@ -371,14 +434,15 @@ export default function Home() {
     if (!autoRefresh || !scan?.address) return
 
     const timer = setInterval(() => {
-      runScan({ address: scan.address, silent: true })
+      runScan({ address: scan.address, chain:scan?.chain?.id || activeScanChainRef.current, silent: true })
     }, 15000)
 
     return () => clearInterval(timer)
-  }, [autoRefresh, scan?.address, runScan])
+  }, [autoRefresh, scan?.address, scan?.chain?.id, runScan])
 
   const loadLiveMonitor = useCallback(async (targetWallet = wallet) => {
     const address = String(targetWallet || '').trim()
+    const requestId=++monitorRequestIdRef.current
     if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)) {
       setLiveMonitor((current) => ({ ...current, enabled:false, loading:false, subscriptionCount:0 }))
       return null
@@ -389,6 +453,7 @@ export default function Home() {
       const response = await fetch('/api/monitor?wallet=' + encodeURIComponent(address), { cache:'no-store' })
       const data = await response.json()
       if (!response.ok || !data?.success) throw new Error(data?.error || 'Monitor status unavailable')
+      if(requestId!==monitorRequestIdRef.current) return null
       const serverPrefs=data.preferencesStored
         ? normalizeNotificationPrefs(data.preferences)
         : normalizeNotificationPrefs(notificationPrefs)
@@ -408,6 +473,7 @@ export default function Home() {
       })
       return {...data,preferences:serverPrefs}
     } catch (error) {
+      if(requestId!==monitorRequestIdRef.current) return null
       setLiveMonitor((current) => ({
         ...current,
         loading:false,
@@ -622,7 +688,7 @@ export default function Home() {
       `${before} → ${after} · RCXT ${next.intelligence?.score??'—'}/100 · opportunity ${next.intelligence?.opportunityScore??next.intelligence?.setupScore??'—'}/100`,
       {
         tag:`signal-${next.address}`,
-        url:`/?token=${encodeURIComponent(next.address)}`,
+        url:tokenDeepLink(next),
         critical:after==='SELL / AVOID',
       },
     )
@@ -645,7 +711,7 @@ export default function Home() {
         `RCXT ${item.intelligence?.score??'—'}/100 · opportunity ${item.intelligence?.opportunityScore??item.intelligence?.setupScore??'—'}/100 · ${item.intelligence?.risk||'risk'} risk`,
         {
           tag:`radar-${item.address}`,
-          url:`/?token=${encodeURIComponent(item.address)}`,
+          url:tokenDeepLink(item,'solana'),
           critical:newSignal==='SELL / AVOID',
         },
       )
@@ -664,7 +730,7 @@ export default function Home() {
         `score:${next.address}:${scoreTarget}`,
         `${next.token?.symbol||'Token'} crossed RCXT ${scoreTarget}`,
         `Score is now ${next.intelligence?.score}/100 · ${next.intelligence?.signal} · opportunity ${next.intelligence?.opportunityScore??next.intelligence?.setupScore??'—'}/100`,
-        {tag:`score-${next.address}`,url:`/?token=${encodeURIComponent(next.address)}`},
+        {tag:`score-${itemChainId(next)}-${next.address}`,url:tokenDeepLink(next)},
       )
     }
 
@@ -679,20 +745,14 @@ export default function Home() {
         `mc:${next.address}:${marketCapTarget}`,
         `${next.token?.symbol||'Token'} hit MC target`,
         `Market cap crossed ${compactUsd(marketCapTarget)} · now ${compactUsd(next.market?.marketCap)}`,
-        {tag:`mc-${next.address}`,url:`/?token=${encodeURIComponent(next.address)}`},
+        {tag:`mc-${itemChainId(next)}-${next.address}`,url:tokenDeepLink(next)},
       )
     }
   }
 
   function maybeNotifyRiskEscalation(previous, next) {
-    const dangerFlags=[
-      'MINT_AUTHORITY_ACTIVE',
-      'FREEZE_AUTHORITY_ACTIVE',
-      'EXTREME_OWNER_CONCENTRATION',
-      'EXTREME_ACCOUNT_CONCENTRATION',
-    ]
-    const beforeFlags=new Set(previous?.intelligence?.riskFlags||[])
-    const afterFlags=(next?.intelligence?.riskFlags||[]).filter((flag)=>dangerFlags.includes(flag))
+    const beforeFlags=new Set(criticalStructureFlags(previous))
+    const afterFlags=criticalStructureFlags(next)
     const newDanger=afterFlags.filter((flag)=>!beforeFlags.has(flag))
     const riskRank={LOWER:0,MODERATE:1,HIGH:2,EXTREME:3}
     const beforeRank=riskRank[previous?.intelligence?.risk]??0
@@ -716,8 +776,8 @@ export default function Home() {
       title,
       `RCXT ${next.intelligence?.score??'—'}/100 · ${detail}`,
       {
-        tag:`risk-${next.address}`,
-        url:`/?token=${encodeURIComponent(next.address)}`,
+        tag:`risk-${itemChainId(next)}-${next.address}`,
+        url:tokenDeepLink(next),
         critical:rugLike,
       },
     )
@@ -736,7 +796,8 @@ export default function Home() {
     if (!scan?.address) return
     try {
       const notes = JSON.parse(localStorage.getItem(NOTES_KEY) || '{}')
-      notes[scan.address] = tokenNote.slice(0, 2000)
+      const noteKey = `${scan?.chain?.id || 'solana'}:${String(scan.address).toLowerCase()}`
+      notes[noteKey] = tokenNote.slice(0, 2000)
       localStorage.setItem(NOTES_KEY, JSON.stringify(notes))
       setNotificationStatus('Token note saved.')
     } catch {
@@ -746,7 +807,9 @@ export default function Home() {
 
   async function shareCurrentToken() {
     if (!scan?.address) return
-    const url = `${window.location.origin}/?token=${encodeURIComponent(scan.address)}`
+    const params = new URLSearchParams({ token:scan.address })
+    if (scan?.chain?.id) params.set('chain',scan.chain.id)
+    const url = `${window.location.origin}/?${params.toString()}`
     try {
       if (navigator.share) {
         await navigator.share({
@@ -789,6 +852,7 @@ export default function Home() {
   async function loadWallet() {
     const address = wallet.trim()
     if (!address) return
+    const requestId=++walletRequestIdRef.current
 
     setWalletLoading(true)
     setWalletError('')
@@ -799,19 +863,22 @@ export default function Home() {
       })
       const data = await response.json()
       if (!response.ok || !data.success) throw new Error(data.error || 'Wallet load failed')
+      if(requestId!==walletRequestIdRef.current) return
       localStorage.setItem(WALLET_KEY, address)
       setWalletData(data)
     } catch (error) {
-      setWalletError(error.message)
+      if(requestId===walletRequestIdRef.current) setWalletError(error.message)
     } finally {
-      setWalletLoading(false)
+      if(requestId===walletRequestIdRef.current) setWalletLoading(false)
     }
   }
 
   function openRadarToken(item) {
+    const chain = itemChainId(item,'solana')
     navigateView('scanner')
     setTokenAddress(item.address)
-    runScan({ address: item.address })
+    setScanChain(chain)
+    runScan({ address:item.address, chain })
   }
 
   function hideCoin(item) {
@@ -892,16 +959,21 @@ export default function Home() {
 
   function openTradePlan(plan) {
     if (!plan?.address) return
+    const chain=itemChainId(plan,'solana')
     navigateView('scanner')
     setTokenAddress(plan.address)
-    runScan({ address: plan.address })
+    setScanChain(chain)
+    runScan({ address:plan.address, chain })
   }
 
-  function deleteTradePlan(address) {
-    if (!address) return
+  function deleteTradePlan(plan) {
+    if (!plan?.address) return
+    const chain=itemChainId(plan,'solana')
+    const address=chain==='solana'?String(plan.address):String(plan.address).toLowerCase()
     try {
-      localStorage.removeItem('rcxt-trade-plan:' + address)
-      setTradePlans((current) => current.filter((plan) => plan.address !== address))
+      localStorage.removeItem('rcxt-trade-plan:' + chain + ':' + address)
+      if(chain==='solana') localStorage.removeItem('rcxt-trade-plan:' + plan.address)
+      setTradePlans((current) => current.filter((item) => assetKey(item)!==assetKey(plan)))
     } catch {}
   }
 
@@ -926,19 +998,23 @@ export default function Home() {
     if (!address) return
     navigateView('scanner')
     setTokenAddress(address)
-    runScan({ address })
+    runScan({ address, chain:entry?.chain || 'auto' })
   }
 
   function toggleWatch(item) {
     const address = item?.address || item?.mint
     if (!address) return
+    const chain = itemChainId(item,'solana')
+    const key = assetKey({address,chain})
 
     setWatchlist((current) => {
-      const exists = current.some((coin) => coin.address === address)
+      const exists = current.some((coin) => assetKey(coin) === key)
       const next = exists
-        ? current.filter((coin) => coin.address !== address)
+        ? current.filter((coin) => assetKey(coin) !== key)
         : [{
             address,
+            chain,
+            chainLabel:item?.chain?.label || item?.chainLabel || chain,
             symbol: item?.symbol || item?.token?.symbol || 'TOKEN',
             name: item?.name || item?.token?.name || 'Unknown',
             addedAt: Date.now(),
@@ -952,16 +1028,18 @@ export default function Home() {
   function toggleCompare(item) {
     const address = item?.address || item?.mint
     if (!address) return
+    const chain = itemChainId(item,'solana')
+    const key = assetKey({address,chain})
 
     setCompare((current) => {
-      if (current.some((coin) => coin.address === address)) {
-        return current.filter((coin) => coin.address !== address)
+      if (current.some((coin) => assetKey(coin) === key)) {
+        return current.filter((coin) => assetKey(coin) !== key)
       }
       if (current.length >= 4) {
         setNotificationStatus('Compare supports up to 4 tokens at once.')
         return current
       }
-      return [...current, { ...item, address }]
+      return [...current, { ...item, address, chain }]
     })
   }
 
@@ -993,10 +1071,11 @@ export default function Home() {
   function exportTradePlansCsv() {
     if (!tradePlans.length) return
     const rows = [
-      ['token','name','address','status','positionUsd','entryMarketCap','tpPercent','scaleOutPercent','stopPercent','enteredAt','closedAt','exitMarketCap','estimatedExitValue','estimatedPnl','thesis','invalidation'],
+      ['token','name','chain','address','status','positionUsd','entryMarketCap','tpPercent','scaleOutPercent','stopPercent','enteredAt','closedAt','exitMarketCap','estimatedExitValue','estimatedPnl','thesis','invalidation'],
       ...tradePlans.map((plan) => [
         plan.token || '',
         plan.name || '',
+        itemChainId(plan,'solana'),
         plan.address || '',
         plan.status || 'DRAFT',
         plan.investment ?? '',
@@ -1021,8 +1100,8 @@ export default function Home() {
     [hiddenCoins],
   )
 
-  const watchAddresses = useMemo(
-    () => new Set(watchlist.map((coin) => coin.address)),
+  const watchKeys = useMemo(
+    () => new Set(watchlist.map((coin) => assetKey(coin))),
     [watchlist],
   )
 
@@ -1309,7 +1388,7 @@ export default function Home() {
 
                 <div className="commandFooter">
                   <button onClick={resetRadarWorkspace}>Reset radar workspace</button>
-                  <span>v6.0 · multi-source intelligence + Bubble Map</span>
+                  <span>v6.1 · multichain intelligence + simple verdicts</span>
                 </div>
               </div>
             ) : null}
@@ -1343,7 +1422,7 @@ export default function Home() {
           <span className="overline">MARKET INTELLIGENCE TERMINAL</span>
           <h1>Trade the data.<br /><span>Not the emotion.</span></h1>
           <p>
-            Live Solana wallet tracking, contract-risk checks, order-flow analysis,
+            Multichain token scanning, Solana wallet tracking, contract-risk checks, order-flow analysis,
             deterministic trade signals, and an AI analyst that explains the setup.
           </p>
         </div>
@@ -1388,8 +1467,8 @@ export default function Home() {
             {activeDrawer === 'watchlist' ? (
               <div className="drawerList">
                 {watchlist.length ? watchlist.map((coin) => (
-                  <button key={coin.address} onClick={() => openRadarToken(coin)}>
-                    <div><strong>{coin.symbol}</strong><span>{coin.name}</span></div>
+                  <button key={assetKey(coin)} onClick={() => openRadarToken(coin)}>
+                    <div><strong>{coin.symbol}</strong><span>{coin.name} · {coin.chainLabel || itemChainId(coin)}</span></div>
                     <small>{shortAddress(coin.address, 5)} →</small>
                   </button>
                 )) : <EmptyDrawer text="Nothing watched yet. Tap ☆ on a radar card or scanner." />}
@@ -1416,8 +1495,8 @@ export default function Home() {
             {activeDrawer === 'history' ? (
               <div className="drawerList">
                 {history.length ? history.map((entry, index) => (
-                  <button key={`${entry.address}-${index}`} onClick={() => openHistoryScan(entry)}>
-                    <div><strong>{entry.symbol || 'TOKEN'}</strong><span>{entry.signal || 'Saved scan'}</span></div>
+                  <button key={`${entry.chain || 'solana'}:${entry.address}-${index}`} onClick={() => openHistoryScan(entry)}>
+                    <div><strong>{entry.symbol || 'TOKEN'}</strong><span>{entry.chainLabel || entry.chain || 'solana'} · {entry.signal || 'Saved scan'}</span></div>
                     <small>{entry.score ?? '—'}/100 →</small>
                   </button>
                 )) : <EmptyDrawer text="No recent scans yet. Manual token scans appear here." />}
@@ -1441,7 +1520,7 @@ export default function Home() {
                 <small className="tradePlanStatsNote">Journal P/L is estimated from saved market-cap math, not exchange-verified realized P/L.</small>
                 <div className="tradePlanLibrary">
                   {tradePlans.length ? tradePlans.map((plan) => (
-                    <div className="tradePlanLibraryRow" key={plan.address}>
+                    <div className="tradePlanLibraryRow" key={assetKey(plan)}>
                       <button className="tradePlanOpen" onClick={() => openTradePlan(plan)}>
                         <div>
                           <strong>{plan.token || shortAddress(plan.address, 5)}</strong>
@@ -1461,7 +1540,7 @@ export default function Home() {
                           ) : null}
                         </div>
                       </button>
-                      <button className="tradePlanDelete" onClick={() => deleteTradePlan(plan.address)} aria-label={'Delete ' + (plan.token || 'trade plan')}>×</button>
+                      <button className="tradePlanDelete" onClick={() => deleteTradePlan(plan)} aria-label={'Delete ' + (plan.token || 'trade plan')}>×</button>
                     </div>
                   )) : <EmptyDrawer text="No trade plans yet. Save one from the V4 Market Lab." />}
                 </div>
@@ -1610,9 +1689,9 @@ export default function Home() {
               {watchlist.length ? (
                 <div className="watchGrid">
                   {watchlist.map((coin) => (
-                    <button key={coin.address} onClick={() => openRadarToken(coin)}>
+                    <button key={assetKey(coin)} onClick={() => openRadarToken(coin)}>
                       <strong>{coin.symbol}</strong>
-                      <span>{coin.name}</span>
+                      <span>{coin.name} · {coin.chainLabel || itemChainId(coin)}</span>
                       <small>{shortAddress(coin.address, 4)}</small>
                     </button>
                   ))}
@@ -1662,17 +1741,17 @@ export default function Home() {
                     <span className="rank">#{String(index + 1).padStart(2, '0')}</span>
                     <div className="radarTopActions">
                       <button
-                        className={watchAddresses.has(item.address) ? 'watchButton active' : 'watchButton'}
+                        className={watchKeys.has(assetKey(item,'solana')) ? 'watchButton active' : 'watchButton'}
                         onClick={(event) => {
                           event.stopPropagation()
                           toggleWatch(item)
                         }}
-                        aria-label={watchAddresses.has(item.address) ? `Remove ${item.symbol} from watchlist` : `Watch ${item.symbol}`}
+                        aria-label={watchKeys.has(assetKey(item,'solana')) ? `Remove ${item.symbol} from watchlist` : `Watch ${item.symbol}`}
                       >
-                        {watchAddresses.has(item.address) ? '★' : '☆'}
+                        {watchKeys.has(assetKey(item,'solana')) ? '★' : '☆'}
                       </button>
                       <button
-                        className={compare.some((coin) => coin.address === item.address) ? 'compareButton active' : 'compareButton'}
+                        className={compare.some((coin) => assetKey(coin) === assetKey(item,'solana')) ? 'compareButton active' : 'compareButton'}
                         onClick={(event) => {
                           event.stopPropagation()
                           toggleCompare(item)
@@ -1734,7 +1813,7 @@ export default function Home() {
                     <ScoreRing score={item.intelligence.score} />
                     <div>
                       <small>RCXT RISK-ADJUSTED SCORE</small>
-                      <b>{item.intelligence.grade} · {item.intelligence.confidence}% confidence</b>
+                      <b>{item.intelligence.grade} · {item.intelligence.confidence}% evidence confidence</b>
                     </div>
                   </div>
                   <ScoreAxes intelligence={item.intelligence} compact />
@@ -1763,7 +1842,7 @@ export default function Home() {
             <div><span>03</span><b>Order Flow</b><small>Buy/sell pressure</small></div>
             <div><span>04</span><b>Momentum</b><small>5m → 24h structure</small></div>
             <div><span>05</span><b>Maturity</b><small>Pair-age risk</small></div>
-            <div><span>06</span><b>Contract</b><small>Mint + freeze authority</small></div>
+            <div><span>06</span><b>Contract</b><small>Chain-specific controls</small></div>
           </div>
         </section>
       )}
@@ -1775,7 +1854,7 @@ export default function Home() {
               <span className="sectionNumber">02</span>
               <div>
                 <h2>Deep Token Scanner</h2>
-                <p>Paste a Solana CA for a live market, contract, and signal breakdown.</p>
+                <p>Scan Solana or supported EVM contracts with chain-aware market and security checks.</p>
               </div>
             </div>
             <label className="autoToggle">
@@ -1789,14 +1868,24 @@ export default function Home() {
             </label>
           </div>
 
-          <div className="scanBar">
+          <div className="scanBar multiChain">
+            <select
+              className="chainSelect"
+              value={scanChain}
+              onChange={(event) => setScanChain(event.target.value)}
+              aria-label="Token blockchain"
+            >
+              {SCAN_CHAIN_OPTIONS.map((chain) => (
+                <option key={chain.id} value={chain.id}>{chain.label}</option>
+              ))}
+            </select>
             <input
               value={tokenAddress}
               onChange={(event) => setTokenAddress(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') runScan()
               }}
-              placeholder="Paste Solana token contract address"
+              placeholder="Paste token contract address"
               aria-label="Token contract address"
             />
             <button className="primaryButton" onClick={() => runScan()} disabled={scanLoading}>
@@ -1808,22 +1897,29 @@ export default function Home() {
 
           {scan ? (
             <>
+              <ScanVerdict scan={scan} />
               <div className="scanQuickActions">
-                <button className={watchAddresses.has(scan.address) ? 'toolButton active' : 'toolButton'} onClick={() => toggleWatch(scan)}>
-                  {watchAddresses.has(scan.address) ? '★ Watching' : '☆ Watch'}
+                <button className={watchKeys.has(assetKey(scan)) ? 'toolButton active' : 'toolButton'} onClick={() => toggleWatch(scan)}>
+                  {watchKeys.has(assetKey(scan)) ? '★ Watching' : '☆ Watch'}
                 </button>
                 <button className="toolButton" onClick={() => navigator.clipboard?.writeText(scan.address)}>Copy CA</button>
-                <button
-                  className="toolButton bubbleMapButton"
-                  onClick={() => window.open(
-                    `https://v2.bubblemaps.io/map?address=${encodeURIComponent(scan.address)}&chain=solana&partnerId=regular`,
-                    '_blank',
-                    'noopener,noreferrer',
-                  )}
-                  title="Open this token in Bubblemaps V2"
-                >
-                  Bubble Map ↗
-                </button>
+                {scan?.chain?.id === 'solana' ? (
+                  <button
+                    className="toolButton bubbleMapButton"
+                    onClick={() => window.open(
+                      `https://v2.bubblemaps.io/map?address=${encodeURIComponent(scan.address)}&chain=solana&partnerId=regular`,
+                      '_blank',
+                      'noopener,noreferrer',
+                    )}
+                    title="Open this token in Bubblemaps V2"
+                  >
+                    Bubble Map ↗
+                  </button>
+                ) : scan?.chain?.explorerUrl ? (
+                  <a className="toolLink chainExplorerLink" href={scan.chain.explorerUrl} target="_blank" rel="noreferrer">
+                    Explorer ↗
+                  </a>
+                ) : null}
                 <details className="scanMoreActions">
                   <summary>More</summary>
                   <div>
@@ -1843,6 +1939,7 @@ export default function Home() {
                       {hiddenAddresses.has(scan.address) ? 'Restore Coin' : 'Hide Coin'}
                     </button>
                     {scan.pair?.url ? <a className="toolLink" href={scan.pair.url} target="_blank" rel="noreferrer">DexScreener ↗</a> : null}
+                    {scan?.chain?.explorerUrl ? <a className="toolLink" href={scan.chain.explorerUrl} target="_blank" rel="noreferrer">{scan.chain.label || 'Chain'} Explorer ↗</a> : null}
                     {isPumpFunToken(scan) ? (
                       <a className="toolLink pumpLink" href={`https://pump.fun/coin/${scan.address}`} target="_blank" rel="noreferrer">
                         Pump.fun ↗
@@ -1852,31 +1949,17 @@ export default function Home() {
                 </details>
               </div>
 
-              <div className="scanHero">
-                <div className="scanIdentity">
-                  <span className="tokenSymbol">{scan.token.symbol}</span>
-                  <h3>{scan.token.name}</h3>
-                  <button
-                    className="addressButton"
-                    onClick={() => navigator.clipboard?.writeText(scan.address)}
-                  >
-                    {shortAddress(scan.address)} · copy
-                  </button>
-                </div>
-
-                <div className="signalHero">
-                  <span>RCXT SIGNAL</span>
-                  <SignalBadge signal={scan.intelligence.signal} large />
-                  <small>
-                    {scan.intelligence.confidence}% data confidence · {scan.intelligence.risk} risk
-                  </small>
-                  <em>{scan.intelligence.preliminary ? 'Preliminary market score' : 'Full contract-verified scan'}</em>
-                </div>
-
-                <ScoreRing score={scan.intelligence.score} large />
-              </div>
-
-              <BeginnerSnapshot scan={scan} />
+              <details className="quickReadDisclosure">
+                <summary>
+                  <div>
+                    <span>WHY THIS RESULT</span>
+                    <strong>Reasons + scenario map</strong>
+                    <small>Open only when you want the deeper explanation.</small>
+                  </div>
+                  <b>OPEN</b>
+                </summary>
+                <BeginnerSnapshot scan={scan} />
+              </details>
 
               <details className="coreMetricsDisclosure">
                 <summary>
@@ -1958,30 +2041,92 @@ export default function Home() {
                 <article className="panel">
                   <PanelHeader eyebrow="RISK CONTROL" title="Contract + market flags" />
                   <div className="securityRows">
-                    <SecurityRow
-                      label="Mint authority"
-                      good={scan.security?.available && !scan.security?.mintAuthority}
-                      unknown={!scan.security?.available}
-                      value={
-                        !scan.security?.available
-                          ? 'Unavailable'
-                          : scan.security?.mintAuthority
-                            ? 'Active'
-                            : 'Disabled'
-                      }
-                    />
-                    <SecurityRow
-                      label="Freeze authority"
-                      good={scan.security?.available && !scan.security?.freezeAuthority}
-                      unknown={!scan.security?.available}
-                      value={
-                        !scan.security?.available
-                          ? 'Unavailable'
-                          : scan.security?.freezeAuthority
-                            ? 'Active'
-                            : 'Disabled'
-                      }
-                    />
+                    {scan.security?.securityModel === 'evm-token' ? (
+                      <>
+                        <SecurityRow
+                          label="Contract bytecode"
+                          good={scan.security?.contractCodePresent === true}
+                          unknown={!scan.security?.available || scan.security?.contractCodePresent == null}
+                          value={
+                            !scan.security?.available
+                              ? 'RPC unavailable'
+                              : scan.security?.contractCodePresent
+                                ? 'Present'
+                                : 'Not found'
+                          }
+                        />
+                        <SecurityRow
+                          label="Open source"
+                          good={scan.security?.external?.goplus?.openSource === true}
+                          unknown={scan.security?.external?.goplus?.openSource == null}
+                          value={
+                            scan.security?.external?.goplus?.openSource === true
+                              ? 'Verified source'
+                              : scan.security?.external?.goplus?.openSource === false
+                                ? 'Closed source'
+                                : 'Unknown'
+                          }
+                        />
+                        <SecurityRow
+                          label="Honeypot"
+                          good={scan.security?.external?.goplus?.honeypot === false}
+                          unknown={scan.security?.external?.goplus?.honeypot == null}
+                          value={
+                            scan.security?.external?.goplus?.honeypot === true
+                              ? 'DETECTED'
+                              : scan.security?.external?.goplus?.honeypot === false
+                                ? 'Not detected'
+                                : 'Unknown'
+                          }
+                        />
+                        <SecurityRow
+                          label="Buy / sell tax"
+                          good={
+                            Math.max(
+                              Number(scan.security?.external?.goplus?.buyTaxPercent || 0),
+                              Number(scan.security?.external?.goplus?.sellTaxPercent || 0),
+                            ) < 10
+                          }
+                          unknown={
+                            scan.security?.external?.goplus?.buyTaxPercent == null &&
+                            scan.security?.external?.goplus?.sellTaxPercent == null
+                          }
+                          value={
+                            scan.security?.external?.goplus?.buyTaxPercent == null &&
+                            scan.security?.external?.goplus?.sellTaxPercent == null
+                              ? 'Unknown'
+                              : `${fixed(scan.security?.external?.goplus?.buyTaxPercent || 0,1,'0.0')}% / ${fixed(scan.security?.external?.goplus?.sellTaxPercent || 0,1,'0.0')}%`
+                          }
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <SecurityRow
+                          label="Mint authority"
+                          good={scan.security?.available && !scan.security?.mintAuthority}
+                          unknown={!scan.security?.available}
+                          value={
+                            !scan.security?.available
+                              ? 'Unavailable'
+                              : scan.security?.mintAuthority
+                                ? 'Active'
+                                : 'Disabled'
+                          }
+                        />
+                        <SecurityRow
+                          label="Freeze authority"
+                          good={scan.security?.available && !scan.security?.freezeAuthority}
+                          unknown={!scan.security?.available}
+                          value={
+                            !scan.security?.available
+                              ? 'Unavailable'
+                              : scan.security?.freezeAuthority
+                                ? 'Active'
+                                : 'Disabled'
+                          }
+                        />
+                      </>
+                    )}
                     <SecurityRow
                       label="Contract verification"
                       good={Boolean(scan.intelligence.contractVerified)}
@@ -2086,7 +2231,7 @@ export default function Home() {
                       unknown={Number(scan.intelligence?.securityEvidence?.market?.priceProviderCount || 0) < 2}
                       value={
                         scan.intelligence?.securityEvidence?.market?.priceConflict
-                          ? `${Number(scan.intelligence?.securityEvidence?.market?.maxDeviationPercent || 0).toFixed(1)}% source spread`
+                          ? `${fixed(scan.intelligence?.securityEvidence?.market?.maxDeviationPercent || 0,1,'0.0')}% source spread`
                           : scan.intelligence?.securityEvidence?.market?.priceAgreement
                             ? 'Strong agreement'
                             : Number(scan.intelligence?.securityEvidence?.market?.priceProviderCount || 0) >= 2
@@ -2151,7 +2296,7 @@ export default function Home() {
                       value={
                         scan.intelligence?.concentration?.top1Percent == null
                           ? 'Unavailable'
-                          : `${Number(scan.intelligence.concentration.top1Percent).toFixed(1)}%`
+                          : `${fixed(scan.intelligence.concentration.top1Percent,1)}%`
                       }
                     />
                     <SecurityRow
@@ -2169,7 +2314,7 @@ export default function Home() {
                       unknown={!scan.intelligence?.concentration?.available}
                       value={
                         scan.intelligence?.concentration?.available
-                          ? `${Number(scan.intelligence.concentration.top10Percent).toFixed(1)}%`
+                          ? `${fixed(scan.intelligence.concentration.top10Percent,1)}%`
                           : 'Unavailable'
                       }
                     />
@@ -2182,7 +2327,7 @@ export default function Home() {
                           value={
                             scan.intelligence?.concentration?.accountTop1Percent == null
                               ? 'Unavailable'
-                              : `${Number(scan.intelligence.concentration.accountTop1Percent).toFixed(1)}%`
+                              : `${fixed(scan.intelligence.concentration.accountTop1Percent,1)}%`
                           }
                         />
                         <SecurityRow
@@ -2316,11 +2461,13 @@ export default function Home() {
               </div>
 
               </DetailSection>
-              <V4AnalyticsSuite
-                scan={scan}
-                walletEquity={Number(walletData?.portfolioTotalUsd || walletData?.portfolioTokenValueUsd || 0)}
-                onContext={setMarketContext}
-              />
+              <SectionBoundary name="Market Lab">
+                <V4AnalyticsSuite
+                  scan={scan}
+                  walletEquity={Number(walletData?.portfolioTotalUsd || walletData?.portfolioTokenValueUsd || 0)}
+                  onContext={setMarketContext}
+                />
+              </SectionBoundary>
                 </div>
               </details>
 
@@ -2371,7 +2518,7 @@ export default function Home() {
               </div>
             </>
           ) : (
-            <EmptyScanner history={history} onSelect={(item) => runScan({ address: item.address })} />
+            <EmptyScanner history={history} onSelect={(item) => runScan({ address: item.address, chain:item.chain || 'auto' })} />
           )}
         </section>
       )}
@@ -2405,7 +2552,9 @@ export default function Home() {
 
           {walletError ? <ErrorBox text={walletError} /> : null}
 
-          <ChallengeTracker walletAddress={wallet} walletData={walletData} />
+          <SectionBoundary name="$5 → $50K Challenge">
+            <ChallengeTracker walletAddress={wallet} walletData={walletData} />
+          </SectionBoundary>
           <WalletActivity
             walletAddress={wallet}
             onOpenToken={openRadarToken}
@@ -2419,14 +2568,14 @@ export default function Home() {
             <>
               <div className="walletRiskStrip">
                 <MetricCard label="Largest Position" value={portfolioStats.largestSymbol} />
-                <MetricCard label="Top Concentration" value={`${portfolioStats.concentration.toFixed(1)}%`} tone={portfolioStats.concentration > 50 ? 'negative' : ''} />
+                <MetricCard label="Top Concentration" value={`${fixed(portfolioStats.concentration,1,'0.0')}%`} tone={portfolioStats.concentration > 50 ? 'negative' : ''} />
                 <MetricCard label="High-Risk Positions" value={portfolioStats.highRisk} tone={portfolioStats.highRisk ? 'negative' : 'positive'} />
-                <MetricCard label="High-Risk Value" value={`${portfolioStats.highRiskValuePercent.toFixed(0)}%`} tone={portfolioStats.highRiskValuePercent >= 30 ? 'negative' : 'positive'} />
-                <MetricCard label="Low-Liq Value" value={`${portfolioStats.lowLiquidityValuePercent.toFixed(0)}%`} tone={portfolioStats.lowLiquidityValuePercent >= 35 ? 'negative' : ''} />
-                <MetricCard label="Unknown-Liq Value" value={`${portfolioStats.unknownLiquidityValuePercent.toFixed(0)}%`} tone={portfolioStats.unknownLiquidityValuePercent >= 50 ? 'negative' : ''} />
-                <MetricCard label="Weighted Score" value={portfolioStats.weightedScore == null ? '—' : portfolioStats.weightedScore.toFixed(0)} />
+                <MetricCard label="High-Risk Value" value={`${fixed(portfolioStats.highRiskValuePercent,0,'0')}%`} tone={portfolioStats.highRiskValuePercent >= 30 ? 'negative' : 'positive'} />
+                <MetricCard label="Low-Liq Value" value={`${fixed(portfolioStats.lowLiquidityValuePercent,0,'0')}%`} tone={portfolioStats.lowLiquidityValuePercent >= 35 ? 'negative' : ''} />
+                <MetricCard label="Unknown-Liq Value" value={`${fixed(portfolioStats.unknownLiquidityValuePercent,0,'0')}%`} tone={portfolioStats.unknownLiquidityValuePercent >= 50 ? 'negative' : ''} />
+                <MetricCard label="Weighted Score" value={portfolioStats.weightedScore == null ? '—' : fixed(portfolioStats.weightedScore,0)} />
                 <MetricCard label="Portfolio Risk" value={portfolioStats.portfolioRisk} tone={portfolioStats.portfolioRisk === 'HIGH' ? 'negative' : portfolioStats.portfolioRisk === 'LOWER' ? 'positive' : ''} />
-                <MetricCard label="Value in $10K+ Liq" value={`${portfolioStats.liquidPercent.toFixed(0)}%`} />
+                <MetricCard label="Value in $10K+ Liq" value={`${fixed(portfolioStats.liquidPercent,0,'0')}%`} />
                 <button className="toolButton walletExport" onClick={exportWalletCsv}>Export wallet CSV</button>
               </div>
 
@@ -2452,7 +2601,7 @@ export default function Home() {
                       <span>{scenario.label}</span>
                       <strong>{usd(scenario.endValue)}</strong>
                       <b className="negativeText">−{usd(scenario.loss)}</b>
-                      <small>{scenario.percentLoss.toFixed(1)}% of total portfolio</small>
+                      <small>{fixed(scenario.percentLoss,1,'0.0')}% of total portfolio</small>
                     </div>
                   ))}
                 </div>
@@ -2526,8 +2675,8 @@ export default function Home() {
 
       <footer className="footer">
         <div>
-          <b>RCXT RADAR · v6.0.0</b>
-          <span>Score engine v6.0.0 · Solana · DexScreener · GeckoTerminal · RugCheck · GoPlus</span>
+          <b>RCXT RADAR · v6.1.0</b>
+          <span>Score engine v6.1.0 · Solana + EVM · DexScreener · GeckoTerminal · RugCheck · GoPlus</span>
         </div>
         <p>
           Signals are software-generated market intelligence, not guarantees or personalized financial advice.
@@ -2587,6 +2736,45 @@ function ScoreRing({ score, large = false }) {
   )
 }
 
+
+function ScanVerdict({ scan }) {
+  const intel = scan?.intelligence || {}
+  const { verdict, tone, reason, checks } = deriveScanVerdict(scan)
+
+  return (
+    <article className={`scanVerdict ${tone}`}>
+      <div className="scanVerdictMain">
+        <div className="scanVerdictIdentity">
+          <span>{scan?.token?.symbol || 'TOKEN'} · {scan?.chain?.label || 'Unknown chain'}</span>
+          <strong>{scan?.token?.name || 'Token scan'}</strong>
+          <button className="addressButton" onClick={() => navigator.clipboard?.writeText(scan?.address || '')}>
+            {shortAddress(scan?.address)} · copy
+          </button>
+        </div>
+        <div className="scanVerdictAnswer">
+          <small>RCXT SETUP RESULT</small>
+          <b>{verdict}</b>
+          <span>{verdict === 'YES' ? 'Setup passes current gates' : verdict === 'NO' ? 'Risk controls veto this setup' : 'Wait for more confirmation'}</span>
+        </div>
+        <div className="scanVerdictScore">
+          <strong>{intel.score ?? '—'}<small>/100</small></strong>
+          <span>{intel.confidence ?? '—'}% evidence confidence</span>
+          <em>{intel.risk || 'UNKNOWN'} risk</em>
+        </div>
+      </div>
+      <p className="scanVerdictReason">{reason}</p>
+      <div className="scanVerdictChecks">
+        {checks.map((check) => (
+          <div key={check.label} className={check.state}>
+            <span>{check.label}</span>
+            <b>{check.value}</b>
+          </div>
+        ))}
+      </div>
+      <small className="scanVerdictNote">YES / WAIT / NO summarizes RCXT's current setup gates. It is not a guarantee of price direction or profit.</small>
+    </article>
+  )
+}
 
 function BeginnerSnapshot({ scan }) {
   const intel = scan?.intelligence || {}
@@ -2798,7 +2986,7 @@ function CalibrationStrip({ calibration, modelVersion, signal, score }) {
             <span>{row.horizon}</span>
             <strong>{row.directionalHitRate == null ? '—' : Math.round(row.directionalHitRate * 100) + '% direction hit'}</strong>
             <small>
-              avg {row.avgReturnPct == null ? '—' : (row.avgReturnPct >= 0 ? '+' : '') + row.avgReturnPct.toFixed(1) + '%'}
+              avg {row.avgReturnPct == null ? '—' : (row.avgReturnPct >= 0 ? '+' : '') + fixed(row.avgReturnPct,1) + '%'}
               {' · '}{row.samples} samples
             </small>
           </div>
@@ -2889,7 +3077,7 @@ function SnapshotDelta({ rows, current, modelVersion }) {
           const tone = value == null ? '' : value > 0 ? 'positive' : value < 0 ? 'negative' : ''
           const rendered = value == null
             ? '—'
-            : (value >= 0 ? '+' : '') + value.toFixed(unit === 'pts' ? 0 : 1) + unit
+            : (value >= 0 ? '+' : '') + fixed(value,unit === 'pts' ? 0 : 1,'0') + unit
           return (
             <div key={label}>
               <span>{label}</span>
@@ -3057,7 +3245,7 @@ function EmptyScanner({ history, onSelect }) {
           <span>RECENT SCANS</span>
           <div>
             {history.map((item) => (
-              <button key={item.address} onClick={() => onSelect(item)}>
+              <button key={assetKey(item,item?.chain||'solana')} onClick={() => onSelect(item)}>
                 <strong>{item.symbol}</strong>
                 <small>{item.score}/100 · {item.signal}</small>
               </button>
@@ -3077,7 +3265,7 @@ function CompareTray({ items, onRemove, onOpen }) {
       </div>
       <div className="compareGrid">
         {items.map((item) => (
-          <div className="compareCard" key={item.address}>
+          <div className="compareCard" key={assetKey(item)}>
             <button className="compareRemove" onClick={() => onRemove(item)}>×</button>
             <button className="compareOpen" onClick={() => onOpen(item)}>
               <strong>{item.symbol || item.token?.symbol || 'TOKEN'}</strong>
@@ -3115,6 +3303,11 @@ function number(value, digits = 2) {
   return Number(value || 0).toLocaleString(undefined, {
     maximumFractionDigits: digits,
   })
+}
+
+function fixed(value, digits = 1, fallback = '—') {
+  const n = Number(value)
+  return Number.isFinite(n) ? n.toFixed(digits) : fallback
 }
 
 function usd(value) {
@@ -3158,7 +3351,9 @@ function isPumpFunToken(scan) {
 }
 
 function formatAge(hours) {
-  if (hours < 1) return `${Math.round(hours * 60)}m`
-  if (hours < 48) return `${hours.toFixed(1)}h`
-  return `${(hours / 24).toFixed(1)}d`
+  const n = Number(hours)
+  if (!Number.isFinite(n) || n < 0) return 'Unknown'
+  if (n < 1) return `${Math.round(n * 60)}m`
+  if (n < 48) return `${fixed(n,1)}h`
+  return `${fixed(n / 24,1)}d`
 }

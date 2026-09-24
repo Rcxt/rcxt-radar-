@@ -7,6 +7,12 @@ function finite(value,fallback=0){
   return Number.isFinite(n)?n:fallback
 }
 
+function optionalNumber(value){
+  if(value===null||value===undefined||value==='') return null
+  const n=Number(value)
+  return Number.isFinite(n)?n:null
+}
+
 export function projectedPositionValue({
   investment,
   entryMarketCap,
@@ -58,10 +64,12 @@ export function buildProfitLadder({
     if(!deduped.length||Math.abs(rounded-deduped.at(-1))/rounded>0.025) deduped.push(rounded)
   }
 
-  return deduped.slice(0,12).map((targetMarketCap)=>({
-    targetMarketCap,
-    ...projectedPositionValue({investment,entryMarketCap:entry,targetMarketCap,estimatedCostsPercent}),
-  }))
+  return deduped.slice(0,12)
+    .map((targetMarketCap)=>{
+      const projection=projectedPositionValue({investment,entryMarketCap:entry,targetMarketCap,estimatedCostsPercent})
+      return projection ? { targetMarketCap, ...projection } : null
+    })
+    .filter(Boolean)
 }
 
 export function positionPlan({
@@ -124,12 +132,15 @@ export function beginnerMarketExplanation(scan,chartAnalytics){
     text:`${intel.signal||'WATCH'} with a ${intel.score??0}/100 risk-adjusted score. This means the setup has ${Number(intel.score||0)>=70?'several constructive signals':'meaningful weaknesses or missing confirmation'}; it does not mean a ${intel.score??0}% chance of profit.`,
   })
 
-  const liquidity=Number(scan.market?.liquidityUsd||0)
+  const liquidityReported=intel.liquidityReported!==false && scan.market?.liquidityUsd!=null
+  const liquidity=liquidityReported?optionalNumber(scan.market?.liquidityUsd):null
   lines.push({
     title:'Can you get in and out?',
-    text:liquidity>=50000
-      ? `Liquidity is about $${Math.round(liquidity).toLocaleString()}, which is healthier than a thin launch, but slippage can still change quickly.`
-      : `Liquidity is only about $${Math.round(liquidity).toLocaleString()}. Small liquidity makes entries/exits more sensitive to slippage and large sellers.`,
+    text:liquidity==null
+      ? 'Reported pool liquidity is unavailable, so RCXT cannot confirm exit depth from this snapshot.'
+      : liquidity>=50000
+        ? `Liquidity is about ${Math.round(liquidity).toLocaleString()}, which is healthier than a thin launch, but slippage can still change quickly.`
+        : `Liquidity is only about ${Math.round(liquidity).toLocaleString()}. Small liquidity makes entries/exits more sensitive to slippage and large sellers.`,
   })
 
   if(analytics){
@@ -195,9 +206,17 @@ export function breakEvenMarketCap({
 export function buildExecutionChecklist({scan,analytics,tape,positionSize=0}){
   if(!scan) return []
   const intel=scan.intelligence||{}
-  const liquidity=Number(scan.market?.liquidityUsd||0)
-  const burden=liquidity>0&&Number(positionSize)>0 ? Number(positionSize)/liquidity*100 : null
+  const liquidityReported=intel.liquidityReported!==false && scan?.market?.liquidityUsd!=null
+  const liquidity=liquidityReported?optionalNumber(scan.market?.liquidityUsd):null
+  const burden=liquidity!=null&&liquidity>0&&Number(positionSize)>0 ? Number(positionSize)/liquidity*100 : null
   const chartAvailable=Boolean(analytics?.available)
+  const chartM15=chartAvailable?optionalNumber(analytics?.momentum?.m15):null
+  const marketM5=optionalNumber(scan?.market?.priceChange?.m5)
+  const flowNet=tape?optionalNumber(tape?.netFlowUsd):null
+  const flowBuyPct=tape?optionalNumber(tape?.buyVolumePercent):null
+  const tapeHasSample=Boolean(tape)&&(tape?.sampleSize==null||Number(tape.sampleSize)>0)
+  const flowKnown=tapeHasSample&&flowNet!==null&&flowBuyPct!==null
+  const chaseValue=chartAvailable?chartM15:marketM5
 
   const items=[
     {
@@ -205,14 +224,18 @@ export function buildExecutionChecklist({scan,analytics,tape,positionSize=0}){
       label:'Contract controls',
       pass:Boolean(intel.contractVerified),
       unknown:!scan.security?.available,
-      detail:intel.contractVerified?'Mint/freeze controls passed':'Contract verification incomplete or needs review',
+      detail:intel.contractVerified
+        ? (scan?.chain?.family==='evm'?'EVM contract/security controls passed':'Mint/freeze and structural controls passed')
+        : 'Contract verification incomplete or needs review',
     },
     {
       key:'liquidity',
       label:'Exit liquidity',
-      pass:liquidity>=15000,
-      unknown:!liquidity,
-      detail:liquidity?('$'+Math.round(liquidity).toLocaleString()+' reported liquidity'):'Liquidity unavailable',
+      pass:liquidity!==null&&liquidity>=15000,
+      unknown:liquidity===null,
+      detail:liquidity===null
+        ? 'Liquidity unavailable'
+        : '$'+Math.round(liquidity).toLocaleString()+' reported liquidity',
     },
     {
       key:'setup',
@@ -231,21 +254,25 @@ export function buildExecutionChecklist({scan,analytics,tape,positionSize=0}){
     {
       key:'flow',
       label:'Recent USD flow',
-      pass:Number(tape?.netFlowUsd||0)>=0&&Number(tape?.buyVolumePercent||0)>=48,
-      unknown:!tape,
-      detail:tape?('$'+Math.round(Number(tape.netFlowUsd||0)).toLocaleString()+' net · '+Number(tape.buyVolumePercent||0).toFixed(1)+'% buy volume'):'Waiting for trade tape',
+      pass:flowKnown&&flowNet>=0&&flowBuyPct>=48,
+      unknown:!flowKnown,
+      detail:flowKnown
+        ? '$'+Math.round(flowNet).toLocaleString()+' net · '+flowBuyPct.toFixed(1)+'% buy volume'
+        : 'Waiting for usable trade tape',
     },
     {
       key:'chase',
       label:'Not excessively extended',
-      pass:chartAvailable?Number(analytics.momentum?.m15||0)<25:Number(scan.market?.priceChange?.m5||0)<20,
-      unknown:false,
-      detail:chartAvailable?('15m '+Number(analytics.momentum?.m15||0).toFixed(1)+'%'):('5m '+Number(scan.market?.priceChange?.m5||0).toFixed(1)+'%'),
+      pass:chaseValue!==null&&chaseValue<(chartAvailable?25:20),
+      unknown:chaseValue===null,
+      detail:chaseValue===null
+        ? 'Short-term momentum is unavailable'
+        : (chartAvailable?'15m ':'5m ')+chaseValue.toFixed(1)+'%',
     },
     {
       key:'burden',
       label:'Position vs liquidity',
-      pass:burden==null?true:burden<=1,
+      pass:burden!=null&&burden<=1,
       unknown:burden==null,
       detail:burden==null?'Enter account/risk settings to measure':'Planned position is '+burden.toFixed(2)+'% of liquidity',
     },
@@ -260,7 +287,6 @@ export function buildExecutionChecklist({scan,analytics,tape,positionSize=0}){
   }
 }
 
-
 export function buildEntryQuality({scan,analytics,tape}){
   if(!scan) return {available:false,score:null,label:'UNAVAILABLE',reasons:[],warnings:[]}
 
@@ -269,8 +295,9 @@ export function buildEntryQuality({scan,analytics,tape}){
   let score=50
   let evidence=0
 
-  const liquidity=Number(scan?.market?.liquidityUsd||0)
-  if(liquidity>0){
+  const liquidityReported=scan?.intelligence?.liquidityReported!==false && scan?.market?.liquidityUsd!=null
+  const liquidity=liquidityReported?optionalNumber(scan?.market?.liquidityUsd):null
+  if(liquidity!==null){
     evidence+=1
     if(liquidity>=50000){score+=12;reasons.push('Liquidity is relatively healthy')}
     else if(liquidity>=15000){score+=6;reasons.push('Liquidity is usable but still needs care')}
@@ -312,10 +339,10 @@ export function buildEntryQuality({scan,analytics,tape}){
     if(atrPct>=18){score-=8;warnings.push('Per-candle volatility is extreme')}
   }
 
-  if(tape){
+  if(tape&&(tape?.sampleSize==null||Number(tape.sampleSize)>0)&&optionalNumber(tape?.netFlowUsd)!==null&&optionalNumber(tape?.buyVolumePercent)!==null){
     evidence+=1
-    const net=Number(tape?.netFlowUsd||0)
-    const buyPct=Number(tape?.buyVolumePercent||50)
+    const net=Number(tape.netFlowUsd)
+    const buyPct=Number(tape.buyVolumePercent)
     const flags=tape?.flags||[]
 
     if(net>0&&buyPct>=55){score+=8;reasons.push('Recent USD trade flow favors buyers')}
@@ -357,7 +384,6 @@ export function buildRugRiskChecklist({scan,tape}){
   const intel=scan.intelligence||{}
   const security=scan.security||{}
   const market=scan.market||{}
-  const trading=scan.trading||{}
   const concentration=intel.concentration||{}
   const tapeFlags=tape?.flags||[]
   const items=[]
@@ -367,150 +393,79 @@ export function buildRugRiskChecklist({scan,tape}){
   }
 
   if(!security.available){
-    add('contract-data','Contract data','unknown','Mint security data is unavailable or incomplete.','measured')
+    add('contract-data','Contract data','unknown','Chain-specific security data is unavailable or incomplete.','measured')
+  }else if(security.securityModel==='evm-token'){
+    const evm=security?.external?.goplus||{}
+    add('evm-bytecode','Contract bytecode',security.contractCodePresent===true?'pass':security.contractCodePresent===false?'critical':'unknown',security.contractCodePresent===true?'Contract bytecode is present.':security.contractCodePresent===false?'No contract bytecode was found.':'Bytecode status is unavailable.','measured')
+    add('evm-honeypot','Honeypot simulation',evm.honeypot===true?'critical':evm.honeypot===false?'pass':'unknown',evm.honeypot===true?'GoPlus reports honeypot behavior.':evm.honeypot===false?'GoPlus did not detect honeypot behavior.':'Honeypot simulation is unavailable.','measured')
+    add('evm-source','Contract source',evm.openSource===true?'pass':evm.openSource===false?'warning':'unknown',evm.openSource===true?'Contract source is available for inspection.':evm.openSource===false?'Contract source is not verified/open.':'Source verification is unavailable.','measured')
+    const buyTax=optionalNumber(evm.buyTaxPercent)
+    const sellTax=optionalNumber(evm.sellTaxPercent)
+    const taxKnown=buyTax!==null||sellTax!==null
+    const maxTax=Math.max(buyTax||0,sellTax||0)
+    add('evm-tax','Buy / sell tax',!taxKnown?'unknown':maxTax>=50?'critical':maxTax>=10?'warning':'pass',taxKnown?`Buy ${buyTax??0}% · Sell ${sellTax??0}%`:'Token tax data is unavailable.','measured')
   }else{
-    add(
-      'mint-authority',
-      'Mint authority',
-      security.mintAuthority?'critical':'pass',
-      security.mintAuthority?'Mint authority is still active.':'Mint authority is disabled.',
-      'measured'
-    )
-    add(
-      'freeze-authority',
-      'Freeze authority',
-      security.freezeAuthority?'critical':'pass',
-      security.freezeAuthority?'Freeze authority is still active.':'Freeze authority is disabled.',
-      'measured'
-    )
+    add('mint-authority','Mint authority',security.mintAuthority?'critical':'pass',security.mintAuthority?'Mint authority is still active.':'Mint authority is disabled.','measured')
+    add('freeze-authority','Freeze authority',security.freezeAuthority?'critical':'pass',security.freezeAuthority?'Freeze authority is still active.':'Freeze authority is disabled.','measured')
   }
 
   if(concentration.available){
-    const top1=Number(concentration.top1Percent||0)
-    const top10=Number(concentration.top10Percent||0)
-    const method=concentration.method==='RESOLVED_TOKEN_ACCOUNT_OWNERS'?'resolved owners':'token accounts'
-    add(
-      'concentration',
-      'Supply concentration',
-      top1>=70||top10>=92?'critical':top1>=45||top10>=80?'warning':'pass',
-      `Top 1 ${method}: ${top1.toFixed(1)}% · Top 10: ${top10.toFixed(1)}%.`,
-      'measured'
-    )
+    const top1=optionalNumber(concentration.top1Percent)
+    const top10=optionalNumber(concentration.top10Percent)
+    const method=concentration.method==='RESOLVED_TOKEN_ACCOUNT_OWNERS'
+      ? 'resolved owners'
+      : String(concentration.method||'').includes('EXTERNAL')||String(concentration.method||'').includes('GOPLUS')||String(concentration.method||'').includes('RUGCHECK')
+        ? 'external holders'
+        : 'token accounts'
+    if(top1===null&&top10===null){
+      add('concentration','Supply concentration','unknown','Holder concentration is marked available but percentages are missing.','measured')
+    }else{
+      add('concentration','Supply concentration',(top1!==null&&top1>=70)||(top10!==null&&top10>=92)?'critical':(top1!==null&&top1>=45)||(top10!==null&&top10>=80)?'warning':'pass',`Top 1 ${method}: ${top1===null?'—':top1.toFixed(1)+'%'} · Top 10: ${top10===null?'—':top10.toFixed(1)+'%'}.`,'measured')
+    }
   }else{
     add('concentration','Supply concentration','unknown','Largest holder/account concentration could not be verified.','measured')
   }
 
-  const liquidityReported=intel.liquidityReported!==false
-  const liquidity=liquidityReported?Number(market.liquidityUsd||0):null
-  const liquidityToCap=liquidityReported&&intel.liquidityToCapPercent!=null
-    ? Number(intel.liquidityToCapPercent)
-    : null
+  const liquidityReported=intel.liquidityReported!==false && market?.liquidityUsd!=null
+  const liquidity=liquidityReported?optionalNumber(market.liquidityUsd):null
+  const liquidityToCap=liquidityReported&&intel.liquidityToCapPercent!=null?optionalNumber(intel.liquidityToCapPercent):null
 
-  if(!liquidityReported){
-    add(
-      'liquidity',
-      'Exit liquidity',
-      'unknown',
-      intel.liquiditySource==='PUMPFUN_BONDING_CURVE_UNREPORTED'
-        ? 'Pump.fun bonding-curve liquidity is not reported as AMM pool liquidity.'
-        : 'Liquidity data is unavailable.',
-      'measured'
-    )
-    add(
-      'liq-cap',
-      'Liquidity vs market cap',
-      'unknown',
-      'Cannot compute a liquidity-to-market-cap ratio without a reported liquidity value.',
-      'computed'
-    )
+  if(!liquidityReported||liquidity===null){
+    add('liquidity','Exit liquidity','unknown',intel.liquiditySource==='PUMPFUN_BONDING_CURVE_UNREPORTED'?'Pump.fun bonding-curve liquidity is not reported as AMM pool liquidity.':'Liquidity data is unavailable.','measured')
+    add('liq-cap','Liquidity vs market cap','unknown','Cannot compute a liquidity-to-market-cap ratio without reported liquidity and circulating market cap.','computed')
   }else{
-    add(
-      'liquidity',
-      'Exit liquidity',
-      liquidity<3000?'critical':liquidity<10000?'warning':'pass',
-      liquidity?`Reported pool liquidity is about ${Math.round(liquidity).toLocaleString()}.`:'Reported liquidity is zero.',
-      'measured'
-    )
-    add(
-      'liq-cap',
-      'Liquidity vs market cap',
-      liquidityToCap>0&&liquidityToCap<2?'critical':liquidityToCap<6?'warning':'pass',
-      `Liquidity is ${Number(liquidityToCap||0).toFixed(1)}% of market cap.`,
-      'computed'
-    )
+    add('liquidity','Exit liquidity',liquidity<3000?'critical':liquidity<10000?'warning':'pass',liquidity?`Reported pool liquidity is about ${Math.round(liquidity).toLocaleString()}.`:'Reported liquidity is zero.','measured')
+    if(liquidityToCap===null){
+      add('liq-cap','Liquidity vs market cap','unknown','Circulating market cap is unavailable, so this ratio cannot be verified.','computed')
+    }else{
+      add('liq-cap','Liquidity vs market cap',liquidityToCap>0&&liquidityToCap<2?'critical':liquidityToCap<6?'warning':'pass',`Liquidity is ${liquidityToCap.toFixed(1)}% of market cap.`,'computed')
+    }
   }
 
-  const ageHours=Number(intel.ageHours)
-  if(Number.isFinite(ageHours)){
-    add(
-      'age',
-      'Pair maturity',
-      ageHours<0.25?'critical':ageHours<2?'warning':'pass',
-      ageHours<1?`Pair is about ${Math.round(ageHours*60)} minutes old.`:`Pair is about ${ageHours.toFixed(1)} hours old.`,
-      'measured'
-    )
+  const ageHours=optionalNumber(intel.ageHours)
+  if(ageHours!==null){
+    add('age','Pair maturity',ageHours<0.25?'critical':ageHours<2?'warning':'pass',ageHours<1?`Pair is about ${Math.round(ageHours*60)} minutes old.`:`Pair is about ${ageHours.toFixed(1)} hours old.`,'measured')
   }else{
     add('age','Pair maturity','unknown','Pair creation time is unavailable.','measured')
   }
 
-  if(intel.turnover24h==null){
-    add(
-      'turnover',
-      'Turnover / churn',
-      'unknown',
-      'Turnover cannot be calculated without a reported liquidity value.',
-      'computed'
-    )
-  }else{
-    const turnover=Number(intel.turnover24h||0)
-    add(
-      'turnover',
-      'Turnover / churn',
-      turnover>=150?'warning':turnover>=60?'watch':'pass',
-      `24h volume is about ${turnover.toFixed(1)}× reported liquidity.`,
-      'computed'
-    )
-  }
+  const turnover=optionalNumber(intel.turnover24h)
+  add('turnover','Turnover / churn',turnover===null?'unknown':turnover>=150?'warning':turnover>=60?'watch':'pass',turnover===null?'Turnover data is unavailable.':`24h volume is about ${turnover.toFixed(1)}× reported liquidity.`,'computed')
 
-  const buy1=Number(intel.buyPercent1h||50)
-  add(
-    'seller-pressure',
-    'Recent order flow',
-    buy1<30?'critical':buy1<42?'warning':buy1>85?'watch':'pass',
-    `1h transaction count is ${buy1.toFixed(1)}% buys.`,
-    'measured'
-  )
+  const flow1Known=intel?.dataAvailability?.flow?.h1===true
+  const buy1=flow1Known?optionalNumber(intel.buyPercent1h):null
+  add('seller-pressure','Recent order flow',buy1==null?'unknown':buy1<30?'critical':buy1<42?'warning':buy1>85?'watch':'pass',buy1==null?'1h transaction flow is unavailable.':`1h transaction count is ${buy1.toFixed(1)}% buys.`,'measured')
 
-  const h1=Number(market?.priceChange?.h1||0)
-  const h24=Number(market?.priceChange?.h24||0)
-  add(
-    'price-structure',
-    'Price stretch',
-    h1>150||h24>1000?'warning':h1<-40?'critical':h1>60||h24>400?'watch':'pass',
-    `Price change: 1h ${h1>=0?'+':''}${h1.toFixed(1)}% · 24h ${h24>=0?'+':''}${h24.toFixed(1)}%.`,
-    'measured'
-  )
+  const h1Known=intel?.dataAvailability?.momentum?.h1===true
+  const h24Known=intel?.dataAvailability?.momentum?.h24===true
+  const h1=h1Known?optionalNumber(market?.priceChange?.h1):null
+  const h24=h24Known?optionalNumber(market?.priceChange?.h24):null
+  const priceKnown=h1!==null||h24!==null
+  add('price-structure','Price stretch',!priceKnown?'unknown':((h1!==null&&h1>150)||(h24!==null&&h24>1000))?'warning':(h1!==null&&h1<-40)?'critical':((h1!==null&&h1>60)||(h24!==null&&h24>400))?'watch':'pass',!priceKnown?'1h/24h momentum data is unavailable.':`Price change: 1h ${h1==null?'—':(h1>=0?'+':'')+h1.toFixed(1)+'%'} · 24h ${h24==null?'—':(h24>=0?'+':'')+h24.toFixed(1)+'%'}.`,'measured')
 
-  if(tape){
-    const manipulationFlags=[
-      'MICROTRADE_NOISE',
-      'REPEAT_WALLET_CHURN',
-      'WALLET_ACTIVITY_CONCENTRATION',
-      'WALLET_VOLUME_CONCENTRATION',
-      'TRADE_SIZE_SKEW',
-      'WHALE_FLOW_CONCENTRATED',
-      'MULTI_WHALE_DISTRIBUTION',
-    ].filter(flag=>tapeFlags.includes(flag))
-
-    add(
-      'trade-quality',
-      'Recent trade quality',
-      manipulationFlags.length>=3?'critical':manipulationFlags.length?'warning':'pass',
-      manipulationFlags.length
-        ? manipulationFlags.map(flag=>flag.replaceAll('_',' ').toLowerCase()).join(' · ')
-        : 'No major recent tape-quality anomaly was detected in the sampled trades.',
-      'measured'
-    )
+  if(tape&&(tape?.sampleSize==null||Number(tape.sampleSize)>0)){
+    const manipulationFlags=['MICROTRADE_NOISE','REPEAT_WALLET_CHURN','WALLET_ACTIVITY_CONCENTRATION','WALLET_VOLUME_CONCENTRATION','TRADE_SIZE_SKEW','WHALE_FLOW_CONCENTRATED','MULTI_WHALE_DISTRIBUTION'].filter(flag=>tapeFlags.includes(flag))
+    add('trade-quality','Recent trade quality',manipulationFlags.length>=3?'critical':manipulationFlags.length?'warning':'pass',manipulationFlags.length?manipulationFlags.map(flag=>flag.replaceAll('_',' ').toLowerCase()).join(' · '):'No major recent tape-quality anomaly was detected in the sampled trades.','measured')
   }else{
     add('trade-quality','Recent trade quality','unknown','Recent trade tape is not available.','measured')
   }
@@ -519,22 +474,7 @@ export function buildRugRiskChecklist({scan,tape}){
   const warning=items.filter(item=>item.severity==='warning').length
   const watch=items.filter(item=>item.severity==='watch').length
   const unknown=items.filter(item=>item.severity==='unknown').length
+  const label=critical>=2?'SEVERE RED FLAGS':critical===1?'CRITICAL FLAG':warning>=3?'HIGH CAUTION':warning>=1||watch>=2?'CAUTION':unknown>=3?'INCOMPLETE DATA':'NO MAJOR FLAGS'
 
-  const label=
-    critical>=2?'SEVERE RED FLAGS':
-    critical===1?'CRITICAL FLAG':
-    warning>=3?'HIGH CAUTION':
-    warning>=1||watch>=2?'CAUTION':
-    unknown>=3?'INCOMPLETE DATA':'NO MAJOR FLAGS'
-
-  return {
-    available:true,
-    items,
-    critical,
-    warning,
-    watch,
-    unknown,
-    label,
-    meaning:'Evidence checklist for structural/manipulation risk. It cannot prove a token is or is not a scam.',
-  }
+  return {available:true,items,critical,warning,watch,unknown,label,meaning:'Evidence checklist for structural/manipulation risk. It cannot prove a token is or is not a scam.'}
 }

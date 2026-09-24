@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 
 import {
   buildEntryQuality,
+  buildExecutionChecklist,
   buildProfitLadder,
   buildRugRiskChecklist,
   challengeStats,
@@ -45,6 +46,34 @@ test('profit ladder contains only targets above entry and ascending',()=>{
   for(let i=1;i<rows.length;i+=1){
     assert.ok(rows[i].targetMarketCap>=rows[i-1].targetMarketCap)
   }
+})
+
+test('profit ladder returns no incomplete rows when investment is blank or zero',()=>{
+  const blank=buildProfitLadder({
+    investment:'',
+    entryMarketCap:12000,
+    estimatedCostsPercent:1,
+  })
+  const zero=buildProfitLadder({
+    investment:0,
+    entryMarketCap:12000,
+    estimatedCostsPercent:1,
+  })
+
+  assert.deepEqual(blank,[])
+  assert.deepEqual(zero,[])
+})
+
+test('every profit ladder row contains finite projection fields',()=>{
+  const rows=buildProfitLadder({
+    investment:20,
+    entryMarketCap:12000,
+    estimatedCostsPercent:1,
+  })
+  assert.ok(rows.length>0)
+  assert.ok(rows.every(row=>Number.isFinite(row.multiple)))
+  assert.ok(rows.every(row=>Number.isFinite(row.netValue)))
+  assert.ok(rows.every(row=>Number.isFinite(row.netProfit)))
 })
 
 test('challenge stats calculate high-water drawdown safely',()=>{
@@ -221,4 +250,50 @@ test('rug guard treats unreported Pump.fun liquidity as unknown, not critical',(
   assert.equal(liqCap?.severity,'unknown')
   assert.equal(turnover?.severity,'unknown')
   assert.ok(!result.items.some(item=>item.key==='liquidity'&&item.severity==='critical'))
+})
+
+
+test('execution checklist keeps missing flow and momentum unknown',()=>{
+  const result=buildExecutionChecklist({
+    scan:{
+      chain:{family:'evm'},
+      market:{liquidityUsd:null,priceChange:{m5:null}},
+      security:{available:true},
+      intelligence:{contractVerified:false,setupScore:55,liquidityReported:false},
+    },
+    analytics:null,
+    tape:{sampleSize:0,netFlowUsd:0,buyVolumePercent:null},
+    positionSize:20,
+  })
+  const flow=result.items.find(item=>item.key==='flow')
+  const chase=result.items.find(item=>item.key==='chase')
+  const liquidity=result.items.find(item=>item.key==='liquidity')
+  assert.equal(flow?.unknown,true)
+  assert.equal(chase?.unknown,true)
+  assert.equal(liquidity?.unknown,true)
+  assert.equal(flow?.pass,false)
+  assert.equal(chase?.pass,false)
+})
+
+test('rug guard treats missing age and momentum as unknown rather than critical or pass',()=>{
+  const result=buildRugRiskChecklist({
+    scan:{
+      market:{liquidityUsd:20000,priceChange:{h1:null,h24:null}},
+      security:{available:true,mintAuthority:null,freezeAuthority:null},
+      intelligence:{
+        liquidityReported:true,
+        liquidityToCapPercent:null,
+        turnover24h:null,
+        ageHours:null,
+        buyPercent1h:null,
+        dataAvailability:{flow:{h1:false},momentum:{h1:false,h24:false}},
+        concentration:{available:false},
+      },
+    },
+    tape:{sampleSize:0,flags:[]},
+  })
+  assert.equal(result.items.find(item=>item.key==='age')?.severity,'unknown')
+  assert.equal(result.items.find(item=>item.key==='seller-pressure')?.severity,'unknown')
+  assert.equal(result.items.find(item=>item.key==='price-structure')?.severity,'unknown')
+  assert.equal(result.items.find(item=>item.key==='liq-cap')?.severity,'unknown')
 })

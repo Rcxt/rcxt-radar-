@@ -11,6 +11,14 @@ const SUPABASE_PUBLISHABLE_KEY =
   'sb_publishable_55I4aMBK66DBjB3imBmoxg_gWKRz3Zv'
 
 const addressPattern = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/
+const evmAddressPattern = /^0x[a-fA-F0-9]{40}$/
+const chainPattern = /^[a-z0-9_-]{2,32}$/
+
+function finiteOrNull(value){
+  if(value===null||value===undefined||value==='') return null
+  const number=Number(value)
+  return Number.isFinite(number)?number:null
+}
 
 
 function getQuery(req, name, fallback = '') {
@@ -26,6 +34,10 @@ export default async function handler(req,res){
   if(req.method!=='GET') return res.status(405).json({success:false,error:'Method not allowed'})
 
   const calibration=getQuery(req,'calibration')==='1'
+  const calibrationFamily=String(getQuery(req,'family','solana')).trim().toLowerCase()
+  if(calibration&&!['solana','evm'].includes(calibrationFamily)){
+    return res.status(400).json({success:false,error:'Unsupported calibration family.'})
+  }
   const limited=rateLimit(req,{
     key:calibration?'calibration':'history',
     limit:calibration?20:30,
@@ -49,7 +61,13 @@ export default async function handler(req,res){
       const data=await response.json()
       if(!response.ok||!data?.ok) throw new Error(data?.error||'Calibration service unavailable')
 
-      const rows=(data.summary||data.rows||[]).map(row=>({
+      const chainSummary=Array.isArray(data.chainSummary)?data.chainSummary:[]
+      const chainBuckets=Array.isArray(data.chainBuckets)?data.chainBuckets:[]
+      const chainComponents=Array.isArray(data.chainComponents)?data.chainComponents:[]
+
+      const rows=chainSummary
+        .filter(row=>String(row.chain_family||'')===calibrationFamily)
+        .map(row=>({
         scoreVersion:row.score_version,
         signal:row.signal,
         horizon:row.horizon,
@@ -59,7 +77,9 @@ export default async function handler(req,res){
         avgDelayMinutes:row.avg_delay_minutes==null?null:Number(row.avg_delay_minutes),
       }))
 
-      const buckets=(data.buckets||[]).map(row=>({
+      const buckets=chainBuckets
+        .filter(row=>String(row.chain_family||'')===calibrationFamily)
+        .map(row=>({
         scoreVersion:row.score_version,
         scoreBucketMin:Number(row.score_bucket_min||0),
         scoreBucketMax:Number(row.score_bucket_max||0),
@@ -73,7 +93,9 @@ export default async function handler(req,res){
         avgAbsDelayMinutes:row.avg_abs_delay_minutes==null?null:Number(row.avg_abs_delay_minutes),
       }))
 
-      const components=(data.components||[]).map(row=>({
+      const components=chainComponents
+        .filter(row=>String(row.chain_family||'')===calibrationFamily)
+        .map(row=>({
         scoreVersion:row.score_version,
         horizon:row.horizon,
         setupSamples:Number(row.setup_samples||0),
@@ -98,7 +120,8 @@ export default async function handler(req,res){
 
       return res.status(200).json({
         success:true,
-        samplePolicy:data.samplePolicy||'clean-complete-components-with-timing-window',
+        samplePolicy:data.samplePolicy||'independent-chain-token-time-buckets-with-timing-window',
+        chainFamily:calibrationFamily,
         totalSamples:rows.reduce((sum,row)=>sum+row.samples,0),
         rawTotalSamples:rawRows.reduce((sum,row)=>sum+row.samples,0),
         rows,
@@ -112,10 +135,12 @@ export default async function handler(req,res){
   }
 
   const address=String(getQuery(req,'address')).trim()
-  if(!addressPattern.test(address)) return res.status(400).json({success:false,error:'Invalid Solana token address.'})
+  const chain=String(getQuery(req,'chain','solana')).trim().toLowerCase()
+  if(!addressPattern.test(address)&&!evmAddressPattern.test(address)) return res.status(400).json({success:false,error:'Invalid token address.'})
+  if(!chainPattern.test(chain)) return res.status(400).json({success:false,error:'Invalid chain id.'})
 
   try{
-    const response=await fetch(`${SUPABASE_URL}/functions/v1/rcxt-log?token=${encodeURIComponent(address)}&limit=20`,{
+    const response=await fetch(`${SUPABASE_URL}/functions/v1/rcxt-log?token=${encodeURIComponent(address)}&chain=${encodeURIComponent(chain)}&limit=20`,{
       headers:{apikey:SUPABASE_PUBLISHABLE_KEY},
       cache:'no-store',
       signal:AbortSignal.timeout(3000),
@@ -124,25 +149,27 @@ export default async function handler(req,res){
     if(!response.ok||!data?.ok) throw new Error(data?.error||'History request failed')
 
     const rows=(data.rows||[]).map((row)=>({
-      score:Number(row.score||0),
+      chain:row.chain_id||chain,
+      chainFamily:row.chain_family||null,
+      score:finiteOrNull(row.score),
       scoreVersion:row.score_version||null,
       signal:row.signal||'WATCH',
       risk:row.risk||null,
-      confidence:Number(row.confidence||0),
+      confidence:finiteOrNull(row.confidence),
       setupScore:row.setup_score==null?null:Number(row.setup_score),
       executionScore:row.execution_score==null?null:Number(row.execution_score),
       safetyScore:row.safety_score==null?null:Number(row.safety_score),
       dataQualityScore:row.data_quality_score==null?null:Number(row.data_quality_score),
       marketState:row.market_state||null,
       riskFlagCount:row.risk_flag_count==null?null:Number(row.risk_flag_count),
-      priceUsd:Number(row.price_usd||0),
-      marketCap:Number(row.market_cap||0),
-      liquidityUsd:Number(row.liquidity_usd||0),
-      volume24h:Number(row.volume_24h||0),
+      priceUsd:finiteOrNull(row.price_usd),
+      marketCap:finiteOrNull(row.market_cap),
+      liquidityUsd:finiteOrNull(row.liquidity_usd),
+      volume24h:finiteOrNull(row.volume_24h),
       createdAt:row.created_at,
     }))
 
-    return res.status(200).json({success:true,address,count:rows.length,rows})
+    return res.status(200).json({success:true,address,chain,count:rows.length,rows})
   }catch(error){
     return res.status(502).json({success:false,error:error?.message||'History service unavailable.'})
   }

@@ -1,3 +1,4 @@
+import { getChain } from '../lib/chains.js'
 import { rateLimit, applyRateHeaders } from '../lib/rate-limit.js'
 import { analyzeCandles } from '../lib/market-analytics.js'
 
@@ -19,16 +20,16 @@ function cacheSet(key,value){
   if(chartCache.size>120) chartCache.delete(chartCache.keys().next().value)
 }
 
-async function fetchCandles(pairAddress,interval){
+async function fetchCandles(pairAddress,interval,chain){
   const config=INTERVALS[interval]||INTERVALS['5m']
-  const url=new URL(`https://api.geckoterminal.com/api/v2/networks/solana/pools/${encodeURIComponent(pairAddress)}/ohlcv/${config.timeframe}`)
+  const url=new URL(`https://api.geckoterminal.com/api/v2/networks/${encodeURIComponent(chain.geckoterminal)}/pools/${encodeURIComponent(pairAddress)}/ohlcv/${config.timeframe}`)
   url.searchParams.set('aggregate',String(config.aggregate))
   url.searchParams.set('limit',String(config.limit))
   url.searchParams.set('currency','usd')
   url.searchParams.set('token','base')
 
   const response=await fetch(url,{
-    headers:{accept:'application/json','user-agent':'RCXT-Radar/4.0'},
+    headers:{accept:'application/json','user-agent':'RCXT-Radar/6.1'},
     signal:AbortSignal.timeout(5000),
   })
   const text=await response.text()
@@ -68,12 +69,17 @@ export default async function handler(req,res){
 
   const pairAddress=String(getQuery(req, 'pair')).trim()
   const interval=String(getQuery(req, 'interval', '5m'))
-  if(!/^[1-9A-HJ-NP-Za-km-z]{32,50}$/.test(pairAddress)){
-    return res.status(400).json({success:false,error:'Valid Solana pair address required.'})
+  const chain=getChain(String(getQuery(req,'chain','solana')).trim().toLowerCase())
+  if(!chain) return res.status(400).json({success:false,error:'Unsupported chain.'})
+  const validPair=chain.family==='evm'
+    ? /^0x[a-fA-F0-9]{40}$/.test(pairAddress)
+    : /^[1-9A-HJ-NP-Za-km-z]{32,50}$/.test(pairAddress)
+  if(!validPair){
+    return res.status(400).json({success:false,error:`Valid ${chain.label} pair address required.`})
   }
   if(!INTERVALS[interval]) return res.status(400).json({success:false,error:'Unsupported chart interval.'})
 
-  const key=`${pairAddress}:${interval}`
+  const key=`${chain.id}:${pairAddress}:${interval}`
   const cached=cacheGet(key)
   if(cached){
     res.setHeader('X-RCXT-Cache','HIT')
@@ -82,9 +88,9 @@ export default async function handler(req,res){
   }
 
   try{
-    const {candles,meta,config}=await fetchCandles(pairAddress,interval)
+    const {candles,meta,config}=await fetchCandles(pairAddress,interval,chain)
     const analytics=analyzeCandles(candles,{intervalMinutes:config.minutes})
-    const result={success:true,provider:'GeckoTerminal',pairAddress,interval,generatedAt:new Date().toISOString(),meta,count:candles.length,candles,analytics}
+    const result={success:true,provider:'GeckoTerminal',chain:chain.id,pairAddress,interval,generatedAt:new Date().toISOString(),meta,count:candles.length,candles,analytics}
     cacheSet(key,result)
     res.setHeader('X-RCXT-Cache','MISS')
     res.setHeader('Cache-Control','public, s-maxage=8, stale-while-revalidate=20')

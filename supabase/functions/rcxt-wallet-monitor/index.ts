@@ -50,6 +50,7 @@ async function getSecrets(url: string, secretKey: string) {
     method:"POST",
     headers:headers(secretKey),
     body:"{}",
+    signal:AbortSignal.timeout(8000),
   });
   if(!response.ok) throw new Error("Secret lookup failed");
   const rows = await response.json();
@@ -57,7 +58,7 @@ async function getSecrets(url: string, secretKey: string) {
 }
 
 async function restJson(url: string, secretKey: string, path: string) {
-  const response = await fetch(`${url}/rest/v1/${path}`, { headers:headers(secretKey) });
+  const response = await fetch(`${url}/rest/v1/${path}`, { headers:headers(secretKey), signal:AbortSignal.timeout(8000) });
   if(!response.ok) throw new Error(`Database query failed (${response.status})`);
   return response.json();
 }
@@ -68,6 +69,7 @@ async function patchRow(url: string, secretKey: string, path: string, body: unkn
     method:"PATCH",
     headers:headers(secretKey,{prefer:"return=minimal"}),
     body:JSON.stringify(clean),
+    signal:AbortSignal.timeout(8000),
   });
   if(!response.ok) throw new Error(`Database update failed (${response.status})`);
 }
@@ -77,6 +79,7 @@ async function insertEvent(url: string, secretKey: string, row: Record<string,un
     method:"POST",
     headers:headers(secretKey,{prefer:"resolution=ignore-duplicates,return=minimal"}),
     body:JSON.stringify([row]),
+    signal:AbortSignal.timeout(8000),
   });
   if(!response.ok) throw new Error(`Event insert failed (${response.status})`);
 }
@@ -99,8 +102,14 @@ function hardRiskFlags(scan:any) {
   return flags.filter((flag:string)=>[
     "MINT_AUTHORITY_ACTIVE",
     "FREEZE_AUTHORITY_ACTIVE",
+    "PERMANENT_DELEGATE_ACTIVE",
+    "DEFAULT_ACCOUNT_FROZEN",
+    "NON_TRANSFERABLE_TOKEN",
+    "TOKEN_PAUSED",
+    "EXTERNAL_RUGGED",
+    "EXTERNAL_STRUCTURAL_DANGER",
     "EXTREME_OWNER_CONCENTRATION",
-    "EXTREME_ACCOUNT_CONCENTRATION",
+    "EXTREME_EXTERNAL_CONCENTRATION",
   ].includes(flag));
 }
 
@@ -222,7 +231,7 @@ async function processWallet(dbUrl:string, secretKey:string, secrets:any, wallet
     let scanData:any=null;
     try{
       const result=await fetchJson(
-        `https://rcxt-radar.vercel.app/api/scan?address=${encodeURIComponent(mint)}&persist=1`,
+        `https://rcxt-radar.vercel.app/api/scan?address=${encodeURIComponent(mint)}&chain=solana&persist=1`,
         15000
       );
       scanData=result?.scan||null;
@@ -288,8 +297,8 @@ async function processWallet(dbUrl:string, secretKey:string, secrets:any, wallet
       pushResult=await sendPushes(dbUrl,secretKey,secrets,wallet,{
         title,
         body:`${spent}${details}${flagText}${mcText?" · "+mcText:""}`,
-        url:`/?token=${encodeURIComponent(mint)}`,
-        tag:`wallet-${mint}-${category}`,
+        url:`/?token=${encodeURIComponent(mint)}&chain=solana`,
+        tag:`wallet-solana-${mint}-${category}`,
         token:mint,
         wallet,
         signal,

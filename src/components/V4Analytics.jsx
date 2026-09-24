@@ -28,9 +28,35 @@ function tiny(value){
   return '$'+n.toPrecision(5)
 }
 
+function planChain(scan){
+  return String(scan?.chain?.id||'solana').toLowerCase()
+}
+
+function planStorageKey(scan){
+  const chain=planChain(scan)
+  const raw=String(scan?.address||'')
+  const address=chain==='solana'?raw:raw.toLowerCase()
+  return 'rcxt-trade-plan:'+chain+':'+address
+}
+
+function legacyPlanStorageKey(scan){
+  return 'rcxt-trade-plan:'+String(scan?.address||'')
+}
+
+function tokenUrl(scan){
+  const params=new URLSearchParams({token:String(scan?.address||'')})
+  params.set('chain',planChain(scan))
+  return '/?'+params.toString()
+}
+
 function pct(value,digits=1){
   const n=Number(value)
   return Number.isFinite(n)?(n>=0?'+':'')+n.toFixed(digits)+'%':'—'
+}
+
+function fixed(value,digits=1,fallback='—'){
+  const n=Number(value)
+  return Number.isFinite(n)?n.toFixed(digits):fallback
 }
 
 function CandleChart({candles}){
@@ -117,9 +143,21 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
 
   useEffect(()=>{
     setEntryMarketCap(scan?.market?.marketCap?String(Math.round(scan.market.marketCap)):'')
+    setPlanThesis('')
+    setPlanInvalidation('')
+    setPlanSavedAt(null)
+    setPlanAlerts(false)
+    setPlanStatus('DRAFT')
+    setPlanEnteredAt(null)
+    setPlanClosedAt(null)
+    setPlanExitMarketCap(null)
+    setPlanExitValue(null)
+    setPlanExitPnl(null)
     if(!scan?.address) return
     try{
-      const saved=JSON.parse(localStorage.getItem('rcxt-trade-plan:'+scan.address)||'null')
+      const primary=localStorage.getItem(planStorageKey(scan))
+      const legacy=planChain(scan)==='solana'?localStorage.getItem(legacyPlanStorageKey(scan)):null
+      const saved=JSON.parse(primary||legacy||'null')
       if(saved){
         if(saved.investment!=null) setInvestment(String(saved.investment))
         if(saved.entryMarketCap!=null) setEntryMarketCap(String(saved.entryMarketCap))
@@ -136,20 +174,11 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
         setPlanExitMarketCap(saved.exitMarketCap??null)
         setPlanExitValue(saved.exitValue??null)
         setPlanExitPnl(saved.exitPnl??null)
-      }else{
-        setPlanThesis('')
-        setPlanInvalidation('')
-        setPlanSavedAt(null)
-        setPlanAlerts(false)
-        setPlanStatus('DRAFT')
-        setPlanEnteredAt(null)
-        setPlanClosedAt(null)
-        setPlanExitMarketCap(null)
-        setPlanExitValue(null)
-        setPlanExitPnl(null)
       }
-    }catch{}
-  },[scan?.address])
+    }catch{
+      // Malformed storage must never leave the previous token's plan visible.
+    }
+  },[scan?.address,scan?.chain?.id])
 
   useEffect(()=>{
     if(walletEquity>0) setAccountValue(String(Number(walletEquity).toFixed(2)))
@@ -169,7 +198,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
     async function load(){
       setLoading(true);setError('')
       try{
-        const response=await fetch('/api/chart?pair='+encodeURIComponent(pair)+'&interval='+encodeURIComponent(interval),{cache:'no-store'})
+        const response=await fetch('/api/chart?pair='+encodeURIComponent(pair)+'&chain='+encodeURIComponent(scan?.chain?.id||'solana')+'&interval='+encodeURIComponent(interval),{cache:'no-store'})
         const data=await response.json()
         if(!response.ok||!data?.success) throw new Error(data?.error||'Chart unavailable')
         if(active) setChart(data)
@@ -180,7 +209,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
     load()
     const timer=setInterval(load,30000)
     return()=>{active=false;clearInterval(timer)}
-  },[scan?.pair?.pairAddress,interval])
+  },[scan?.pair?.pairAddress,scan?.chain?.id,interval])
 
   useEffect(()=>{
     let active=true
@@ -189,7 +218,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
 
     async function loadTape(){
       try{
-        const response=await fetch('/api/trades?pair='+encodeURIComponent(pair),{cache:'no-store'})
+        const response=await fetch('/api/trades?pair='+encodeURIComponent(pair)+'&chain='+encodeURIComponent(scan?.chain?.id||'solana'),{cache:'no-store'})
         const data=await response.json()
         if(response.ok&&data?.success&&active) setTape(data)
       }catch{}
@@ -198,7 +227,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
     loadTape()
     const timer=setInterval(loadTape,30000)
     return()=>{active=false;clearInterval(timer)}
-  },[scan?.pair?.pairAddress])
+  },[scan?.pair?.pairAddress,scan?.chain?.id])
 
   const ladder=useMemo(()=>buildProfitLadder({
     investment,
@@ -538,17 +567,17 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
         const registration=await navigator.serviceWorker.ready
         await registration.showNotification(title,{
           body,
-          tag:'rcxt-plan-'+scan?.address,
+          tag:'rcxt-plan-'+planChain(scan)+'-'+scan?.address,
           renotify:true,
-          data:{url:'/?token='+encodeURIComponent(scan?.address||'')},
+          data:{url:tokenUrl(scan)},
         })
         return
       }
-      const alert = new Notification(title,{body,tag:'rcxt-plan-'+scan?.address})
+      const alert = new Notification(title,{body,tag:'rcxt-plan-'+planChain(scan)+'-'+scan?.address})
       alert.onclick = () => {
         alert.close()
         window.focus()
-        window.location.assign('/?token=' + encodeURIComponent(scan?.address || ''))
+        window.location.assign(tokenUrl(scan))
       }
     }catch{}
   }
@@ -567,7 +596,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
 
     if(scan?.address){
       try{
-        const key='rcxt-trade-plan:'+scan.address
+        const key=planStorageKey(scan)
         const existing=JSON.parse(localStorage.getItem(key)||'null')
         if(existing){
           localStorage.setItem(key,JSON.stringify({...existing,planAlerts:next}))
@@ -581,6 +610,8 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
       token:scan?.token?.symbol||'TOKEN',
       name:scan?.token?.name||'',
       address:scan?.address||'',
+      chain:planChain(scan),
+      chainLabel:scan?.chain?.label||planChain(scan),
       investment:Number(investment||0),
       entryMarketCap:Number(entryMarketCap||0),
       takeProfitPercent:Number(takeProfitPercent||0),
@@ -604,7 +635,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
     if(!scan?.address) return null
     const payload=planPayload(overrides)
     try{
-      localStorage.setItem('rcxt-trade-plan:'+scan.address,JSON.stringify(payload))
+      localStorage.setItem(planStorageKey(scan),JSON.stringify(payload))
       setPlanSavedAt(payload.savedAt)
       window.dispatchEvent(new CustomEvent('rcxt-trade-plan-updated',{detail:payload}))
       return payload
@@ -703,7 +734,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
     const lines=[
       (scan?.token?.symbol||'TOKEN')+' profit list',
       'Position: '+money(Number(investment||0))+' | Entry MC: '+money(Number(entryMarketCap||0)),
-      ...ladder.map(row=>money(row.targetMarketCap)+' MC → '+money(row.netValue)+' value ('+money(row.netProfit)+' P/L, '+row.multiple.toFixed(2)+'x)')
+      ...ladder.map(row=>money(row.targetMarketCap)+' MC → '+money(row.netValue)+' value ('+money(row.netProfit)+' P/L, '+fixed(row.multiple,2)+'x)')
     ]
     try{await navigator.clipboard.writeText(lines.join('\n'))}catch{}
   }
@@ -752,7 +783,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
               <div><span>Market phase</span><b>{analytics.regime?.phase||'—'}</b><small>{analytics.indicators?.bollingerWidthPercent==null?'—':analytics.indicators.bollingerWidthPercent+'%'} band width</small></div>
               <div><span>VWAP position</span><b className={Number(analytics.indicators?.vwapDistancePercent||0)>=0?'good':'bad'}>{analytics.indicators?.vwapDistancePercent==null?'—':pct(analytics.indicators.vwapDistancePercent)}</b><small>vs recent volume-weighted value</small></div>
               <div><span>Entry Quality</span><b>{entryQuality?.available?entryQuality.score+'/100':'—'}</b><small>{entryQuality?.available?entryQuality.label:'needs more evidence'}</small></div>
-              <div><span>Structure R:R</span><b>{analytics.levels?.structureRiskReward?analytics.levels.structureRiskReward.toFixed(2)+'×':'—'}</b><small>nearest support → resistance</small></div>
+              <div><span>Structure R:R</span><b>{analytics.levels?.structureRiskReward?fixed(analytics.levels.structureRiskReward,2)+'×':'—'}</b><small>nearest support → resistance</small></div>
             </div>
 
             </DetailSection>
@@ -859,12 +890,12 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
               <div>
                 <span>SUPPORT ZONES</span>
                 {(analytics.levels?.support||[]).map(value=><b key={value}>{tiny(value)}</b>)}
-                <small>Nearest: {tiny(analytics.levels?.nearestSupport)} · {analytics.levels?.downsideToSupportPercent==null?'—':analytics.levels.downsideToSupportPercent.toFixed(1)+'% below'}</small>
+                <small>Nearest: {tiny(analytics.levels?.nearestSupport)} · {analytics.levels?.downsideToSupportPercent==null?'—':fixed(analytics.levels.downsideToSupportPercent,1)+'% below'}</small>
               </div>
               <div>
                 <span>RESISTANCE ZONES</span>
                 {(analytics.levels?.resistance||[]).map(value=><b key={value}>{tiny(value)}</b>)}
-                <small>Nearest: {tiny(analytics.levels?.nearestResistance)} · {analytics.levels?.upsideToResistancePercent==null?'—':analytics.levels.upsideToResistancePercent.toFixed(1)+'% above'}</small>
+                <small>Nearest: {tiny(analytics.levels?.nearestResistance)} · {analytics.levels?.upsideToResistancePercent==null?'—':fixed(analytics.levels.upsideToResistancePercent,1)+'% above'}</small>
               </div>
               <div><span>WHY</span>{(analytics.reasons||[]).map(value=><small key={value}>+ {value}</small>)}</div>
               <div><span>RISKS</span>{(analytics.risks||[]).map(value=><small key={value}>− {value}</small>)}</div>
@@ -923,7 +954,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
                 </a>
               ))}
             </div>
-            <p>Supply-whale data comes from public Solana token-account ownership resolution. It does not identify the person or entity controlling a wallet.</p>
+            <p>Supply concentration uses the strongest available chain-specific source. On Solana RCXT can resolve token-account owners; EVM scans use external holder evidence when available. It does not identify the person or entity controlling a wallet.</p>
           </div>
         ) : null}
 
@@ -937,7 +968,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
           <div><span>DATA PROVENANCE</span><h3>Know what is measured vs calculated</h3></div>
         </div>
         <div className="provenanceGrid">
-          <div><b>MEASURED</b><strong>Market / wallet / trades</strong><p>DexScreener prices and liquidity, GeckoTerminal candles/trades, Solana wallet and mint data.</p></div>
+          <div><b>MEASURED</b><strong>Market / wallet / trades</strong><p>DexScreener prices/liquidity, GeckoTerminal candles/trades, and chain-specific contract/security evidence.</p></div>
           <div><b>COMPUTED</b><strong>RCXT / Trench / Entry Quality</strong><p>Deterministic formulas derived from measured inputs. Useful for comparison, not a guaranteed outcome.</p></div>
           <div><b>ESTIMATED</b><strong>Forecast ranges / profit scenarios</strong><p>Volatility and market-cap scenarios. They are not promised future prices or probabilities.</p></div>
         </div>
@@ -965,8 +996,8 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
           <div className="plannerResults">
             <div><span>Risk budget</span><b>{money(riskPlan.riskBudget)}</b></div>
             <div><span>Max position</span><b>{money(riskPlan.positionSize)}</b></div>
-            <div><span>% of account</span><b>{riskPlan.positionPercent.toFixed(1)}%</b></div>
-            <div><span>Liquidity burden</span><b className={liquidityBurden?.label==='LOW'?'good':liquidityBurden?.label==='MODERATE'?'mid':'bad'}>{liquidityBurden?liquidityBurden.percent.toFixed(2)+'%':'—'}</b><small>{liquidityBurden?.label||'No liquidity data'}</small></div>
+            <div><span>% of account</span><b>{fixed(riskPlan.positionPercent,1,'0.0')}%</b></div>
+            <div><span>Liquidity burden</span><b className={liquidityBurden?.label==='LOW'?'good':liquidityBurden?.label==='MODERATE'?'mid':'bad'}>{liquidityBurden?fixed(liquidityBurden.percent,2)+'%':'—'}</b><small>{liquidityBurden?.label||'No liquidity data'}</small></div>
           </div>
           <p>Uses your chosen stop distance. Liquidity burden compares planned position size with reported pool liquidity. Real losses can exceed the estimate because of slippage or failed exits.</p>
         </article>
@@ -1028,12 +1059,12 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
             <div>
               <span>Required market cap</span>
               <strong>{reverseTarget?money(reverseTarget.requiredMarketCap):'—'}</strong>
-              <small>{reverseTarget?reverseTarget.multiple.toFixed(2)+'× from entry MC':'Enter valid position + MC'}</small>
+              <small>{reverseTarget?fixed(reverseTarget.multiple,2)+'× from entry MC':'Enter valid position + MC'}</small>
             </div>
             <div>
               <span>Break-even MC</span>
               <strong>{breakEven?money(breakEven.marketCap):'—'}</strong>
-              <small>{breakEven?breakEven.multiple.toFixed(3)+'× after estimated costs':'—'}</small>
+              <small>{breakEven?fixed(breakEven.multiple,3)+'× after estimated costs':'—'}</small>
             </div>
           </div>
         </div>
@@ -1056,16 +1087,16 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
             <div>
               <span>Nearest support</span>
               <b>{tiny(analytics.levels?.nearestSupport)}</b>
-              <small>{analytics.levels?.downsideToSupportPercent==null?'—':analytics.levels.downsideToSupportPercent.toFixed(1)+'%'}</small>
+              <small>{analytics.levels?.downsideToSupportPercent==null?'—':fixed(analytics.levels.downsideToSupportPercent,1)+'%'}</small>
             </div>
             <div>
               <span>Nearest resistance</span>
               <b>{tiny(analytics.levels?.nearestResistance)}</b>
-              <small>{analytics.levels?.upsideToResistancePercent==null?'—':'+'+analytics.levels.upsideToResistancePercent.toFixed(1)+'%'}</small>
+              <small>{analytics.levels?.upsideToResistancePercent==null?'—':'+'+fixed(analytics.levels.upsideToResistancePercent,1)+'%'}</small>
             </div>
             <div>
               <span>Structure R:R</span>
-              <b>{analytics.levels?.structureRiskReward?analytics.levels.structureRiskReward.toFixed(2)+'×':'—'}</b>
+              <b>{analytics.levels?.structureRiskReward?fixed(analytics.levels.structureRiskReward,2)+'×':'—'}</b>
               <small>support → resistance</small>
             </div>
           </div>
@@ -1119,7 +1150,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
               <div><span>From entry MC</span><b className={livePosition.movePercent>=0?'good':'bad'}>{pct(livePosition.movePercent)}</b></div>
               <div><span>TP market cap</span><b>{money(livePosition.targetMarketCap)}</b><small>{livePosition.targetDistancePercent==null?'—':pct(livePosition.targetDistancePercent)} from current</small></div>
               <div><span>Stop market cap</span><b>{money(livePosition.stopMarketCap)}</b><small>{livePosition.stopDistanceFromCurrent==null?'—':pct(livePosition.stopDistanceFromCurrent)} from current</small></div>
-              <div><span>Remaining R:R</span><b>{livePosition.remainingRiskReward==null?'—':livePosition.remainingRiskReward.toFixed(2)+'×'}</b><small>to plan target vs stop</small></div>
+              <div><span>Remaining R:R</span><b>{livePosition.remainingRiskReward==null?'—':fixed(livePosition.remainingRiskReward,2)+'×'}</b><small>to plan target vs stop</small></div>
             </div>
           </div>
         ) : null}
@@ -1190,7 +1221,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
           <div className="customProfitResult">
             <span>Custom target</span>
             <strong>{money(customProjection.netValue)}</strong>
-            <b>{money(customProjection.netProfit)} est. P/L · {customProjection.multiple.toFixed(2)}× MC</b>
+            <b>{money(customProjection.netProfit)} est. P/L · {fixed(customProjection.multiple,2)}× MC</b>
           </div>
         ) : null}
 
@@ -1203,7 +1234,7 @@ export default function V4AnalyticsSuite({scan,walletEquity=0,onContext}){
               {ladder.map((row)=>(
                 <tr key={row.targetMarketCap}>
                   <td>{money(row.targetMarketCap)}</td>
-                  <td>{row.multiple.toFixed(2)}×</td>
+                  <td>{fixed(row.multiple,2)}×</td>
                   <td>{money(row.netValue)}</td>
                   <td className={row.netProfit>=0?'positiveText':'negativeText'}>{money(row.netProfit)}</td>
                   <td>{pct(row.roiPercent,0)}</td>

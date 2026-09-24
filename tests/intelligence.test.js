@@ -36,8 +36,8 @@ function baseSecurity(){
   }
 }
 
-test('score engine version is 6.0.0',()=>{
-  assert.equal(SCORE_VERSION,'6.0.0')
+test('score engine version is 6.1.0',()=>{
+  assert.equal(SCORE_VERSION,'6.1.0')
 })
 
 test('resolved owner concentration is preferred when available',()=>{
@@ -67,8 +67,9 @@ test('raw token-account concentration is used as fallback',()=>{
 
   assert.equal(result.concentration.method,'TOKEN_ACCOUNTS')
   assert.equal(result.concentration.top1Percent,75)
-  assert.ok(result.riskFlags.includes('EXTREME_ACCOUNT_CONCENTRATION'))
+  assert.ok(result.riskFlags.includes('RAW_ACCOUNT_CONCENTRATION_UNVERIFIED'))
   assert.ok(!result.riskFlags.includes('EXTREME_OWNER_CONCENTRATION'))
+  assert.notEqual(result.signal,'SELL / AVOID')
 })
 
 test('extreme concentration vetoes otherwise healthy setup',()=>{
@@ -580,5 +581,379 @@ test('transfer hook is caution evidence and caps aggressive promotion',()=>{
 
   assert.ok(result.riskFlags.includes('TRANSFER_HOOK_ACTIVE'))
   assert.ok(result.score<=60)
+  assert.equal(result.contractVerified,false)
   assert.notEqual(result.signal,'BUY SETUP')
+})
+
+
+function evmSecurity(overrides={}){
+  return {
+    available:true,
+    securityModel:'evm-token',
+    source:'evm-rpc',
+    contractCodePresent:true,
+    concentrationAvailable:false,
+    ownerConcentrationAvailable:false,
+    externalConcentrationAvailable:true,
+    externalConcentrationSource:'GOPLUS_TOP_HOLDERS',
+    externalTop1Percent:12,
+    externalTop5Percent:30,
+    externalTop10Percent:48,
+    external:{
+      providerCount:2,
+      providers:['evm-rpc','goplus'],
+      dangerRiskCount:0,
+      warningRiskCount:0,
+      hardRiskFlags:[],
+      softRiskFlags:[],
+      dataConflicts:[],
+      rugged:false,
+      evidenceScore:72,
+      authority:{corroboratedSafe:false,mint:{votes:[]},freeze:{votes:[]}},
+      goplus:{
+        available:true,
+        model:'evm',
+        openSource:true,
+        honeypot:false,
+        cannotSellAll:false,
+        malicious:false,
+        hiddenOwner:false,
+        ownerChangeBalance:false,
+        selfDestruct:false,
+        transferPausable:false,
+        blacklistActive:false,
+        proxy:false,
+        buyTaxPercent:2,
+        sellTaxPercent:3,
+        top1Percent:12,
+        top10Percent:48,
+      },
+      market:{
+        priceProviderCount:2,
+        externalPriceProviderCount:1,
+        maxDeviationPercent:2,
+        priceConflict:false,
+        priceAgreement:false,
+        evidenceScore:54,
+      },
+    },
+    ...overrides,
+  }
+}
+
+test('healthy EVM evidence can verify contract without Solana authority claims',()=>{
+  const result=analyzePair(healthyPair(),evmSecurity())
+
+  assert.equal(result.contractVerified,true)
+  assert.equal(result.securityEvidence.securityModel,'evm-token')
+  assert.equal(result.securityEvidence.evm.openSource,true)
+  assert.ok(!result.positives.some(value=>/mint authority/i.test(value)))
+  assert.ok(!result.positives.some(value=>/freeze authority/i.test(value)))
+})
+
+test('EVM honeypot evidence hard-vetoes an otherwise healthy setup',()=>{
+  const security=evmSecurity()
+  security.external.hardRiskFlags=['GOPLUS_HONEYPOT']
+  security.external.dangerRiskCount=1
+  security.external.goplus.honeypot=true
+
+  const result=analyzePair(healthyPair(),security)
+  assert.equal(result.contractVerified,false)
+  assert.equal(result.signal,'SELL / AVOID')
+  assert.ok(result.score<=37)
+})
+
+test('closed-source EVM contract cannot be marked verified',()=>{
+  const security=evmSecurity()
+  security.external.goplus.openSource=false
+  security.external.softRiskFlags=['GOPLUS_CLOSED_SOURCE']
+
+  const result=analyzePair(healthyPair(),security)
+  assert.equal(result.contractVerified,false)
+  assert.ok(result.riskFlags.includes('EVM_CLOSED_SOURCE'))
+})
+
+test('extreme EVM token taxes cap score and execution quality',()=>{
+  const security=evmSecurity()
+  security.external.goplus.buyTaxPercent=55
+  security.external.goplus.sellTaxPercent=60
+
+  const result=analyzePair(healthyPair(),security)
+  assert.ok(result.riskFlags.includes('EVM_EXTREME_TAX'))
+  assert.ok(result.score<=35)
+  assert.ok(result.executionScore<60)
+})
+
+
+test('stable-looking symbol cannot bypass normal contract scoring',()=>{
+  const pair=healthyPair()
+  pair.baseToken={symbol:'USDC',name:'USD Coin'}
+  const result=analyzePair(pair,baseSecurity())
+
+  assert.notEqual(result.marketState,'STABLE ASSET')
+  assert.ok(!result.riskFlags.includes('STABLE_ASSET'))
+  assert.notEqual(result.grade,'N/A')
+})
+
+test('FDV-only token does not receive mislabeled market-cap targets',()=>{
+  const pair=healthyPair()
+  pair.marketCap=null
+  pair.fdv=2_000_000
+  const result=analyzePair(pair,baseSecurity())
+
+  assert.equal(result.valuationBasis,'FDV')
+  assert.equal(result.marketCapPlan.available,false)
+  assert.equal(result.marketCapPlan.basis,'fdv-only')
+  assert.equal(result.marketCapPlan.fdv,2_000_000)
+})
+
+test('external holder evidence is preferred over unresolved raw token accounts',()=>{
+  const result=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    top1Percent:80,
+    top5Percent:90,
+    top10Percent:97,
+    ownerConcentrationAvailable:false,
+    externalConcentrationAvailable:true,
+    externalConcentrationSource:'RUGCHECK_TOP_HOLDERS',
+    externalTop1Percent:12,
+    externalTop5Percent:31,
+    externalTop10Percent:54,
+    external:{
+      providerCount:2,
+      providers:['solana-rpc','rugcheck'],
+      dangerRiskCount:0,
+      warningRiskCount:0,
+      hardRiskFlags:[],
+      softRiskFlags:[],
+      dataConflicts:[],
+      rugged:false,
+      evidenceScore:80,
+      market:{priceProviderCount:2,externalPriceProviderCount:1,priceConflict:false,liquidityConflict:false},
+    },
+  })
+
+  assert.equal(result.concentration.method,'RUGCHECK_TOP_HOLDERS')
+  assert.equal(result.concentration.top1Percent,12)
+  assert.ok(!result.riskFlags.includes('RAW_ACCOUNT_CONCENTRATION_UNVERIFIED'))
+})
+
+test('security without independent corroboration cannot promote to LEAN BUY',()=>{
+  const result=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    external:{
+      providerCount:1,
+      providers:['solana-rpc'],
+      dangerRiskCount:0,
+      warningRiskCount:0,
+      hardRiskFlags:[],
+      softRiskFlags:[],
+      dataConflicts:[],
+      rugged:false,
+      market:{priceProviderCount:2,externalPriceProviderCount:1,priceConflict:false,liquidityConflict:false},
+    },
+  })
+
+  assert.equal(result.signal,'WATCH')
+  assert.ok(result.entryGate.leanBuyMissing.some(item=>/Security evidence/i.test(item)))
+  assert.ok(result.score<=74)
+})
+
+test('single live price source cannot promote to LEAN BUY',()=>{
+  const security=evmSecurity()
+  security.external.market.priceProviderCount=1
+  security.external.market.externalPriceProviderCount=0
+  const result=analyzePair(healthyPair(),security)
+
+  assert.equal(result.signal,'WATCH')
+  assert.ok(result.entryGate.leanBuyMissing.some(item=>/price is not corroborated/i.test(item)))
+  assert.ok(result.score<=74)
+})
+
+test('liquidity-source conflict blocks entry promotion and lowers confidence',()=>{
+  const security=evmSecurity()
+  security.external.market.liquidityConflict=true
+  const result=analyzePair(healthyPair(),security)
+
+  assert.equal(result.signal,'WATCH')
+  assert.ok(result.riskFlags.includes('LIQUIDITY_SOURCE_CONFLICT'))
+  assert.ok(result.confidence<=68)
+  assert.ok(result.score<=72)
+})
+
+test('market-cap conflict suppresses scenario targets',()=>{
+  const security=evmSecurity()
+  security.external.market.marketCapConflict=true
+  security.external.market.marketCapProviderCount=2
+  security.external.market.marketCapSpreadPercent=60
+  const result=analyzePair(healthyPair(),security)
+
+  assert.equal(result.marketCapPlan.available,false)
+  assert.equal(result.marketCapPlan.basis,'market-cap-source-conflict')
+  assert.ok(result.riskFlags.includes('MARKET_CAP_SOURCE_CONFLICT'))
+  assert.ok(result.confidence<=70)
+})
+
+test('EVM mintability prevents full contract verification and buy promotion',()=>{
+  const security=evmSecurity()
+  security.external.goplus.mintable=true
+  security.external.softRiskFlags=['GOPLUS_MINTABLE']
+  const result=analyzePair(healthyPair(),security)
+
+  assert.equal(result.contractVerified,false)
+  assert.ok(result.riskFlags.includes('EVM_MINTABLE'))
+  assert.equal(result.signal,'WATCH')
+})
+
+test('EVM reclaimable ownership prevents full contract verification',()=>{
+  const security=evmSecurity()
+  security.external.goplus.takeBackOwnership=true
+  security.external.softRiskFlags=['GOPLUS_OWNERSHIP_RECLAIMABLE']
+  const result=analyzePair(healthyPair(),security)
+
+  assert.equal(result.contractVerified,false)
+  assert.ok(result.riskFlags.includes('EVM_OWNERSHIP_RECLAIMABLE'))
+  assert.equal(result.signal,'WATCH')
+})
+
+test('cannot-sell-all is restrictive but not treated like a honeypot',()=>{
+  const security=evmSecurity()
+  security.external.goplus.cannotSellAll=true
+  security.external.softRiskFlags=['GOPLUS_CANNOT_SELL_ALL']
+  const result=analyzePair(healthyPair(),security)
+
+  assert.ok(result.riskFlags.includes('EVM_CANNOT_SELL_ALL'))
+  assert.ok(!result.riskFlags.includes('EXTERNAL_STRUCTURAL_DANGER'))
+  assert.notEqual(result.signal,'SELL / AVOID')
+  assert.equal(result.contractVerified,false)
+})
+
+
+test('missing 5m price change does not earn flat-momentum bonus',()=>{
+  const complete=healthyPair()
+  complete.priceChange.m5=0
+  const missing=healthyPair()
+  delete missing.priceChange.m5
+
+  const completeResult=analyzePair(complete,baseSecurity())
+  const missingResult=analyzePair(missing,baseSecurity())
+
+  assert.ok(completeResult.setupScore>=missingResult.setupScore)
+  assert.equal(missingResult.microAcceleration,completeResult.microAcceleration)
+})
+
+test('missing flow cannot masquerade as neutral 50-50 entry confirmation',()=>{
+  const pair=healthyPair()
+  delete pair.txns.h1
+  const result=analyzePair(pair,baseSecurity())
+
+  assert.equal(result.signal,'WATCH')
+  assert.ok(result.entryGate.leanBuyMissing.some(item=>/1h transaction flow/i.test(item)))
+})
+
+test('unknown pair age blocks entry promotion',()=>{
+  const pair=healthyPair()
+  delete pair.pairCreatedAt
+  const result=analyzePair(pair,baseSecurity())
+
+  assert.equal(result.signal,'WATCH')
+  assert.ok(result.entryGate.leanBuyMissing.some(item=>/Pair age is unavailable/i.test(item)))
+  assert.equal(result.marketCapPlan.available,false)
+  assert.equal(result.marketCapPlan.basis,'insufficient-market-history')
+})
+
+test('missing momentum fields remain unknown and suppress target scenarios',()=>{
+  const pair=healthyPair()
+  delete pair.priceChange.h1
+  delete pair.priceChange.h6
+  const result=analyzePair(pair,baseSecurity())
+
+  assert.equal(result.signal,'WATCH')
+  assert.ok(result.entryGate.leanBuyMissing.some(item=>/1h momentum data is unavailable/i.test(item)))
+  assert.ok(result.entryGate.leanBuyMissing.some(item=>/6h momentum data is unavailable/i.test(item)))
+  assert.equal(result.marketCapPlan.available,false)
+})
+
+
+test('high manipulation-risk trade tape blocks entry promotion',()=>{
+  const security=evmSecurity()
+  security.external.market.tradeQuality={
+    available:true,
+    sampleQuality:'STRONG',
+    manipulationRiskScore:82,
+    activityQualityScore:18,
+    flags:['LOW_WALLET_DIVERSITY','REPEAT_WALLET_CHURN','WALLET_ACTIVITY_CONCENTRATION'],
+    summary:{sampleSize:60,uniqueWallets:3},
+  }
+  const result=analyzePair(healthyPair(),security)
+
+  assert.equal(result.signal,'WATCH')
+  assert.ok(result.riskFlags.includes('ACTIVITY_QUALITY_HIGH_RISK'))
+  assert.ok(result.score<=58)
+  assert.ok(result.confidence<=55)
+  assert.ok(result.entryGate.leanBuyMissing.some(item=>/trade activity/i.test(item)))
+})
+
+test('clean trade sample never boosts setup or safety score',()=>{
+  const baselineSecurity=evmSecurity()
+  const baseline=analyzePair(healthyPair(),baselineSecurity)
+
+  const cleanSecurity=evmSecurity()
+  cleanSecurity.external.market.tradeQuality={
+    available:true,
+    sampleQuality:'STRONG',
+    manipulationRiskScore:0,
+    activityQualityScore:100,
+    flags:[],
+    summary:{sampleSize:60,uniqueWallets:30},
+  }
+  const clean=analyzePair(healthyPair(),cleanSecurity)
+
+  assert.equal(clean.setupScore,baseline.setupScore)
+  assert.equal(clean.safetyScore,baseline.safetyScore)
+  assert.ok(clean.dataQualityScore>=baseline.dataQualityScore)
+})
+
+
+test('active Token-2022 pause authority prevents full contract verification',()=>{
+  const result=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    token2022:true,
+    pauseAuthority:'11111111111111111111111111111111',
+    paused:false,
+  })
+
+  assert.ok(result.riskFlags.includes('PAUSE_AUTHORITY_ACTIVE'))
+  assert.equal(result.contractVerified,false)
+  assert.equal(result.signal,'WATCH')
+})
+
+test('cannot-buy simulation conflicting with real buys lowers confidence without calling honeypot',()=>{
+  const security=evmSecurity()
+  security.external.goplus.cannotBuy=true
+  security.external.softRiskFlags=['GOPLUS_CANNOT_BUY_SIMULATION']
+  const result=analyzePair(healthyPair(),security)
+
+  assert.ok(result.riskFlags.includes('EVM_BUY_SIMULATION_CONFLICT'))
+  assert.ok(!result.riskFlags.includes('EXTERNAL_STRUCTURAL_DANGER'))
+  assert.equal(result.contractVerified,false)
+  assert.ok(result.confidence<=60)
+  assert.ok(result.score<=65)
+  assert.equal(result.signal,'WATCH')
+})
+
+test('cannot-buy simulation with no observed buys becomes a severe execution veto',()=>{
+  const pair=healthyPair()
+  pair.txns.h1={buys:0,sells:20}
+  pair.txns.h24={buys:0,sells:120}
+  const security=evmSecurity()
+  security.external.goplus.cannotBuy=true
+  security.external.softRiskFlags=['GOPLUS_CANNOT_BUY_SIMULATION']
+  const result=analyzePair(pair,security)
+
+  assert.ok(result.riskFlags.includes('EVM_CANNOT_BUY'))
+  assert.ok(result.score<=45)
+  assert.equal(result.contractVerified,false)
+  assert.notEqual(result.signal,'BUY SETUP')
+  assert.notEqual(result.signal,'LEAN BUY')
 })

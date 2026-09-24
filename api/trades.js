@@ -1,3 +1,4 @@
+import { getChain } from '../lib/chains.js'
 import { rateLimit, applyRateHeaders } from '../lib/rate-limit.js'
 
 const CACHE_TTL=20_000
@@ -38,11 +39,17 @@ export default async function handler(req,res){
   if(!limited.allowed) return res.status(429).json({success:false,error:'Too many trade-tape requests.'})
 
   const pair=String(getQuery(req, 'pair')).trim()
-  if(!/^[1-9A-HJ-NP-Za-km-z]{32,50}$/.test(pair)){
-    return res.status(400).json({success:false,error:'Valid Solana pair address required.'})
+  const chain=getChain(String(getQuery(req,'chain','solana')).trim().toLowerCase())
+  if(!chain) return res.status(400).json({success:false,error:'Unsupported chain.'})
+  const validPair=chain.family==='evm'
+    ? /^0x[a-fA-F0-9]{40}$/.test(pair)
+    : /^[1-9A-HJ-NP-Za-km-z]{32,50}$/.test(pair)
+  if(!validPair){
+    return res.status(400).json({success:false,error:`Valid ${chain.label} pair address required.`})
   }
 
-  const hit=getCached(pair)
+  const cacheKey=`${chain.id}:${pair}`
+  const hit=getCached(cacheKey)
   if(hit){
     res.setHeader('X-RCXT-Cache','HIT')
     res.setHeader('Cache-Control','public, s-maxage=12, stale-while-revalidate=30')
@@ -50,11 +57,11 @@ export default async function handler(req,res){
   }
 
   try{
-    const url='https://api.geckoterminal.com/api/v2/networks/solana/pools/'+encodeURIComponent(pair)+'/trades'
+    const url='https://api.geckoterminal.com/api/v2/networks/'+encodeURIComponent(chain.geckoterminal)+'/pools/'+encodeURIComponent(pair)+'/trades'
     const response=await fetch(url,{
       headers:{
         accept:'application/json;version=20230203',
-        'user-agent':'RCXT-Radar/4.0',
+        'user-agent':'RCXT-Radar/6.1',
       },
       signal:AbortSignal.timeout(5000),
     })
@@ -135,7 +142,7 @@ export default async function handler(req,res){
           netFlowUsd:Number(netFlow.toFixed(2)),
           volumeSharePercent:Number(volumeShare.toFixed(1)),
           direction,
-          explorerUrl:'https://solscan.io/account/'+row.wallet,
+          explorerUrl:chain.accountExplorer ? chain.accountExplorer+row.wallet : null,
         }
       })
       .filter((row)=>row.totalVolumeUsd>=whaleWalletThreshold||row.volumeSharePercent>=5)
@@ -155,7 +162,7 @@ export default async function handler(req,res){
       buyVolumeUsd:Number(buyVolume.toFixed(2)),
       sellVolumeUsd:Number(sellVolume.toFixed(2)),
       netFlowUsd:Number((buyVolume-sellVolume).toFixed(2)),
-      buyVolumePercent:totalVolume?Number((buyVolume/totalVolume*100).toFixed(1)):50,
+      buyVolumePercent:totalVolume?Number((buyVolume/totalVolume*100).toFixed(1)):null,
       averageTradeUsd:trades.length?Number((totalVolume/trades.length).toFixed(2)):0,
       medianTradeUsd:Number(medianSize.toFixed(2)),
       largestBuyUsd:Number(largestBuy.toFixed(2)),
@@ -202,13 +209,14 @@ export default async function handler(req,res){
     const result={
       success:true,
       provider:'GeckoTerminal',
+      chain:chain.id,
       pairAddress:pair,
       generatedAt:new Date().toISOString(),
       summary:{...summary,flags},
       whaleWallets,
       trades:trades.slice(0,35),
     }
-    setCached(pair,result)
+    setCached(cacheKey,result)
     res.setHeader('X-RCXT-Cache','MISS')
     res.setHeader('Cache-Control','public, s-maxage=12, stale-while-revalidate=30')
     return res.status(200).json(result)

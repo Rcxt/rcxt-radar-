@@ -22,8 +22,8 @@ export default async function handler(req, res) {
       const buys1h = Number(pair?.txns?.h1?.buys || 0)
       const sells1h = Number(pair?.txns?.h1?.sells || 0)
       const tx1h = buys1h + sells1h
-      const buyPct5m = tx5m ? (buys5m / tx5m) * 100 : 50
-      const buyPct1h = tx1h ? (buys1h / tx1h) * 100 : 50
+      const buyPct5m = tx5m ? (buys5m / tx5m) * 100 : null
+      const buyPct1h = tx1h ? (buys1h / tx1h) * 100 : null
       const liquidityReported = intelligence?.liquidityReported !== false
       const liquidityUsd = liquidityReported ? Number(pair?.liquidity?.usd || 0) : null
       const volume5m = Number(pair?.volume?.m5 || 0)
@@ -60,10 +60,10 @@ export default async function handler(req, res) {
         Number(pair?.rcxtDiscovery?.score || 0) * 0.15
       )
 
-      if (buyPct5m >= 52 && buyPct5m <= 72) trenchScore += 7
-      if (buyPct1h >= 50 && buyPct1h <= 70) trenchScore += 4
-      if (buyPct5m < 35 && tx5m >= 10) trenchScore -= 18
-      if (buyPct1h < 38 && tx1h >= 20) trenchScore -= 24
+      if (buyPct5m !== null && tx5m >= 4 && buyPct5m >= 52 && buyPct5m <= 72) trenchScore += 7
+      if (buyPct1h !== null && tx1h >= 10 && buyPct1h >= 50 && buyPct1h <= 70) trenchScore += 4
+      if (buyPct5m !== null && buyPct5m < 35 && tx5m >= 10) trenchScore -= 18
+      if (buyPct1h !== null && buyPct1h < 38 && tx1h >= 20) trenchScore -= 24
       if (liquidityReported && liquidityUsd < 3000) trenchScore -= 18
       if (change5m > 35 || change1h > 120) trenchScore -= 14
       if (change5m < -15) trenchScore -= 12
@@ -72,15 +72,15 @@ export default async function handler(req, res) {
       if (change5m < -35 || change1h < -45) trenchScore = Math.min(trenchScore, 42)
       trenchScore = Math.max(0, Math.min(100, trenchScore))
 
-      if (buyPct1h < 35 && tx1h >= 50) trenchScore = Math.min(trenchScore, 68)
-      if (buyPct5m < 30 && tx5m >= 20) trenchScore = Math.min(trenchScore, 55)
+      if (buyPct1h !== null && buyPct1h < 35 && tx1h >= 50) trenchScore = Math.min(trenchScore, 68)
+      if (buyPct5m !== null && buyPct5m < 30 && tx5m >= 20) trenchScore = Math.min(trenchScore, 55)
 
       const trenchState =
         (change5m < -35 || change1h < -45) ? 'DUMPING' :
         (liquidityReported && liquidityUsd < 3000) ? 'THIN' :
-        (buyPct5m < 35 && tx5m >= 10) ? 'SELLERS' :
-        (buyPct1h < 38 && tx1h >= 20 && buyPct5m >= 50) ? 'REVERSAL' :
-        (buyPct1h < 38 && tx1h >= 20) ? 'SELLERS' :
+        (buyPct5m !== null && buyPct5m < 35 && tx5m >= 10) ? 'SELLERS' :
+        (buyPct1h !== null && buyPct1h < 38 && tx1h >= 20 && buyPct5m !== null && buyPct5m >= 50) ? 'REVERSAL' :
+        (buyPct1h !== null && buyPct1h < 38 && tx1h >= 20) ? 'SELLERS' :
         (change5m > 35 || change1h > 120) ? 'EXTENDED' :
         trenchScore >= 78 ? 'HOT' :
         trenchScore >= 62 ? 'ACTIVE' :
@@ -113,11 +113,11 @@ export default async function handler(req, res) {
         buys5m,
         sells5m,
         tx5m,
-        buyPct5m: Number(buyPct5m.toFixed(1)),
+        buyPct5m: buyPct5m===null?null:Number(buyPct5m.toFixed(1)),
         buys1h,
         sells1h,
         tx1h,
-        buyPct1h: Number(buyPct1h.toFixed(1)),
+        buyPct1h: buyPct1h===null?null:Number(buyPct1h.toFixed(1)),
         buys24h: Number(pair?.txns?.h24?.buys || 0),
         sells24h: Number(pair?.txns?.h24?.sells || 0),
         ageHours: ageHours === null ? null : Number(ageHours.toFixed(1)),

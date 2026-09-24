@@ -18,6 +18,9 @@
     },
     "api/social.js": {
       "maxDuration": 15
+    },
+    "api/health.js": {
+      "maxDuration": 30
     }
   },
   "headers": [
