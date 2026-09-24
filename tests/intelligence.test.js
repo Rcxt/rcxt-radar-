@@ -36,8 +36,8 @@ function baseSecurity(){
   }
 }
 
-test('score engine version is 6.0.0',()=>{
-  assert.equal(SCORE_VERSION,'6.0.0')
+test('score engine version is 6.1.0-beta.1',()=>{
+  assert.equal(SCORE_VERSION,'6.1.0-beta.1')
 })
 
 test('resolved owner concentration is preferred when available',()=>{
@@ -581,4 +581,103 @@ test('transfer hook is caution evidence and caps aggressive promotion',()=>{
   assert.ok(result.riskFlags.includes('TRANSFER_HOOK_ACTIVE'))
   assert.ok(result.score<=60)
   assert.notEqual(result.signal,'BUY SETUP')
+})
+
+
+function evmSecurity(overrides={}){
+  return {
+    available:true,
+    securityModel:'evm-token',
+    source:'evm-rpc',
+    contractCodePresent:true,
+    concentrationAvailable:false,
+    ownerConcentrationAvailable:false,
+    externalConcentrationAvailable:true,
+    externalConcentrationSource:'GOPLUS_TOP_HOLDERS',
+    externalTop1Percent:12,
+    externalTop5Percent:30,
+    externalTop10Percent:48,
+    external:{
+      providerCount:2,
+      providers:['evm-rpc','goplus'],
+      dangerRiskCount:0,
+      warningRiskCount:0,
+      hardRiskFlags:[],
+      softRiskFlags:[],
+      dataConflicts:[],
+      rugged:false,
+      evidenceScore:72,
+      authority:{corroboratedSafe:false,mint:{votes:[]},freeze:{votes:[]}},
+      goplus:{
+        available:true,
+        model:'evm',
+        openSource:true,
+        honeypot:false,
+        cannotSellAll:false,
+        malicious:false,
+        hiddenOwner:false,
+        ownerChangeBalance:false,
+        selfDestruct:false,
+        transferPausable:false,
+        blacklistActive:false,
+        proxy:false,
+        buyTaxPercent:2,
+        sellTaxPercent:3,
+        top1Percent:12,
+        top10Percent:48,
+      },
+      market:{
+        priceProviderCount:2,
+        externalPriceProviderCount:1,
+        maxDeviationPercent:2,
+        priceConflict:false,
+        priceAgreement:false,
+        evidenceScore:54,
+      },
+    },
+    ...overrides,
+  }
+}
+
+test('healthy EVM evidence can verify contract without Solana authority claims',()=>{
+  const result=analyzePair(healthyPair(),evmSecurity())
+
+  assert.equal(result.contractVerified,true)
+  assert.equal(result.securityEvidence.securityModel,'evm-token')
+  assert.equal(result.securityEvidence.evm.openSource,true)
+  assert.ok(!result.positives.some(value=>/mint authority/i.test(value)))
+  assert.ok(!result.positives.some(value=>/freeze authority/i.test(value)))
+})
+
+test('EVM honeypot evidence hard-vetoes an otherwise healthy setup',()=>{
+  const security=evmSecurity()
+  security.external.hardRiskFlags=['GOPLUS_HONEYPOT']
+  security.external.dangerRiskCount=1
+  security.external.goplus.honeypot=true
+
+  const result=analyzePair(healthyPair(),security)
+  assert.equal(result.contractVerified,false)
+  assert.equal(result.signal,'SELL / AVOID')
+  assert.ok(result.score<=37)
+})
+
+test('closed-source EVM contract cannot be marked verified',()=>{
+  const security=evmSecurity()
+  security.external.goplus.openSource=false
+  security.external.softRiskFlags=['GOPLUS_CLOSED_SOURCE']
+
+  const result=analyzePair(healthyPair(),security)
+  assert.equal(result.contractVerified,false)
+  assert.ok(result.riskFlags.includes('EVM_CLOSED_SOURCE'))
+})
+
+test('extreme EVM token taxes cap score and execution quality',()=>{
+  const security=evmSecurity()
+  security.external.goplus.buyTaxPercent=55
+  security.external.goplus.sellTaxPercent=60
+
+  const result=analyzePair(healthyPair(),security)
+  assert.ok(result.riskFlags.includes('EVM_EXTREME_TAX'))
+  assert.ok(result.score<=35)
+  assert.ok(result.executionScore<60)
 })
