@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { criticalStructureFlags } from '../lib/risk-policy.js'
 import { normalizeNotificationPrefs } from '../lib/notification-prefs.js'
 
 function short(value,size=5){
@@ -45,6 +46,7 @@ export default function WalletActivity({walletAddress='',onOpenToken,notificatio
   const scoringRef=useRef(new Set())
   const seenBuyRef=useRef(new Set())
   const initializedBuyMonitorRef=useRef(false)
+  const activityRequestRef=useRef(0)
   const prefs=normalizeNotificationPrefs(notificationPrefs||serverMonitor?.preferences||{})
   const prefsRef=useRef(prefs)
   const serverMonitorEnabledRef=useRef(Boolean(serverMonitor?.enabled))
@@ -95,13 +97,7 @@ export default function WalletActivity({walletAddress='',onOpenToken,notificatio
   }
 
   function rugAssessment(scan){
-    const flags=Array.isArray(scan?.intelligence?.riskFlags)?scan.intelligence.riskFlags:[]
-    const rugFlags=flags.filter(flag=>[
-      'MINT_AUTHORITY_ACTIVE',
-      'FREEZE_AUTHORITY_ACTIVE',
-      'EXTREME_OWNER_CONCENTRATION',
-      'EXTREME_ACCOUNT_CONCENTRATION',
-    ].includes(flag))
+    const rugFlags=criticalStructureFlags(scan)
     const severe=scan?.intelligence?.risk==='EXTREME'||scan?.intelligence?.signal==='SELL / AVOID'
     return {rugFlags,severe}
   }
@@ -125,12 +121,15 @@ export default function WalletActivity({walletAddress='',onOpenToken,notificatio
 
   async function loadActivity({silent=false}={}){
     if(!valid) return
+    const requestId=++activityRequestRef.current
+    const requestAddress=address
     if(!silent) setLoading(true)
     setError('')
     try{
       const response=await fetch('/api/activity?address='+encodeURIComponent(address)+'&limit=15',{cache:'no-store'})
       const json=await response.json()
       if(!response.ok||!json?.success) throw new Error(json?.error||'Wallet activity unavailable')
+      if(requestId!==activityRequestRef.current||requestAddress!==address) return
       setData(json)
       setLastRefresh(Date.now())
 
@@ -166,9 +165,9 @@ export default function WalletActivity({walletAddress='',onOpenToken,notificatio
       }
       writeStoredSet('rcxt-buy-alerted-v1',alreadyNotified)
     }catch(err){
-      setError(err?.message||'Wallet activity unavailable')
+      if(requestId===activityRequestRef.current) setError(err?.message||'Wallet activity unavailable')
     }finally{
-      if(!silent) setLoading(false)
+      if(!silent&&requestId===activityRequestRef.current) setLoading(false)
     }
   }
 
@@ -219,7 +218,7 @@ export default function WalletActivity({walletAddress='',onOpenToken,notificatio
       ].join('|')
       const storedRisks=readStoredSet('rcxt-risk-alerted-v1')
       const riskKey=mint+':'+riskFingerprint
-      const url='/?token='+encodeURIComponent(mint)
+      const url='/?token='+encodeURIComponent(mint)+'&chain=solana'
 
       const activePrefs=prefsRef.current
       const hotButRisky=Number(next.opportunityScore||0)>=60&&['HIGH','EXTREME'].includes(next.risk)
@@ -264,7 +263,7 @@ export default function WalletActivity({walletAddress='',onOpenToken,notificatio
         await showAlert(
           'RCXT buy detected: '+symbol,
           'New buy detected, but the first risk scan could not complete. RCXT will retry.',
-          {tag:'buy-pending-'+mint,url:'/?token='+encodeURIComponent(mint)}
+          {tag:'buy-pending-'+mint,url:'/?token='+encodeURIComponent(mint)+'&chain=solana'}
         )
       }
     }finally{
