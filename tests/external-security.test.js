@@ -425,3 +425,47 @@ test('GoPlus gas abuse is preserved as hard danger evidence',()=>{
   assert.ok(merged.external.hardRiskFlags.includes('GOPLUS_GAS_ABUSE'))
   assert.ok(merged.external.dangerRiskCount>=1)
 })
+
+
+test('GoPlus holder-risk concentration excludes clearly tagged burn and locked balances',()=>{
+  const address='0x3458e003F6ED93df0F537b8AcaC6FbE08E41247f'
+  const normalized=normalizeGoPlusEvm({
+    result:{
+      [address.toLowerCase()]:{
+        is_open_source:'1',
+        holders:[
+          {percent:'0.40',tag:'Burn Address',is_locked:'0',is_contract:'0'},
+          {percent:'0.20',tag:'Liquidity Pool',is_locked:'0',is_contract:'1'},
+          {percent:'0.15',tag:'Team Locker',is_locked:'1',is_contract:'1'},
+          {percent:'0.12',tag:'Deployer',is_locked:'0',is_contract:'0'},
+          {percent:'0.05',tag:'',is_locked:'0',is_contract:'0'},
+        ],
+      },
+    },
+  },address)
+
+  assert.equal(normalized.rawTop1Percent,40)
+  assert.equal(normalized.rawTop5Percent,92)
+  assert.equal(normalized.excludedHolderPercent,75)
+  assert.equal(normalized.excludedHolderCount,3)
+  assert.equal(normalized.top1Percent,12)
+  assert.equal(normalized.top5Percent,17)
+})
+
+test('untagged contract holders are not automatically ignored',()=>{
+  const address='0x3458e003F6ED93df0F537b8AcaC6FbE08E41247f'
+  const normalized=normalizeGoPlusEvm({
+    result:{
+      [address.toLowerCase()]:{
+        is_open_source:'1',
+        holders:[
+          {percent:'0.35',tag:'',is_locked:'0',is_contract:'1'},
+          {percent:'0.10',tag:'Deployer',is_locked:'0',is_contract:'0'},
+        ],
+      },
+    },
+  },address)
+
+  assert.equal(normalized.top1Percent,35)
+  assert.equal(normalized.excludedHolderPercent,0)
+})
