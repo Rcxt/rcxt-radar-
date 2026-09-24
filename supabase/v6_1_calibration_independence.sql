@@ -130,3 +130,8 @@ select
   round(corr(data_quality_score::double precision, return_pct::double precision)::numeric,4) as data_quality_return_corr
 from public.score_calibration_clean
 group by chain_family, score_version, horizon;
+
+
+grant select on public.score_calibration_chain_summary to service_role;
+grant select on public.score_calibration_chain_buckets to service_role;
+grant select on public.score_component_outcomes_chain_clean to service_role;
