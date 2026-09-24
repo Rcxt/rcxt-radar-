@@ -1,6 +1,8 @@
-import { getBestPair } from '../lib/dexscreener.js'
+import { getBestPair, resolveDexChain } from '../lib/dexscreener.js'
 import { analyzePair } from '../lib/intelligence.js'
 import { getMintSecurity, looksLikeSolanaAddress } from '../lib/solana.js'
+import { getEvmSecurity } from '../lib/evm-security.js'
+import { getChain, isAddressValidForChain, looksLikeEvmAddress, normalizeTokenAddress, SUPPORTED_CHAIN_IDS } from '../lib/chains.js'
 import { getExternalSecurity, mergeSecurityEvidence } from '../lib/external-security.js'
 import { buildMarketConsensus, getMarketConsensus } from '../lib/market-consensus.js'
 import { logTokenScan } from '../lib/supabase-log.js'
@@ -22,17 +24,37 @@ export default async function handler(req, res) {
   applyRateHeaders(res, limited, 90)
   if (!limited.allowed) return res.status(429).json({ success:false, error:'Too many scan requests. Try again shortly.' })
 
-  const address=String(getQuery(req, 'address')).trim()
-  if (!looksLikeSolanaAddress(address)) return res.status(400).json({ success:false, error:'Enter a valid Solana token address.' })
+  const rawAddress=String(getQuery(req, 'address')).trim()
+  const requestedChain=String(getQuery(req, 'chain', 'auto')).trim().toLowerCase() || 'auto'
+  if (!looksLikeSolanaAddress(rawAddress) && !looksLikeEvmAddress(rawAddress)) {
+    return res.status(400).json({ success:false, error:'Enter a valid Solana or EVM token contract address.' })
+  }
 
+  let chain = requestedChain === 'auto' ? null : getChain(requestedChain)
+  if (requestedChain !== 'auto' && !chain) {
+    return res.status(400).json({ success:false, error:`Unsupported chain. Choose one of: ${SUPPORTED_CHAIN_IDS.join(', ')}` })
+  }
+
+  if (!chain) {
+    chain = looksLikeSolanaAddress(rawAddress) ? getChain('solana') : await resolveDexChain(rawAddress)
+  }
+  if (!chain) {
+    return res.status(404).json({ success:false, error:'Could not identify an active supported chain for this contract. Select the chain manually.' })
+  }
+  if (!isAddressValidForChain(rawAddress,chain)) {
+    return res.status(400).json({ success:false, error:`That address is not valid for ${chain.label}.` })
+  }
+
+  const address=normalizeTokenAddress(rawAddress,chain)
+  const autoDetected=requestedChain==='auto'
   const shouldPersist = String(getQuery(req, 'persist', '1')) !== '0'
 
   try {
     const [pair,onchainSecurity,externalSecurity,externalMarket]=await Promise.all([
-      getBestPair(address),
-      getMintSecurity(address),
-      getExternalSecurity(address),
-      getMarketConsensus(address,null),
+      getBestPair(address,chain),
+      chain.family === 'evm' ? getEvmSecurity(address,chain) : getMintSecurity(address),
+      getExternalSecurity(address,chain),
+      getMarketConsensus(address,null,chain),
     ])
     if (!pair) return res.status(404).json({ success:false, error:'No active DexScreener market found for this token.' })
 
@@ -49,6 +71,14 @@ export default async function handler(req, res) {
     const sells={m5:Number(pair?.txns?.m5?.sells||0),h1:Number(pair?.txns?.h1?.sells||0),h6:Number(pair?.txns?.h6?.sells||0),h24:Number(pair?.txns?.h24?.sells||0)}
     const scan={
       address,
+      chain:{
+        id:chain.id,
+        label:chain.label,
+        family:chain.family,
+        chainId:chain.chainId ?? null,
+        autoDetected,
+        explorerUrl:chain.explorer ? `${chain.explorer}${address}` : null,
+      },
       token:{name:pair?.baseToken?.name||'Unknown',symbol:pair?.baseToken?.symbol||'UNKNOWN',address},
       market:{
         priceUsd:Number(pair?.priceUsd||0),priceNative:Number(pair?.priceNative||0),
@@ -66,7 +96,7 @@ export default async function handler(req, res) {
         buyPercent:intelligence.buyPercent24h
       },
       security:mintSecurity,
-      pair:{dex:pair?.dexId||null,pairAddress:pair?.pairAddress||null,url:pair?.url||null,createdAt:pair?.pairCreatedAt||null},
+      pair:{chain:pair?.chainId||chain.dexscreener,dex:pair?.dexId||null,pairAddress:pair?.pairAddress||null,url:pair?.url||null,createdAt:pair?.pairCreatedAt||null},
       intelligence
     }
 
