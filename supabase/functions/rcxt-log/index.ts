@@ -166,17 +166,18 @@ async function fetchCalibrationView(url: string, secretKey: string, view: string
 }
 
 async function calibrationSummary(url: string, secretKey: string) {
-  const [summary,buckets,components,chainSummary,chainBuckets,rawSummary,rawBuckets,rawComponents] = await Promise.all([
+  const [summary,buckets,components,chainSummary,chainBuckets,chainComponents,rawSummary,rawBuckets,rawComponents] = await Promise.all([
     fetchCalibrationView(url,secretKey,"score_calibration_clean_summary","score_version.desc,horizon.asc,signal.asc"),
     fetchCalibrationView(url,secretKey,"score_calibration_clean_buckets","score_version.desc,score_bucket_min.desc,horizon.asc"),
     fetchCalibrationView(url,secretKey,"score_component_outcomes_clean","score_version.desc,horizon.asc"),
     fetchCalibrationView(url,secretKey,"score_calibration_chain_summary","score_version.desc,chain_family.asc,horizon.asc,signal.asc"),
     fetchCalibrationView(url,secretKey,"score_calibration_chain_buckets","score_version.desc,chain_family.asc,score_bucket_min.desc,horizon.asc"),
+    fetchCalibrationView(url,secretKey,"score_component_outcomes_chain_clean","score_version.desc,chain_family.asc,horizon.asc"),
     fetchCalibrationView(url,secretKey,"score_calibration_summary","score_version.desc,horizon.asc,signal.asc"),
     fetchCalibrationView(url,secretKey,"score_calibration_buckets","score_version.desc,score_bucket_min.desc,horizon.asc"),
     fetchCalibrationView(url,secretKey,"score_component_outcomes","score_version.desc,horizon.asc"),
   ]);
-  return {summary,buckets,components,chainSummary,chainBuckets,rawSummary,rawBuckets,rawComponents};
+  return {summary,buckets,components,chainSummary,chainBuckets,chainComponents,rawSummary,rawBuckets,rawComponents};
 }
 
 async function walletHistory(url: string, secretKey: string, address: string, limit = 100) {
