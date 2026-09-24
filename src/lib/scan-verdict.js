@@ -7,7 +7,10 @@ export function deriveScanVerdict(scan){
   const executionScore=Number(intel.executionScore)
   const safetyScore=Number(intel.safetyScore)
   const priceProviderCount=Number(marketEvidence?.priceProviderCount||0)
+  const securityProviderCount=Number(evidence?.providerCount||0)
   const priceConflict=Boolean(marketEvidence?.priceConflict)
+  const liquidityConflict=Boolean(marketEvidence?.liquidityConflict)
+  const confidence=Number(intel.confidence)
   const hardDanger=Boolean(
     evidence?.rugged ||
     Number(evidence?.dangerRiskCount||0)>0 ||
@@ -20,7 +23,11 @@ export function deriveScanVerdict(scan){
     ['BUY SETUP','LEAN BUY'].includes(signal) &&
     intel.contractVerified &&
     !intel.preliminary &&
+    securityProviderCount>=2 &&
+    priceProviderCount>=2 &&
     !priceConflict &&
+    !liquidityConflict &&
+    Number.isFinite(confidence) && confidence>=50 &&
     Number.isFinite(executionScore) && executionScore>=55 &&
     (!Number.isFinite(safetyScore) || safetyScore>=60)
   )
@@ -39,7 +46,9 @@ export function deriveScanVerdict(scan){
     tone:verdict.toLowerCase(),
     reason,
     priceProviderCount,
+    securityProviderCount,
     priceConflict,
+    liquidityConflict,
     executionScore:Number.isFinite(executionScore)?executionScore:null,
     checks:[
       {
