@@ -385,6 +385,7 @@ export default function Home() {
     const target = String(address || '').trim()
     const selectedChain = String(chain || activeScanChainRef.current || 'auto').toLowerCase()
     if (!target || liveInFlightRef.current) return
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
     if (activeScanAddressRef.current !== target) return
 
     liveInFlightRef.current = true
@@ -502,6 +503,7 @@ export default function Home() {
     if (!autoRefresh || !scan?.address) return
 
     const timer = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
       runScan({ address:scan.address, chain:scan?.chain?.id || activeScanChainRef.current, silent:true })
     }, 10000)
 
@@ -2573,8 +2575,8 @@ export default function Home() {
                   </div>
                 ) : (
                   <p className="aiEmpty">
-                    The deterministic score is already live. Run the AI layer for a second-pass
-                    explanation of the signal, contradictions, and invalidation conditions.
+                    The deterministic score is automatically re-verified in the background. Run the AI layer
+                    for a second-pass explanation of the signal, contradictions, and invalidation conditions.
                   </p>
                 )}
               </article>
