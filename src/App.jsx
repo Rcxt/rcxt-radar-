@@ -13,6 +13,7 @@ import {
   normalizeNotificationPrefs,
   shouldNotifySignalTransition,
 } from './lib/notification-prefs.js'
+import { criticalStructureFlags } from './lib/risk-policy.js'
 
 const WALLET_KEY = 'rcxt-wallet-address-v1'
 const HISTORY_KEY = 'rcxt-scan-history-v1'
@@ -33,6 +34,22 @@ function assetKey(item, fallback = 'solana') {
   const rawAddress = String(item?.address || item?.mint || '')
   const address = chain === 'solana' ? rawAddress : rawAddress.toLowerCase()
   return `${chain}:${address}`
+}
+
+function tokenDeepLink(item, fallback = 'solana') {
+  const address=String(item?.address||item?.mint||'')
+  if(!address) return '/'
+  const params=new URLSearchParams({token:address,chain:itemChainId(item,fallback)})
+  return '/?'+params.toString()
+}
+
+function readStoredJson(key, fallback) {
+  try {
+    const raw=localStorage.getItem(key)
+    return raw==null ? fallback : JSON.parse(raw)
+  } catch {
+    return fallback
+  }
 }
 const SCAN_CHAIN_OPTIONS = [{ id:'auto', label:'Auto-detect' }, ...listChains().map((chain)=>({ id:chain.id, label:chain.label }))]
 
@@ -138,27 +155,27 @@ export default function Home() {
     loadRadar()
 
     try {
-      const saved = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]')
+      const saved = readStoredJson(HISTORY_KEY, [])
       if (Array.isArray(saved)) setHistory(saved.slice(0, 12))
 
-      const hidden = JSON.parse(localStorage.getItem(HIDDEN_KEY) || '[]')
+      const hidden = readStoredJson(HIDDEN_KEY, [])
       if (Array.isArray(hidden)) setHiddenCoins(hidden.filter((item) => item?.address))
 
       const notifySaved = localStorage.getItem(NOTIFY_KEY) === 'enabled'
       setNotificationsEnabled(notifySaved && typeof Notification !== 'undefined' && Notification.permission === 'granted')
 
       const savedNotificationPrefs = normalizeNotificationPrefs(
-        JSON.parse(localStorage.getItem(NOTIFY_PREFS_KEY) || '{}')
+        readStoredJson(NOTIFY_PREFS_KEY, {})
       )
       setNotificationPrefs(savedNotificationPrefs)
 
-      const savedWatchlist = JSON.parse(localStorage.getItem(WATCH_KEY) || '[]')
+      const savedWatchlist = readStoredJson(WATCH_KEY, [])
       if (Array.isArray(savedWatchlist)) setWatchlist(savedWatchlist.filter((item) => item?.address).slice(0, 50))
 
       const savedWallet = localStorage.getItem(WALLET_KEY) || ''
       if (savedWallet) setWallet(savedWallet)
 
-      const savedRules = JSON.parse(localStorage.getItem(RULES_KEY) || '{}')
+      const savedRules = readStoredJson(RULES_KEY, {})
       if (Number.isFinite(Number(savedRules.score))) setAlertScore(Number(savedRules.score))
       if (savedRules.marketCap != null) setAlertMarketCap(String(savedRules.marketCap))
       if (
@@ -177,13 +194,20 @@ export default function Home() {
   useEffect(() => {
     function loadTradePlans() {
       try {
-        const plans = []
+        const plansByAsset = new Map()
         for (let index = 0; index < localStorage.length; index += 1) {
           const key = localStorage.key(index)
           if (!key?.startsWith('rcxt-trade-plan:')) continue
-          const plan = JSON.parse(localStorage.getItem(key) || 'null')
-          if (plan?.address) plans.push(plan)
+          const plan = readStoredJson(key, null)
+          if (!plan?.address) continue
+          const normalized={...plan,chain:itemChainId(plan,'solana')}
+          const identity=assetKey(normalized)
+          const current=plansByAsset.get(identity)
+          if(!current||Number(normalized.savedAt||0)>=Number(current.savedAt||0)){
+            plansByAsset.set(identity,normalized)
+          }
         }
+        const plans=[...plansByAsset.values()]
         plans.sort((a,b) => Number(b.savedAt || 0) - Number(a.savedAt || 0))
         setTradePlans(plans.slice(0, 100))
       } catch {
@@ -662,7 +686,7 @@ export default function Home() {
       `${before} → ${after} · RCXT ${next.intelligence?.score??'—'}/100 · opportunity ${next.intelligence?.opportunityScore??next.intelligence?.setupScore??'—'}/100`,
       {
         tag:`signal-${next.address}`,
-        url:`/?token=${encodeURIComponent(next.address)}`,
+        url:tokenDeepLink(next),
         critical:after==='SELL / AVOID',
       },
     )
@@ -685,7 +709,7 @@ export default function Home() {
         `RCXT ${item.intelligence?.score??'—'}/100 · opportunity ${item.intelligence?.opportunityScore??item.intelligence?.setupScore??'—'}/100 · ${item.intelligence?.risk||'risk'} risk`,
         {
           tag:`radar-${item.address}`,
-          url:`/?token=${encodeURIComponent(item.address)}`,
+          url:tokenDeepLink(item,'solana'),
           critical:newSignal==='SELL / AVOID',
         },
       )
@@ -704,7 +728,7 @@ export default function Home() {
         `score:${next.address}:${scoreTarget}`,
         `${next.token?.symbol||'Token'} crossed RCXT ${scoreTarget}`,
         `Score is now ${next.intelligence?.score}/100 · ${next.intelligence?.signal} · opportunity ${next.intelligence?.opportunityScore??next.intelligence?.setupScore??'—'}/100`,
-        {tag:`score-${next.address}`,url:`/?token=${encodeURIComponent(next.address)}`},
+        {tag:`score-${itemChainId(next)}-${next.address}`,url:tokenDeepLink(next)},
       )
     }
 
@@ -719,20 +743,14 @@ export default function Home() {
         `mc:${next.address}:${marketCapTarget}`,
         `${next.token?.symbol||'Token'} hit MC target`,
         `Market cap crossed ${compactUsd(marketCapTarget)} · now ${compactUsd(next.market?.marketCap)}`,
-        {tag:`mc-${next.address}`,url:`/?token=${encodeURIComponent(next.address)}`},
+        {tag:`mc-${itemChainId(next)}-${next.address}`,url:tokenDeepLink(next)},
       )
     }
   }
 
   function maybeNotifyRiskEscalation(previous, next) {
-    const dangerFlags=[
-      'MINT_AUTHORITY_ACTIVE',
-      'FREEZE_AUTHORITY_ACTIVE',
-      'EXTREME_OWNER_CONCENTRATION',
-      'EXTREME_ACCOUNT_CONCENTRATION',
-    ]
-    const beforeFlags=new Set(previous?.intelligence?.riskFlags||[])
-    const afterFlags=(next?.intelligence?.riskFlags||[]).filter((flag)=>dangerFlags.includes(flag))
+    const beforeFlags=new Set(criticalStructureFlags(previous))
+    const afterFlags=criticalStructureFlags(next)
     const newDanger=afterFlags.filter((flag)=>!beforeFlags.has(flag))
     const riskRank={LOWER:0,MODERATE:1,HIGH:2,EXTREME:3}
     const beforeRank=riskRank[previous?.intelligence?.risk]??0
@@ -756,8 +774,8 @@ export default function Home() {
       title,
       `RCXT ${next.intelligence?.score??'—'}/100 · ${detail}`,
       {
-        tag:`risk-${next.address}`,
-        url:`/?token=${encodeURIComponent(next.address)}`,
+        tag:`risk-${itemChainId(next)}-${next.address}`,
+        url:tokenDeepLink(next),
         critical:rugLike,
       },
     )
@@ -939,16 +957,21 @@ export default function Home() {
 
   function openTradePlan(plan) {
     if (!plan?.address) return
+    const chain=itemChainId(plan,'solana')
     navigateView('scanner')
     setTokenAddress(plan.address)
-    runScan({ address: plan.address })
+    setScanChain(chain)
+    runScan({ address:plan.address, chain })
   }
 
-  function deleteTradePlan(address) {
-    if (!address) return
+  function deleteTradePlan(plan) {
+    if (!plan?.address) return
+    const chain=itemChainId(plan,'solana')
+    const address=chain==='solana'?String(plan.address):String(plan.address).toLowerCase()
     try {
-      localStorage.removeItem('rcxt-trade-plan:' + address)
-      setTradePlans((current) => current.filter((plan) => plan.address !== address))
+      localStorage.removeItem('rcxt-trade-plan:' + chain + ':' + address)
+      if(chain==='solana') localStorage.removeItem('rcxt-trade-plan:' + plan.address)
+      setTradePlans((current) => current.filter((item) => assetKey(item)!==assetKey(plan)))
     } catch {}
   }
 
@@ -1046,10 +1069,11 @@ export default function Home() {
   function exportTradePlansCsv() {
     if (!tradePlans.length) return
     const rows = [
-      ['token','name','address','status','positionUsd','entryMarketCap','tpPercent','scaleOutPercent','stopPercent','enteredAt','closedAt','exitMarketCap','estimatedExitValue','estimatedPnl','thesis','invalidation'],
+      ['token','name','chain','address','status','positionUsd','entryMarketCap','tpPercent','scaleOutPercent','stopPercent','enteredAt','closedAt','exitMarketCap','estimatedExitValue','estimatedPnl','thesis','invalidation'],
       ...tradePlans.map((plan) => [
         plan.token || '',
         plan.name || '',
+        itemChainId(plan,'solana'),
         plan.address || '',
         plan.status || 'DRAFT',
         plan.investment ?? '',
@@ -1494,7 +1518,7 @@ export default function Home() {
                 <small className="tradePlanStatsNote">Journal P/L is estimated from saved market-cap math, not exchange-verified realized P/L.</small>
                 <div className="tradePlanLibrary">
                   {tradePlans.length ? tradePlans.map((plan) => (
-                    <div className="tradePlanLibraryRow" key={plan.address}>
+                    <div className="tradePlanLibraryRow" key={assetKey(plan)}>
                       <button className="tradePlanOpen" onClick={() => openTradePlan(plan)}>
                         <div>
                           <strong>{plan.token || shortAddress(plan.address, 5)}</strong>
@@ -1514,7 +1538,7 @@ export default function Home() {
                           ) : null}
                         </div>
                       </button>
-                      <button className="tradePlanDelete" onClick={() => deleteTradePlan(plan.address)} aria-label={'Delete ' + (plan.token || 'trade plan')}>×</button>
+                      <button className="tradePlanDelete" onClick={() => deleteTradePlan(plan)} aria-label={'Delete ' + (plan.token || 'trade plan')}>×</button>
                     </div>
                   )) : <EmptyDrawer text="No trade plans yet. Save one from the V4 Market Lab." />}
                 </div>
