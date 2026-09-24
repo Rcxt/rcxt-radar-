@@ -1,6 +1,8 @@
 import { getBestPair, getRadarCandidates } from '../lib/dexscreener.js'
 import { analyzePair, SCORE_VERSION } from '../lib/intelligence.js'
 import { getMintSecurity } from '../lib/solana.js'
+import { getEvmSecurity } from '../lib/evm-security.js'
+import { getChain, listChains } from '../lib/chains.js'
 import { getExternalSecurity, mergeSecurityEvidence } from '../lib/external-security.js'
 import { buildMarketConsensus, getMarketConsensus } from '../lib/market-consensus.js'
 import { checkPersistenceHealth } from '../lib/supabase-log.js'
@@ -50,6 +52,7 @@ async function testCharts() {
 }
 
 const PREVIEW_SMOKE_MINT = 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263'
+const PREVIEW_ROBINHOOD_MINT = '0x3458e003F6ED93df0F537b8AcaC6FbE08E41247f'
 
 async function testPreviewV6() {
   const started = Date.now()
@@ -117,6 +120,66 @@ async function testPreviewV6() {
   }
 }
 
+async function testPreviewRobinhood() {
+  const started=Date.now()
+  const chain=getChain('robinhood')
+  try{
+    const [pair,onchainSecurity,externalSecurity,externalMarket]=await Promise.all([
+      getBestPair(PREVIEW_ROBINHOOD_MINT,chain),
+      getEvmSecurity(PREVIEW_ROBINHOOD_MINT,chain),
+      getExternalSecurity(PREVIEW_ROBINHOOD_MINT,chain),
+      getMarketConsensus(PREVIEW_ROBINHOOD_MINT,null,chain),
+    ])
+    if(!pair) return {ok:false,latencyMs:Date.now()-started,error:'Known Robinhood smoke token has no market.'}
+
+    const market=buildMarketConsensus(pair,externalMarket?.providers||{})
+    const security=mergeSecurityEvidence(onchainSecurity,externalSecurity,market)
+    const intelligence=analyzePair(pair,security)
+    const checks={
+      dexMarket:Boolean(pair),
+      evmContractCode:onchainSecurity?.contractCodePresent===true,
+      finiteScore:Number.isFinite(Number(intelligence?.score)),
+      scoreVersion:intelligence?.modelVersion===SCORE_VERSION,
+      geckoterminal:Boolean(market?.providers?.geckoterminal?.available),
+      goplus:Boolean(externalSecurity?.goplus?.available),
+      priceCorroboration:Number(market?.priceProviderCount||0)>=2,
+      securityModel:intelligence?.securityEvidence?.securityModel==='evm-token',
+    }
+
+    return {
+      ok:Object.values(checks).every(Boolean),
+      latencyMs:Date.now()-started,
+      chain:'robinhood',
+      token:pair?.baseToken?.symbol||'ROO',
+      address:PREVIEW_ROBINHOOD_MINT.toLowerCase(),
+      persisted:false,
+      score:{
+        version:intelligence?.modelVersion||null,
+        value:intelligence?.score??null,
+        signal:intelligence?.signal||null,
+        risk:intelligence?.risk||null,
+        confidence:intelligence?.confidence??null,
+        contractVerified:Boolean(intelligence?.contractVerified),
+      },
+      evidence:{
+        securityProviderCount:Number(security?.external?.providerCount||0),
+        securityProviders:security?.external?.providers||[],
+        priceProviderCount:Number(market?.priceProviderCount||0),
+        priceConflict:Boolean(market?.priceConflict),
+        geckoterminal:Boolean(market?.providers?.geckoterminal?.available),
+        goplus:Boolean(externalSecurity?.goplus?.available),
+        openSource:externalSecurity?.goplus?.openSource??null,
+        honeypot:externalSecurity?.goplus?.honeypot??null,
+        buyTaxPercent:externalSecurity?.goplus?.buyTaxPercent??null,
+        sellTaxPercent:externalSecurity?.goplus?.sellTaxPercent??null,
+      },
+      checks,
+    }
+  }catch(error){
+    return {ok:false,latencyMs:Date.now()-started,persisted:false,error:error?.message||'Robinhood V6.1 smoke failed.'}
+  }
+}
+
 export default async function handler(req,res){
   if(req.method!=='GET') return res.status(405).json({success:false,error:'Method not allowed'})
 
@@ -136,9 +199,15 @@ export default async function handler(req,res){
     charts,
   }
 
-  const previewSmoke = process.env.VERCEL_ENV === 'preview' ? await testPreviewV6() : null
+  const previewSmoke = process.env.VERCEL_ENV === 'preview'
+    ? {
+        solana:await testPreviewV6(),
+        robinhood:await testPreviewRobinhood(),
+      }
+    : null
   const coreHealthy=Object.values(services).every((item)=>item.ok)
-  const healthy=coreHealthy && (previewSmoke ? previewSmoke.ok : true)
+  const previewSmokeHealthy=previewSmoke ? previewSmoke.solana.ok && previewSmoke.robinhood.ok : true
+  const healthy=coreHealthy && previewSmokeHealthy
 
   res.setHeader('Cache-Control','no-store')
   return res.status(healthy?200:207).json({
@@ -151,7 +220,7 @@ export default async function handler(req,res){
     refresh:{radarSeconds:10,scannerSeconds:15,chartsSeconds:30,tradeTapeSeconds:30,walletOpenSeconds:15,walletBackgroundSeconds:30},
     build:{
       app:'RCXT Radar',
-      version:'6.0.1',
+      version:'6.1.0-rc.1',
       scoreEngine:SCORE_VERSION,
       trenchEngine:'1.0.0',
       chartEngine:'1.0.0',
@@ -162,7 +231,7 @@ export default async function handler(req,res){
       challengeEngine:'1.1.0',
       walletActivityEngine:'1.2.0',
       notificationEngine:'2.0.0',
-      persistence:'supabase-oidc-v17',
+      persistence:'supabase-oidc-v18-multichain',
       gitSha:process.env.VERCEL_GIT_COMMIT_SHA||null,
       gitRef:process.env.VERCEL_GIT_COMMIT_REF||null,
       environment:process.env.VERCEL_ENV||null,
@@ -176,6 +245,20 @@ export default async function handler(req,res){
     },
     visualProviders:{
       bubblemaps:{ enabled:true, mode:'direct-token-link', scoreInput:false }
+    },
+    multichain:{
+      scanner:true,
+      marketLab:true,
+      history:true,
+      persistence:true,
+      radar:'solana-only',
+      wallet:'solana-only',
+      supported:listChains().map((chain)=>({
+        id:chain.id,
+        label:chain.label,
+        family:chain.family,
+        chainId:chain.chainId??null,
+      })),
     },
     dataProviders:{
       core:{
@@ -200,10 +283,10 @@ export default async function handler(req,res){
       candidate:process.env.VERCEL_ENV !== 'production',
       productionPromoted:process.env.VERCEL_ENV === 'production',
       requiredServicesHealthy:coreHealthy,
-      previewSmokeHealthy:previewSmoke ? previewSmoke.ok : null,
+      previewSmokeHealthy:previewSmoke ? previewSmokeHealthy : null,
       note:process.env.VERCEL_ENV === 'production'
-        ? 'RCXT Radar V6 is promoted to production.'
-        : 'V6 final build is awaiting production promotion.'
+        ? 'RCXT Radar multichain release is promoted to production.'
+        : 'V6.1 multichain release candidate is awaiting production promotion.'
     }
   })
 }
