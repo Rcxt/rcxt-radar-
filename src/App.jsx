@@ -2737,6 +2737,22 @@ function ScoreRing({ score, large = false }) {
 }
 
 
+function openScannerTool(id, fallbackId = '') {
+  const target = document.getElementById(id) || (fallbackId ? document.getElementById(fallbackId) : null)
+  if (!target) return
+
+  if (target.tagName === 'DETAILS') target.open = true
+  let parent = target.parentElement
+  while (parent) {
+    if (parent.tagName === 'DETAILS') parent.open = true
+    parent = parent.parentElement
+  }
+
+  requestAnimationFrame(() => {
+    target.scrollIntoView({ behavior:'smooth', block:'start' })
+  })
+}
+
 function ScanVerdict({ scan }) {
   const intel = scan?.intelligence || {}
   const { verdict, tone, reason, checks } = deriveScanVerdict(scan)
@@ -2757,6 +2773,10 @@ function ScanVerdict({ scan }) {
           <span>{verdict === 'YES' ? 'Setup passes current gates' : verdict === 'NO' ? 'Risk controls veto this setup' : 'Wait for more confirmation'}</span>
         </div>
         <div className="scanVerdictScore">
+          <div className="scanVerdictQuickTools" aria-label="Quick scanner tools">
+            <button type="button" onClick={() => openScannerTool('rcxt-plan-map', 'v4-market-lab')}>Plan Map</button>
+            <button type="button" onClick={() => openScannerTool('rcxt-profit-list', 'v4-market-lab')}>Profit List</button>
+          </div>
           <strong>{intel.score ?? '—'}<small>/100</small></strong>
           <span>{intel.confidence ?? '—'}% evidence confidence</span>
           <em>{intel.risk || 'UNKNOWN'} risk</em>
