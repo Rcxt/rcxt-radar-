@@ -29,7 +29,7 @@ async function fetchCandles(pairAddress,interval,chain){
   url.searchParams.set('token','base')
 
   const response=await fetch(url,{
-    headers:{accept:'application/json','user-agent':'RCXT-Radar/4.0'},
+    headers:{accept:'application/json','user-agent':'RCXT-Radar/6.1'},
     signal:AbortSignal.timeout(5000),
   })
   const text=await response.text()
@@ -69,8 +69,13 @@ export default async function handler(req,res){
 
   const pairAddress=String(getQuery(req, 'pair')).trim()
   const interval=String(getQuery(req, 'interval', '5m'))
-  if(!/^[1-9A-HJ-NP-Za-km-z]{32,50}$/.test(pairAddress)){
-    return res.status(400).json({success:false,error:'Valid Solana pair address required.'})
+  const chain=getChain(String(getQuery(req,'chain','solana')).trim().toLowerCase())
+  if(!chain) return res.status(400).json({success:false,error:'Unsupported chain.'})
+  const validPair=chain.family==='evm'
+    ? /^0x[a-fA-F0-9]{40}$/.test(pairAddress)
+    : /^[1-9A-HJ-NP-Za-km-z]{32,50}$/.test(pairAddress)
+  if(!validPair){
+    return res.status(400).json({success:false,error:`Valid ${chain.label} pair address required.`})
   }
   if(!INTERVALS[interval]) return res.status(400).json({success:false,error:'Unsupported chart interval.'})
 
