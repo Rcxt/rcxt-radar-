@@ -31,9 +31,12 @@ function sumKnown(a,b) {
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ success:false, error:'Method not allowed' })
 
-  const limited = rateLimit(req, { key:'scan', limit:90, windowMs:60_000 })
-  applyRateHeaders(res, limited, 90)
-  if (!limited.allowed) return res.status(429).json({ success:false, error:'Too many scan requests. Try again shortly.' })
+  const mode=String(getQuery(req, 'mode', 'full')).trim().toLowerCase()
+  const liveOnly=mode==='live'
+  const requestLimit=liveOnly?240:90
+  const limited = rateLimit(req, { key:liveOnly?'scan-live':'scan', limit:requestLimit, windowMs:60_000 })
+  applyRateHeaders(res, limited, requestLimit)
+  if (!limited.allowed) return res.status(429).json({ success:false, error:liveOnly?'Too many live refresh requests. Try again shortly.':'Too many scan requests. Try again shortly.' })
 
   const rawAddress=String(getQuery(req, 'address')).trim()
   const requestedChain=String(getQuery(req, 'chain', 'auto')).trim().toLowerCase() || 'auto'
@@ -78,6 +81,79 @@ export default async function handler(req, res) {
   const shouldPersist = String(getQuery(req, 'persist', '1')) !== '0'
 
   try {
+    if (liveOnly) {
+      const pair=await getBestPair(address,chain,{freshMs:1800,staleMs:45_000})
+      if (!pair) return res.status(404).json({ success:false, error:'No active DexScreener market found for this token.' })
+
+      const rawLiquidity=pair?.liquidity?.usd
+      const pumpFunMarket=String(pair?.dexId||'').toLowerCase()==='pumpfun'
+      const rawLiquidityFinite=rawLiquidity!==null&&rawLiquidity!==undefined&&rawLiquidity!==''&&Number.isFinite(Number(rawLiquidity))
+      const liquidityReported=pumpFunMarket
+        ? rawLiquidityFinite&&Number(rawLiquidity)>0
+        : rawLiquidityFinite
+      const buys={
+        m5:finiteOrNull(pair?.txns?.m5?.buys),
+        h1:finiteOrNull(pair?.txns?.h1?.buys),
+        h6:finiteOrNull(pair?.txns?.h6?.buys),
+        h24:finiteOrNull(pair?.txns?.h24?.buys),
+      }
+      const sells={
+        m5:finiteOrNull(pair?.txns?.m5?.sells),
+        h1:finiteOrNull(pair?.txns?.h1?.sells),
+        h6:finiteOrNull(pair?.txns?.h6?.sells),
+        h24:finiteOrNull(pair?.txns?.h24?.sells),
+      }
+      const total24=sumKnown(buys.h24,sells.h24)
+      const buyPercent=total24&&buys.h24!==null
+        ? Math.round((buys.h24/total24)*1000)/10
+        : null
+
+      const snapshot={
+        address,
+        chain:{
+          id:chain.id,
+          label:chain.label,
+          family:chain.family,
+          chainId:chain.chainId ?? null,
+        },
+        token:{name:pair?.baseToken?.name||'Unknown',symbol:pair?.baseToken?.symbol||'UNKNOWN',address},
+        market:{
+          priceUsd:finiteOrNull(pair?.priceUsd),
+          priceNative:finiteOrNull(pair?.priceNative),
+          marketCap:finiteOrNull(pair?.marketCap),
+          fdv:finiteOrNull(pair?.fdv),
+          liquidityUsd:liquidityReported?finiteOrNull(rawLiquidity):null,
+          liquidityReported,
+          volume:{
+            m5:finiteOrNull(pair?.volume?.m5),
+            h1:finiteOrNull(pair?.volume?.h1),
+            h6:finiteOrNull(pair?.volume?.h6),
+            h24:finiteOrNull(pair?.volume?.h24),
+          },
+          priceChange:{
+            m5:finiteOrNull(pair?.priceChange?.m5),
+            h1:finiteOrNull(pair?.priceChange?.h1),
+            h6:finiteOrNull(pair?.priceChange?.h6),
+            h24:finiteOrNull(pair?.priceChange?.h24),
+          },
+        },
+        trading:{
+          buys,sells,
+          transactions:{
+            m5:sumKnown(buys.m5,sells.m5),
+            h1:sumKnown(buys.h1,sells.h1),
+            h6:sumKnown(buys.h6,sells.h6),
+            h24:total24,
+          },
+          buyPercent,
+        },
+        pair:{chain:pair?.chainId||chain.dexscreener,dex:pair?.dexId||null,pairAddress:pair?.pairAddress||null,url:pair?.url||null,createdAt:pair?.pairCreatedAt||null},
+      }
+
+      res.setHeader('Cache-Control','no-store')
+      return res.status(200).json({ success:true, liveAt:new Date().toISOString(), source:'dexscreener', snapshot })
+    }
+
     const [pair,onchainSecurity,externalSecurity,externalMarket]=await Promise.all([
       getBestPair(address,chain),
       chain.family === 'evm' ? getEvmSecurity(address,chain) : getMintSecurity(address),
