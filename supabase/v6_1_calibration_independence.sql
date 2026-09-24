@@ -110,3 +110,5 @@ group by chain_family, score_version,
   (floor(coalesce(score::integer,0)::numeric/10.0)*10)::integer,
   least(100,((floor(coalesce(score::integer,0)::numeric/10.0)*10)+9)::integer),
   signal, risk, horizon;
+
+alter view public.score_calibration_clean set (security_invoker = true);
