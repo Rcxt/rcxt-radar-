@@ -145,3 +145,39 @@ test('stale auxiliary Helius price cannot trigger live price conflict',()=>{
   assert.equal(result.auxiliaryPrices.length,1)
   assert.equal(result.auxiliaryPrices[0].source,'helius')
 })
+
+
+test('two-source price spread catches disagreement hidden by midpoint deviation',()=>{
+  const result=buildMarketConsensus(pair(0.001),{
+    geckoterminal:{available:true,priceUsd:0.00125,liquidityUsd:50000},
+    jupiterPrice:{available:false},
+    helius:{available:false},
+    birdeye:{available:false},
+  })
+
+  assert.equal(result.priceProviderCount,2)
+  assert.ok(result.maxDeviationPercent<12)
+  assert.ok(result.priceSpreadPercent>=12)
+  assert.equal(result.priceConflict,true)
+})
+
+test('market-cap disagreement is tracked separately from live price conflict',()=>{
+  const primary=pair(0.001)
+  primary.marketCap=1_000_000
+  const result=buildMarketConsensus(primary,{
+    geckoterminal:{
+      available:true,
+      priceUsd:0.00101,
+      liquidityUsd:50000,
+      marketCapUsd:1_800_000,
+    },
+    jupiterPrice:{available:false},
+    helius:{available:false},
+    birdeye:{available:false},
+  })
+
+  assert.equal(result.priceConflict,false)
+  assert.equal(result.marketCapProviderCount,2)
+  assert.equal(result.marketCapConflict,true)
+  assert.ok(result.marketCapSpreadPercent>=35)
+})
