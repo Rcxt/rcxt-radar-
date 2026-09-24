@@ -286,14 +286,15 @@ export default function Home() {
 
       try {
         const notes = JSON.parse(localStorage.getItem(NOTES_KEY) || '{}')
-        setTokenNote(notes[data.scan.address] || '')
+        const noteKey = `${data.scan?.chain?.id || 'solana'}:${String(data.scan.address).toLowerCase()}`
+        setTokenNote(notes[noteKey] || notes[data.scan.address] || '')
       } catch {
         setTokenNote('')
       }
 
       if (!silent) {
         try {
-          const historyResponse = await fetch(`/api/history?address=${encodeURIComponent(target)}`, { cache: 'no-store' })
+          const historyResponse = await fetch(`/api/history?address=${encodeURIComponent(target)}&chain=${encodeURIComponent(data.scan?.chain?.id || selectedChain)}`, { cache: 'no-store' })
           const historyData = await historyResponse.json()
           if (activeScanAddressRef.current === target && historyResponse.ok && historyData?.success) setScoreHistory(historyData.rows || [])
         } catch {
@@ -757,7 +758,8 @@ export default function Home() {
     if (!scan?.address) return
     try {
       const notes = JSON.parse(localStorage.getItem(NOTES_KEY) || '{}')
-      notes[scan.address] = tokenNote.slice(0, 2000)
+      const noteKey = `${scan?.chain?.id || 'solana'}:${String(scan.address).toLowerCase()}`
+      notes[noteKey] = tokenNote.slice(0, 2000)
       localStorage.setItem(NOTES_KEY, JSON.stringify(notes))
       setNotificationStatus('Token note saved.')
     } catch {
@@ -949,7 +951,7 @@ export default function Home() {
     if (!address) return
     navigateView('scanner')
     setTokenAddress(address)
-    runScan({ address })
+    runScan({ address, chain:entry?.chain || 'auto' })
   }
 
   function toggleWatch(item) {
@@ -1798,7 +1800,7 @@ export default function Home() {
               <span className="sectionNumber">02</span>
               <div>
                 <h2>Deep Token Scanner</h2>
-                <p>Paste a Solana CA for a live market, contract, and signal breakdown.</p>
+                <p>Scan Solana or supported EVM contracts with chain-aware market and security checks.</p>
               </div>
             </div>
             <label className="autoToggle">
@@ -1812,14 +1814,24 @@ export default function Home() {
             </label>
           </div>
 
-          <div className="scanBar">
+          <div className="scanBar multiChain">
+            <select
+              className="chainSelect"
+              value={scanChain}
+              onChange={(event) => setScanChain(event.target.value)}
+              aria-label="Token blockchain"
+            >
+              {SCAN_CHAIN_OPTIONS.map((chain) => (
+                <option key={chain.id} value={chain.id}>{chain.label}</option>
+              ))}
+            </select>
             <input
               value={tokenAddress}
               onChange={(event) => setTokenAddress(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') runScan()
               }}
-              placeholder="Paste Solana token contract address"
+              placeholder="Paste token contract address"
               aria-label="Token contract address"
             />
             <button className="primaryButton" onClick={() => runScan()} disabled={scanLoading}>
@@ -1837,17 +1849,23 @@ export default function Home() {
                   {watchAddresses.has(scan.address) ? '★ Watching' : '☆ Watch'}
                 </button>
                 <button className="toolButton" onClick={() => navigator.clipboard?.writeText(scan.address)}>Copy CA</button>
-                <button
-                  className="toolButton bubbleMapButton"
-                  onClick={() => window.open(
-                    `https://v2.bubblemaps.io/map?address=${encodeURIComponent(scan.address)}&chain=solana&partnerId=regular`,
-                    '_blank',
-                    'noopener,noreferrer',
-                  )}
-                  title="Open this token in Bubblemaps V2"
-                >
-                  Bubble Map ↗
-                </button>
+                {scan?.chain?.id === 'solana' ? (
+                  <button
+                    className="toolButton bubbleMapButton"
+                    onClick={() => window.open(
+                      `https://v2.bubblemaps.io/map?address=${encodeURIComponent(scan.address)}&chain=solana&partnerId=regular`,
+                      '_blank',
+                      'noopener,noreferrer',
+                    )}
+                    title="Open this token in Bubblemaps V2"
+                  >
+                    Bubble Map ↗
+                  </button>
+                ) : scan?.chain?.explorerUrl ? (
+                  <a className="toolLink chainExplorerLink" href={scan.chain.explorerUrl} target="_blank" rel="noreferrer">
+                    Explorer ↗
+                  </a>
+                ) : null}
                 <details className="scanMoreActions">
                   <summary>More</summary>
                   <div>
@@ -1867,6 +1885,7 @@ export default function Home() {
                       {hiddenAddresses.has(scan.address) ? 'Restore Coin' : 'Hide Coin'}
                     </button>
                     {scan.pair?.url ? <a className="toolLink" href={scan.pair.url} target="_blank" rel="noreferrer">DexScreener ↗</a> : null}
+                    {scan?.chain?.explorerUrl ? <a className="toolLink" href={scan.chain.explorerUrl} target="_blank" rel="noreferrer">{scan.chain.label || 'Chain'} Explorer ↗</a> : null}
                     {isPumpFunToken(scan) ? (
                       <a className="toolLink pumpLink" href={`https://pump.fun/coin/${scan.address}`} target="_blank" rel="noreferrer">
                         Pump.fun ↗
@@ -2383,7 +2402,7 @@ export default function Home() {
               </div>
             </>
           ) : (
-            <EmptyScanner history={history} onSelect={(item) => runScan({ address: item.address })} />
+            <EmptyScanner history={history} onSelect={(item) => runScan({ address: item.address, chain:item.chain || 'auto' })} />
           )}
         </section>
       )}
@@ -2610,7 +2629,7 @@ function ScanVerdict({ scan }) {
     <article className={`scanVerdict ${tone}`}>
       <div className="scanVerdictMain">
         <div className="scanVerdictIdentity">
-          <span>{scan?.token?.symbol || 'TOKEN'}</span>
+          <span>{scan?.token?.symbol || 'TOKEN'} · {scan?.chain?.label || 'Unknown chain'}</span>
           <strong>{scan?.token?.name || 'Token scan'}</strong>
           <button className="addressButton" onClick={() => navigator.clipboard?.writeText(scan?.address || '')}>
             {shortAddress(scan?.address)} · copy
