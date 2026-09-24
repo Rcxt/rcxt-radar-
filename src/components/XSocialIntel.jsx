@@ -40,7 +40,9 @@ export default function XSocialIntel({ scan, notificationsEnabled=false, notific
   const address = String(scan?.address || '')
   const symbol = String(scan?.token?.symbol || '')
   const name = String(scan?.token?.name || '')
+  const chain = String(scan?.chain?.id || 'solana')
   const scanRef = useRef(scan)
+  const socialRequestRef = useRef(0)
 
   const [social, setSocial] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -80,7 +82,7 @@ export default function XSocialIntel({ scan, notificationsEnabled=false, notific
         badge:'/icon.svg',
         tag:'x-'+address,
         renotify:false,
-        data:{url:'/?token='+encodeURIComponent(address)},
+        data:{url:'/?token='+encodeURIComponent(address)+'&chain='+encodeURIComponent(chain)},
       })
     }catch{}
   }
@@ -118,6 +120,7 @@ export default function XSocialIntel({ scan, notificationsEnabled=false, notific
 
   const loadSocial = useCallback(async (withAi = false) => {
     if (!address && !symbol && !name) return
+    const requestId=++socialRequestRef.current
     setLoading(true)
     setError('')
     try {
@@ -125,21 +128,23 @@ export default function XSocialIntel({ scan, notificationsEnabled=false, notific
         address,
         symbol,
         name,
+        chain,
         persist:'1',
       })
       const response = await fetch('/api/social?' + params.toString(), { cache:'no-store' })
       const data = await response.json()
       if (!response.ok || !data?.success) throw new Error(data?.error || 'X search failed')
+      if(requestId!==socialRequestRef.current) return
       setSocial(data.social)
       setLastRefresh(data.scannedAt || new Date().toISOString())
       if(data.social?.available) await maybeNotifyX(data.social)
-      if (withAi && data.social?.available) await runAiReport(data.social)
+      if (withAi && data.social?.available && requestId===socialRequestRef.current) await runAiReport(data.social)
     } catch (nextError) {
-      setError(nextError?.message || 'X search failed')
+      if(requestId===socialRequestRef.current) setError(nextError?.message || 'X search failed')
     } finally {
-      setLoading(false)
+      if(requestId===socialRequestRef.current) setLoading(false)
     }
-  }, [address, symbol, name, runAiReport, notificationsEnabled, notificationPrefs])
+  }, [address, symbol, name, chain, runAiReport, notificationsEnabled, notificationPrefs])
 
   useEffect(() => {
     setSocial(null)
@@ -153,7 +158,7 @@ export default function XSocialIntel({ scan, notificationsEnabled=false, notific
     }, 60_000)
 
     return () => clearInterval(timer)
-  }, [address, symbol, name, loadSocial])
+  }, [address, symbol, name, chain, loadSocial])
 
   const x = social?.x || social?.providers?.[0] || null
   const xReason = String(x?.reason || '')
