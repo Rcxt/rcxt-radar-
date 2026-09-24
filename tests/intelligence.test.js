@@ -581,6 +581,7 @@ test('transfer hook is caution evidence and caps aggressive promotion',()=>{
 
   assert.ok(result.riskFlags.includes('TRANSFER_HOOK_ACTIVE'))
   assert.ok(result.score<=60)
+  assert.equal(result.contractVerified,false)
   assert.notEqual(result.signal,'BUY SETUP')
 })
 
@@ -911,4 +912,48 @@ test('clean trade sample never boosts setup or safety score',()=>{
   assert.equal(clean.setupScore,baseline.setupScore)
   assert.equal(clean.safetyScore,baseline.safetyScore)
   assert.ok(clean.dataQualityScore>=baseline.dataQualityScore)
+})
+
+
+test('active Token-2022 pause authority prevents full contract verification',()=>{
+  const result=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    token2022:true,
+    pauseAuthority:'11111111111111111111111111111111',
+    paused:false,
+  })
+
+  assert.ok(result.riskFlags.includes('PAUSE_AUTHORITY_ACTIVE'))
+  assert.equal(result.contractVerified,false)
+  assert.equal(result.signal,'WATCH')
+})
+
+test('cannot-buy simulation conflicting with real buys lowers confidence without calling honeypot',()=>{
+  const security=evmSecurity()
+  security.external.goplus.cannotBuy=true
+  security.external.softRiskFlags=['GOPLUS_CANNOT_BUY_SIMULATION']
+  const result=analyzePair(healthyPair(),security)
+
+  assert.ok(result.riskFlags.includes('EVM_BUY_SIMULATION_CONFLICT'))
+  assert.ok(!result.riskFlags.includes('EXTERNAL_STRUCTURAL_DANGER'))
+  assert.equal(result.contractVerified,false)
+  assert.ok(result.confidence<=60)
+  assert.ok(result.score<=65)
+  assert.equal(result.signal,'WATCH')
+})
+
+test('cannot-buy simulation with no observed buys becomes a severe execution veto',()=>{
+  const pair=healthyPair()
+  pair.txns.h1={buys:0,sells:20}
+  pair.txns.h24={buys:0,sells:120}
+  const security=evmSecurity()
+  security.external.goplus.cannotBuy=true
+  security.external.softRiskFlags=['GOPLUS_CANNOT_BUY_SIMULATION']
+  const result=analyzePair(pair,security)
+
+  assert.ok(result.riskFlags.includes('EVM_CANNOT_BUY'))
+  assert.ok(result.score<=45)
+  assert.equal(result.contractVerified,false)
+  assert.notEqual(result.signal,'BUY SETUP')
+  assert.notEqual(result.signal,'LEAN BUY')
 })
