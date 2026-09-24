@@ -7,6 +7,7 @@ import { getExternalSecurity, mergeSecurityEvidence } from '../lib/external-secu
 import { buildMarketConsensus, getMarketConsensus } from '../lib/market-consensus.js'
 import { logTokenScan } from '../lib/supabase-log.js'
 import { rateLimit, applyRateHeaders } from '../lib/rate-limit.js'
+import { getTradeQuality } from '../lib/trade-quality.js'
 
 function getQuery(req, name, fallback = '') {
   try {
@@ -58,9 +59,22 @@ export default async function handler(req, res) {
     ])
     if (!pair) return res.status(404).json({ success:false, error:'No active DexScreener market found for this token.' })
 
-    const marketEvidence=buildMarketConsensus(pair,externalMarket?.providers || {})
-    const mintSecurity=mergeSecurityEvidence(onchainSecurity,externalSecurity,marketEvidence)
-    const intelligence=analyzePair(pair,mintSecurity)
+    let marketEvidence=buildMarketConsensus(pair,externalMarket?.providers || {})
+    let mintSecurity=mergeSecurityEvidence(onchainSecurity,externalSecurity,marketEvidence)
+    let intelligence=analyzePair(pair,mintSecurity)
+
+    // Only add the heavier wallet-level trade-tape check when the setup is
+    // otherwise strong enough to approach an entry promotion. It is used as
+    // negative/confirmation evidence, never as a standalone score booster.
+    if (
+      pair?.pairAddress &&
+      (Number(intelligence?.setupScore || 0) >= 55 || Number(intelligence?.score || 0) >= 55)
+    ) {
+      const tradeQuality=await getTradeQuality(pair.pairAddress,chain)
+      marketEvidence={...marketEvidence,tradeQuality}
+      mintSecurity=mergeSecurityEvidence(onchainSecurity,externalSecurity,marketEvidence)
+      intelligence=analyzePair(pair,mintSecurity)
+    }
     const rawLiquidity=pair?.liquidity?.usd
     const pumpFunMarket=String(pair?.dexId||'').toLowerCase()==='pumpfun'
     const rawLiquidityFinite=rawLiquidity!==null&&rawLiquidity!==undefined&&rawLiquidity!==''&&Number.isFinite(Number(rawLiquidity))
