@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { pickBestBasePair } from '../lib/dexscreener.js'
+import { hasMeaningfulChainAmbiguity, pickBestBasePair } from '../lib/dexscreener.js'
 
 const TOKEN='0x1111111111111111111111111111111111111111'
 const OTHER='0x2222222222222222222222222222222222222222'
@@ -40,4 +40,21 @@ test('equal-liquidity pair selection prefers greater 24h activity',()=>{
   ],TOKEN,'ethereum')
 
   assert.equal(result.volume.h24,25_000)
+})
+
+
+test('auto-chain detection refuses a meaningful second deployment',()=>{
+  const ambiguous=hasMeaningfulChainAmbiguity([
+    {liquidityUsd:50_000,volume24hUsd:20_000},
+    {liquidityUsd:12_000,volume24hUsd:8_000},
+  ])
+  assert.equal(ambiguous,true)
+})
+
+test('tiny dust deployment does not make auto-chain unusable',()=>{
+  const ambiguous=hasMeaningfulChainAmbiguity([
+    {liquidityUsd:50_000,volume24hUsd:20_000},
+    {liquidityUsd:100,volume24hUsd:200},
+  ])
+  assert.equal(ambiguous,false)
 })
