@@ -12,6 +12,12 @@ const SUPABASE_PUBLISHABLE_KEY =
 
 const addressPattern=/^[1-9A-HJ-NP-Za-km-z]{32,44}$/
 
+function finiteOrNull(value){
+  if(value===null||value===undefined||value==='') return null
+  const number=Number(value)
+  return Number.isFinite(number)?number:null
+}
+
 
 function getQuery(req, name, fallback = '') {
   try {
@@ -45,13 +51,13 @@ export default async function handler(req,res){
     if(!response.ok||!data?.ok) throw new Error(data?.error||'Challenge history unavailable')
 
     const rows=(data.rows||[]).map((row)=>({
-      totalValueUsd:Number(row.total_value_usd||0),
-      solValueUsd:Number(row.sol_value_usd||0),
-      tokenValueUsd:Number(row.token_value_usd||0),
-      solBalance:Number(row.sol_balance||0),
-      tokenCount:Number(row.token_count||0),
+      totalValueUsd:finiteOrNull(row.total_value_usd),
+      solValueUsd:finiteOrNull(row.sol_value_usd),
+      tokenValueUsd:finiteOrNull(row.token_value_usd),
+      solBalance:finiteOrNull(row.sol_balance),
+      tokenCount:finiteOrNull(row.token_count),
       createdAt:row.created_at,
-    })).filter((row)=>row.totalValueUsd>=0)
+    })).filter((row)=>row.totalValueUsd!==null&&row.totalValueUsd>=0)
 
     const values=rows.map((row)=>row.totalValueUsd).filter(Number.isFinite)
     const highWater=values.length?Math.max(...values):0
