@@ -224,7 +224,7 @@ export default function Home() {
       window.removeEventListener('rcxt-trade-plan-updated', handleUpdate)
       window.removeEventListener('storage', handleUpdate)
     }
-  }, [])
+  }, [scan?.chain?.family])
 
   useEffect(() => {
     let active = true
@@ -252,7 +252,8 @@ export default function Home() {
 
     async function loadCalibration() {
       try {
-        const response = await fetch('/api/history?calibration=1', { cache: 'no-store' })
+        const family=scan?.chain?.family||'solana'
+        const response = await fetch('/api/history?calibration=1&family='+encodeURIComponent(family), { cache: 'no-store' })
         const data = await response.json()
         if (active && response.ok && data?.success) {
           setCalibration({
@@ -260,6 +261,7 @@ export default function Home() {
             rows: data.rows || [],
             buckets: data.buckets || [],
             components: data.components || [],
+            chainFamily: data.chainFamily || family,
           })
         }
       } catch {}
