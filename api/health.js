@@ -37,7 +37,7 @@ async function testCharts() {
   const started = Date.now()
   try {
     const response = await fetch('https://api.geckoterminal.com/api/v2/networks/solana/new_pools?page=1', {
-      headers: { accept:'application/json', 'user-agent':'RCXT-Radar/6.0' },
+      headers: { accept:'application/json', 'user-agent':'RCXT-Radar/6.1' },
       signal: AbortSignal.timeout(3500),
     })
     const json = await response.json()
@@ -199,12 +199,14 @@ export default async function handler(req,res){
     charts,
   }
 
-  const previewSmoke = process.env.VERCEL_ENV === 'preview'
-    ? {
-        solana:await testPreviewV6(),
-        robinhood:await testPreviewRobinhood(),
-      }
-    : null
+  let previewSmoke=null
+  if(process.env.VERCEL_ENV === 'preview'){
+    const [solana,robinhood]=await Promise.all([
+      testPreviewV6(),
+      testPreviewRobinhood(),
+    ])
+    previewSmoke={solana,robinhood}
+  }
   const coreHealthy=Object.values(services).every((item)=>item.ok)
   const previewSmokeHealthy=previewSmoke ? previewSmoke.solana.ok && previewSmoke.robinhood.ok : true
   const healthy=coreHealthy && previewSmokeHealthy
@@ -231,7 +233,7 @@ export default async function handler(req,res){
       challengeEngine:'1.1.0',
       walletActivityEngine:'1.2.0',
       notificationEngine:'2.0.0',
-      persistence:'supabase-oidc-v18-multichain',
+      persistence:'supabase-oidc-v19-calibration',
       gitSha:process.env.VERCEL_GIT_COMMIT_SHA||null,
       gitRef:process.env.VERCEL_GIT_COMMIT_REF||null,
       environment:process.env.VERCEL_ENV||null,
