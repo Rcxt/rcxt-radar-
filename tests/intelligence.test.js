@@ -826,3 +826,49 @@ test('cannot-sell-all is restrictive but not treated like a honeypot',()=>{
   assert.notEqual(result.signal,'SELL / AVOID')
   assert.equal(result.contractVerified,false)
 })
+
+
+test('missing 5m price change does not earn flat-momentum bonus',()=>{
+  const complete=healthyPair()
+  complete.priceChange.m5=0
+  const missing=healthyPair()
+  delete missing.priceChange.m5
+
+  const completeResult=analyzePair(complete,baseSecurity())
+  const missingResult=analyzePair(missing,baseSecurity())
+
+  assert.ok(completeResult.setupScore>=missingResult.setupScore)
+  assert.equal(missingResult.microAcceleration,completeResult.microAcceleration)
+})
+
+test('missing flow cannot masquerade as neutral 50-50 entry confirmation',()=>{
+  const pair=healthyPair()
+  delete pair.txns.h1
+  const result=analyzePair(pair,baseSecurity())
+
+  assert.equal(result.signal,'WATCH')
+  assert.ok(result.entryGate.leanBuyMissing.some(item=>/1h transaction flow/i.test(item)))
+})
+
+test('unknown pair age blocks entry promotion',()=>{
+  const pair=healthyPair()
+  delete pair.pairCreatedAt
+  const result=analyzePair(pair,baseSecurity())
+
+  assert.equal(result.signal,'WATCH')
+  assert.ok(result.entryGate.leanBuyMissing.some(item=>/Pair age is unavailable/i.test(item)))
+  assert.equal(result.marketCapPlan.available,false)
+  assert.equal(result.marketCapPlan.basis,'insufficient-market-history')
+})
+
+test('missing momentum fields remain unknown and suppress target scenarios',()=>{
+  const pair=healthyPair()
+  delete pair.priceChange.h1
+  delete pair.priceChange.h6
+  const result=analyzePair(pair,baseSecurity())
+
+  assert.equal(result.signal,'WATCH')
+  assert.ok(result.entryGate.leanBuyMissing.some(item=>/1h momentum data is unavailable/i.test(item)))
+  assert.ok(result.entryGate.leanBuyMissing.some(item=>/6h momentum data is unavailable/i.test(item)))
+  assert.equal(result.marketCapPlan.available,false)
+})
