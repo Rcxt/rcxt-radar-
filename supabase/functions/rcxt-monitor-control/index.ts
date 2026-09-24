@@ -84,6 +84,7 @@ async function getSecrets(url: string, secretKey: string) {
     method: "POST",
     headers: headers(secretKey),
     body: "{}",
+    signal: AbortSignal.timeout(8000),
   });
   if (!response.ok) throw new Error("Monitor secret lookup failed");
   const rows = await response.json();
@@ -94,9 +95,11 @@ async function getStatus(url: string, secretKey: string, wallet: string) {
   const [monitorResponse, subsResponse] = await Promise.all([
     fetch(`${url}/rest/v1/monitor_wallets?wallet=eq.${encodeURIComponent(wallet)}&select=wallet,enabled,preferences,last_checked_at,last_event_at,last_error,updated_at&limit=1`, {
       headers: headers(secretKey),
+      signal: AbortSignal.timeout(8000),
     }),
     fetch(`${url}/rest/v1/push_subscriptions?wallet=eq.${encodeURIComponent(wallet)}&enabled=eq.true&select=id,updated_at`, {
       headers: headers(secretKey),
+      signal: AbortSignal.timeout(8000),
     }),
   ]);
   const monitorRows = monitorResponse.ok ? await monitorResponse.json() : [];
@@ -114,6 +117,7 @@ async function upsertMonitor(url: string, secretKey: string, wallet: string, ena
     method: "POST",
     headers: headers(secretKey, { prefer: "resolution=merge-duplicates,return=representation" }),
     body: JSON.stringify([row]),
+    signal: AbortSignal.timeout(8000),
   });
   if (!response.ok) throw new Error("Could not update monitor state");
   const rows = await response.json();
@@ -138,19 +142,25 @@ async function upsertSubscription(url: string, secretKey: string, wallet: string
       updated_at: new Date().toISOString(),
       last_error: null,
     }]),
+    signal: AbortSignal.timeout(8000),
   });
   if (!response.ok) throw new Error("Could not save push subscription");
   const rows = await response.json();
   return rows?.[0] || null;
 }
 
-async function disableSubscription(url: string, secretKey: string, endpoint: string) {
+async function disableSubscription(url: string, secretKey: string, wallet: string, endpoint: string) {
   if (!endpoint) return;
-  await fetch(`${url}/rest/v1/push_subscriptions?endpoint=eq.${encodeURIComponent(endpoint)}`, {
-    method: "PATCH",
-    headers: headers(secretKey, { prefer: "return=minimal" }),
-    body: JSON.stringify({ enabled: false, updated_at: new Date().toISOString() }),
-  });
+  const response=await fetch(
+    `${url}/rest/v1/push_subscriptions?wallet=eq.${encodeURIComponent(wallet)}&endpoint=eq.${encodeURIComponent(endpoint)}`,
+    {
+      method: "PATCH",
+      headers: headers(secretKey, { prefer: "return=minimal" }),
+      body: JSON.stringify({ enabled: false, updated_at: new Date().toISOString() }),
+      signal: AbortSignal.timeout(8000),
+    }
+  );
+  if(!response.ok) throw new Error("Could not disable push subscription");
 }
 
 function responseShape(wallet:string,status:any,secrets:any=null){
@@ -217,7 +227,7 @@ export default {
       } else if (action === "subscribe") {
         await upsertSubscription(keys.url, keys.secretKey, wallet, body?.subscription);
       } else if (action === "unsubscribe") {
-        await disableSubscription(keys.url, keys.secretKey, String(body?.endpoint || ""));
+        await disableSubscription(keys.url, keys.secretKey, wallet, String(body?.endpoint || ""));
       } else {
         return Response.json({ success:false, error:"Unknown action" }, { status:400 });
       }
