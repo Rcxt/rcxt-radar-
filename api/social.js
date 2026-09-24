@@ -21,15 +21,16 @@ export default async function handler(req,res){
   const address=String(getQuery(req, 'address')).trim()
   const symbol=String(getQuery(req, 'symbol')).trim().slice(0,32)
   const name=String(getQuery(req, 'name')).trim().slice(0,80)
+  const chain=String(getQuery(req, 'chain','solana')).trim().toLowerCase().slice(0,32)
   if(!address&&!symbol&&!name) return res.status(400).json({success:false,error:'Token identity is required for X search.'})
 
   const shouldPersist=String(getQuery(req, 'persist', '0'))==='1'
 
   try{
-    const social=await getSocialIntel({address,symbol,name})
+    const social=await getSocialIntel({address,symbol,name,chain})
     const persistence=shouldPersist && social?.available
       ? await Promise.race([
-          logSocialSnapshot({address,symbol,social}, req.headers?.['x-vercel-oidc-token']),
+          logSocialSnapshot({address,symbol,chain,social}, req.headers?.['x-vercel-oidc-token']),
           new Promise(resolve=>setTimeout(()=>resolve({ok:false,status:0,error:'Persistence timeout'}),1800))
         ])
       : {ok:true,skipped:true,status:0,error:null}
