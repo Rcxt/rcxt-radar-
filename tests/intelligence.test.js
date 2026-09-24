@@ -67,8 +67,9 @@ test('raw token-account concentration is used as fallback',()=>{
 
   assert.equal(result.concentration.method,'TOKEN_ACCOUNTS')
   assert.equal(result.concentration.top1Percent,75)
-  assert.ok(result.riskFlags.includes('EXTREME_ACCOUNT_CONCENTRATION'))
+  assert.ok(result.riskFlags.includes('RAW_ACCOUNT_CONCENTRATION_UNVERIFIED'))
   assert.ok(!result.riskFlags.includes('EXTREME_OWNER_CONCENTRATION'))
+  assert.notEqual(result.signal,'SELL / AVOID')
 })
 
 test('extreme concentration vetoes otherwise healthy setup',()=>{
@@ -680,4 +681,148 @@ test('extreme EVM token taxes cap score and execution quality',()=>{
   assert.ok(result.riskFlags.includes('EVM_EXTREME_TAX'))
   assert.ok(result.score<=35)
   assert.ok(result.executionScore<60)
+})
+
+
+test('stable-looking symbol cannot bypass normal contract scoring',()=>{
+  const pair=healthyPair()
+  pair.baseToken={symbol:'USDC',name:'USD Coin'}
+  const result=analyzePair(pair,baseSecurity())
+
+  assert.notEqual(result.marketState,'STABLE ASSET')
+  assert.ok(!result.riskFlags.includes('STABLE_ASSET'))
+  assert.notEqual(result.grade,'N/A')
+})
+
+test('FDV-only token does not receive mislabeled market-cap targets',()=>{
+  const pair=healthyPair()
+  pair.marketCap=null
+  pair.fdv=2_000_000
+  const result=analyzePair(pair,baseSecurity())
+
+  assert.equal(result.valuationBasis,'FDV')
+  assert.equal(result.marketCapPlan.available,false)
+  assert.equal(result.marketCapPlan.basis,'fdv-only')
+  assert.equal(result.marketCapPlan.fdv,2_000_000)
+})
+
+test('external holder evidence is preferred over unresolved raw token accounts',()=>{
+  const result=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    top1Percent:80,
+    top5Percent:90,
+    top10Percent:97,
+    ownerConcentrationAvailable:false,
+    externalConcentrationAvailable:true,
+    externalConcentrationSource:'RUGCHECK_TOP_HOLDERS',
+    externalTop1Percent:12,
+    externalTop5Percent:31,
+    externalTop10Percent:54,
+    external:{
+      providerCount:2,
+      providers:['solana-rpc','rugcheck'],
+      dangerRiskCount:0,
+      warningRiskCount:0,
+      hardRiskFlags:[],
+      softRiskFlags:[],
+      dataConflicts:[],
+      rugged:false,
+      evidenceScore:80,
+      market:{priceProviderCount:2,externalPriceProviderCount:1,priceConflict:false,liquidityConflict:false},
+    },
+  })
+
+  assert.equal(result.concentration.method,'RUGCHECK_TOP_HOLDERS')
+  assert.equal(result.concentration.top1Percent,12)
+  assert.ok(!result.riskFlags.includes('RAW_ACCOUNT_CONCENTRATION_UNVERIFIED'))
+})
+
+test('security without independent corroboration cannot promote to LEAN BUY',()=>{
+  const result=analyzePair(healthyPair(),{
+    ...baseSecurity(),
+    external:{
+      providerCount:1,
+      providers:['solana-rpc'],
+      dangerRiskCount:0,
+      warningRiskCount:0,
+      hardRiskFlags:[],
+      softRiskFlags:[],
+      dataConflicts:[],
+      rugged:false,
+      market:{priceProviderCount:2,externalPriceProviderCount:1,priceConflict:false,liquidityConflict:false},
+    },
+  })
+
+  assert.equal(result.signal,'WATCH')
+  assert.ok(result.entryGate.leanBuyMissing.some(item=>/Security evidence/i.test(item)))
+  assert.ok(result.score<=74)
+})
+
+test('single live price source cannot promote to LEAN BUY',()=>{
+  const security=evmSecurity()
+  security.external.market.priceProviderCount=1
+  security.external.market.externalPriceProviderCount=0
+  const result=analyzePair(healthyPair(),security)
+
+  assert.equal(result.signal,'WATCH')
+  assert.ok(result.entryGate.leanBuyMissing.some(item=>/price is not corroborated/i.test(item)))
+  assert.ok(result.score<=74)
+})
+
+test('liquidity-source conflict blocks entry promotion and lowers confidence',()=>{
+  const security=evmSecurity()
+  security.external.market.liquidityConflict=true
+  const result=analyzePair(healthyPair(),security)
+
+  assert.equal(result.signal,'WATCH')
+  assert.ok(result.riskFlags.includes('LIQUIDITY_SOURCE_CONFLICT'))
+  assert.ok(result.confidence<=68)
+  assert.ok(result.score<=72)
+})
+
+test('market-cap conflict suppresses scenario targets',()=>{
+  const security=evmSecurity()
+  security.external.market.marketCapConflict=true
+  security.external.market.marketCapProviderCount=2
+  security.external.market.marketCapSpreadPercent=60
+  const result=analyzePair(healthyPair(),security)
+
+  assert.equal(result.marketCapPlan.available,false)
+  assert.equal(result.marketCapPlan.basis,'market-cap-source-conflict')
+  assert.ok(result.riskFlags.includes('MARKET_CAP_SOURCE_CONFLICT'))
+  assert.ok(result.confidence<=70)
+})
+
+test('EVM mintability prevents full contract verification and buy promotion',()=>{
+  const security=evmSecurity()
+  security.external.goplus.mintable=true
+  security.external.softRiskFlags=['GOPLUS_MINTABLE']
+  const result=analyzePair(healthyPair(),security)
+
+  assert.equal(result.contractVerified,false)
+  assert.ok(result.riskFlags.includes('EVM_MINTABLE'))
+  assert.equal(result.signal,'WATCH')
+})
+
+test('EVM reclaimable ownership prevents full contract verification',()=>{
+  const security=evmSecurity()
+  security.external.goplus.takeBackOwnership=true
+  security.external.softRiskFlags=['GOPLUS_OWNERSHIP_RECLAIMABLE']
+  const result=analyzePair(healthyPair(),security)
+
+  assert.equal(result.contractVerified,false)
+  assert.ok(result.riskFlags.includes('EVM_OWNERSHIP_RECLAIMABLE'))
+  assert.equal(result.signal,'WATCH')
+})
+
+test('cannot-sell-all is restrictive but not treated like a honeypot',()=>{
+  const security=evmSecurity()
+  security.external.goplus.cannotSellAll=true
+  security.external.softRiskFlags=['GOPLUS_CANNOT_SELL_ALL']
+  const result=analyzePair(healthyPair(),security)
+
+  assert.ok(result.riskFlags.includes('EVM_CANNOT_SELL_ALL'))
+  assert.ok(!result.riskFlags.includes('EXTERNAL_STRUCTURAL_DANGER'))
+  assert.notEqual(result.signal,'SELL / AVOID')
+  assert.equal(result.contractVerified,false)
 })
