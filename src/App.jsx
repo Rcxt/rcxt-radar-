@@ -3210,7 +3210,7 @@ function EmptyScanner({ history, onSelect }) {
           <span>RECENT SCANS</span>
           <div>
             {history.map((item) => (
-              <button key={item.address} onClick={() => onSelect(item)}>
+              <button key={assetKey(item,item?.chain||'solana')} onClick={() => onSelect(item)}>
                 <strong>{item.symbol}</strong>
                 <small>{item.score}/100 · {item.signal}</small>
               </button>
@@ -3230,7 +3230,7 @@ function CompareTray({ items, onRemove, onOpen }) {
       </div>
       <div className="compareGrid">
         {items.map((item) => (
-          <div className="compareCard" key={item.address}>
+          <div className="compareCard" key={assetKey(item)}>
             <button className="compareRemove" onClick={() => onRemove(item)}>×</button>
             <button className="compareOpen" onClick={() => onOpen(item)}>
               <strong>{item.symbol || item.token?.symbol || 'TOKEN'}</strong>
