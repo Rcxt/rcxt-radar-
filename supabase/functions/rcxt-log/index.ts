@@ -165,15 +165,17 @@ async function fetchCalibrationView(url: string, secretKey: string, view: string
 }
 
 async function calibrationSummary(url: string, secretKey: string) {
-  const [summary,buckets,components,rawSummary,rawBuckets,rawComponents] = await Promise.all([
+  const [summary,buckets,components,chainSummary,chainBuckets,rawSummary,rawBuckets,rawComponents] = await Promise.all([
     fetchCalibrationView(url,secretKey,"score_calibration_clean_summary","score_version.desc,horizon.asc,signal.asc"),
     fetchCalibrationView(url,secretKey,"score_calibration_clean_buckets","score_version.desc,score_bucket_min.desc,horizon.asc"),
     fetchCalibrationView(url,secretKey,"score_component_outcomes_clean","score_version.desc,horizon.asc"),
+    fetchCalibrationView(url,secretKey,"score_calibration_chain_summary","score_version.desc,chain_family.asc,horizon.asc,signal.asc"),
+    fetchCalibrationView(url,secretKey,"score_calibration_chain_buckets","score_version.desc,chain_family.asc,score_bucket_min.desc,horizon.asc"),
     fetchCalibrationView(url,secretKey,"score_calibration_summary","score_version.desc,horizon.asc,signal.asc"),
     fetchCalibrationView(url,secretKey,"score_calibration_buckets","score_version.desc,score_bucket_min.desc,horizon.asc"),
     fetchCalibrationView(url,secretKey,"score_component_outcomes","score_version.desc,horizon.asc"),
   ]);
-  return {summary,buckets,components,rawSummary,rawBuckets,rawComponents};
+  return {summary,buckets,components,chainSummary,chainBuckets,rawSummary,rawBuckets,rawComponents};
 }
 
 async function walletHistory(url: string, secretKey: string, address: string, limit = 100) {
@@ -231,7 +233,7 @@ export default {
             kind:"calibration_summary",
             rows:calibrationData.summary,
             ...calibrationData,
-            samplePolicy:"clean-complete-components-with-timing-window"
+            samplePolicy:"independent-chain-token-time-buckets-with-timing-window"
           });
         } catch (error) {
           return Response.json({ok:false,error:String((error as Error)?.message || error).slice(0,300)},{status:500});
@@ -263,7 +265,7 @@ export default {
       return Response.json({
         ok:Boolean(keys.url && keys.secretKey),
         service:"rcxt-log",
-        version:18,
+        version:19,
       },{status:keys.url && keys.secretKey ? 200 : 500});
     }
 
