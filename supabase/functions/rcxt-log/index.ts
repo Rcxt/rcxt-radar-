@@ -52,6 +52,7 @@ function short(value: unknown, max = 120) {
 }
 
 function clamp(value: unknown, min: number, max: number) {
+  if (value === null || value === undefined || value === "") return null;
   const n = Number(value);
   return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : null;
 }
@@ -265,7 +266,7 @@ export default {
       return Response.json({
         ok:Boolean(keys.url && keys.secretKey),
         service:"rcxt-log",
-        version:19,
+        version:20,
       },{status:keys.url && keys.secretKey ? 200 : 500});
     }
 
