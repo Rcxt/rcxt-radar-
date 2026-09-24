@@ -11,6 +11,8 @@ const SUPABASE_PUBLISHABLE_KEY =
   'sb_publishable_55I4aMBK66DBjB3imBmoxg_gWKRz3Zv'
 
 const addressPattern = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/
+const evmAddressPattern = /^0x[a-fA-F0-9]{40}$/
+const chainPattern = /^[a-z0-9_-]{2,32}$/
 
 
 function getQuery(req, name, fallback = '') {
@@ -112,10 +114,12 @@ export default async function handler(req,res){
   }
 
   const address=String(getQuery(req,'address')).trim()
-  if(!addressPattern.test(address)) return res.status(400).json({success:false,error:'Invalid Solana token address.'})
+  const chain=String(getQuery(req,'chain','solana')).trim().toLowerCase()
+  if(!addressPattern.test(address)&&!evmAddressPattern.test(address)) return res.status(400).json({success:false,error:'Invalid token address.'})
+  if(!chainPattern.test(chain)) return res.status(400).json({success:false,error:'Invalid chain id.'})
 
   try{
-    const response=await fetch(`${SUPABASE_URL}/functions/v1/rcxt-log?token=${encodeURIComponent(address)}&limit=20`,{
+    const response=await fetch(`${SUPABASE_URL}/functions/v1/rcxt-log?token=${encodeURIComponent(address)}&chain=${encodeURIComponent(chain)}&limit=20`,{
       headers:{apikey:SUPABASE_PUBLISHABLE_KEY},
       cache:'no-store',
       signal:AbortSignal.timeout(3000),
@@ -124,6 +128,8 @@ export default async function handler(req,res){
     if(!response.ok||!data?.ok) throw new Error(data?.error||'History request failed')
 
     const rows=(data.rows||[]).map((row)=>({
+      chain:row.chain_id||chain,
+      chainFamily:row.chain_family||null,
       score:Number(row.score||0),
       scoreVersion:row.score_version||null,
       signal:row.signal||'WATCH',
@@ -142,7 +148,7 @@ export default async function handler(req,res){
       createdAt:row.created_at,
     }))
 
-    return res.status(200).json({success:true,address,count:rows.length,rows})
+    return res.status(200).json({success:true,address,chain,count:rows.length,rows})
   }catch(error){
     return res.status(502).json({success:false,error:error?.message||'History service unavailable.'})
   }
