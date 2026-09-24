@@ -1353,7 +1353,7 @@ export default function Home() {
 
                 <div className="commandFooter">
                   <button onClick={resetRadarWorkspace}>Reset radar workspace</button>
-                  <span>v6.0.1 · simpler scanner + stability</span>
+                  <span>v6.1 · multichain intelligence + simple verdicts</span>
                 </div>
               </div>
             ) : null}
@@ -2640,8 +2640,8 @@ export default function Home() {
 
       <footer className="footer">
         <div>
-          <b>RCXT RADAR · v6.0.1</b>
-          <span>Score engine v6.0.0 · Solana · DexScreener · GeckoTerminal · RugCheck · GoPlus</span>
+          <b>RCXT RADAR · v6.1.0</b>
+          <span>Score engine v6.1.0 · Solana + EVM · DexScreener · GeckoTerminal · RugCheck · GoPlus</span>
         </div>
         <p>
           Signals are software-generated market intelligence, not guarantees or personalized financial advice.
