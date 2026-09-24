@@ -334,10 +334,10 @@ export function buildEntryQuality({scan,analytics,tape}){
     if(atrPct>=18){score-=8;warnings.push('Per-candle volatility is extreme')}
   }
 
-  if(tape){
+  if(tape&&Number(tape?.sampleSize||0)>0&&optionalNumber(tape?.netFlowUsd)!==null&&optionalNumber(tape?.buyVolumePercent)!==null){
     evidence+=1
-    const net=Number(tape?.netFlowUsd||0)
-    const buyPct=Number(tape?.buyVolumePercent||50)
+    const net=Number(tape.netFlowUsd)
+    const buyPct=Number(tape.buyVolumePercent)
     const flags=tape?.flags||[]
 
     if(net>0&&buyPct>=55){score+=8;reasons.push('Recent USD trade flow favors buyers')}
