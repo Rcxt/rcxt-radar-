@@ -82,7 +82,7 @@ export default async function handler(req, res) {
   const address = normalizeTokenAddress(rawAddress, chain)
 
   try {
-    const pair = await getBestPair(address, chain)
+    const pair = await getBestPair(address, chain, { freshMs:1800, staleMs:45_000 })
     if (!pair) {
       return res.status(404).json({ success:false, error:'No active DexScreener market found for this token.' })
     }
