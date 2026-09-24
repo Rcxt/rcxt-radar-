@@ -7,6 +7,7 @@ import NotificationCenter from './components/NotificationCenter.jsx'
 import DetailSection from './components/DetailSection.jsx'
 import SectionBoundary from './components/SectionBoundary.jsx'
 import { deriveScanVerdict } from './lib/scan-verdict.js'
+import { listChains } from '../lib/chains.js'
 import {
   DEFAULT_NOTIFICATION_PREFS,
   normalizeNotificationPrefs,
@@ -22,6 +23,7 @@ const ALERT_DEDUPE_KEY = 'rcxt-alert-dedupe-v2'
 const WATCH_KEY = 'rcxt-watchlist-v1'
 const RULES_KEY = 'rcxt-alert-rules-v1'
 const NOTES_KEY = 'rcxt-token-notes-v1'
+const SCAN_CHAIN_OPTIONS = [{ id:'auto', label:'Auto-detect' }, ...listChains().map((chain)=>({ id:chain.id, label:chain.label }))]
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4)
@@ -33,12 +35,14 @@ function urlBase64ToUint8Array(base64String) {
 export default function Home() {
   const [view, setView] = useState('radar')
   const activeScanAddressRef = useRef('')
+  const activeScanChainRef = useRef('auto')
   const runScanRef = useRef(null)
   const [radar, setRadar] = useState([])
   const [radarLoading, setRadarLoading] = useState(true)
   const [radarError, setRadarError] = useState('')
 
   const [tokenAddress, setTokenAddress] = useState('')
+  const [scanChain, setScanChain] = useState('auto')
   const [scan, setScan] = useState(null)
   const [scanLoading, setScanLoading] = useState(false)
   const [scanError, setScanError] = useState('')
@@ -241,11 +245,15 @@ export default function Home() {
     return () => clearInterval(timer)
   }, [view, loadRadar])
 
-  const runScan = useCallback(async ({ address, silent = false } = {}) => {
+  const runScan = useCallback(async ({ address, chain, silent = false } = {}) => {
     const target = String(address ?? tokenAddress).trim()
     if (!target) return
+    const selectedChain = String(chain ?? (silent ? activeScanChainRef.current : scanChain) ?? 'auto').toLowerCase()
     if (silent && activeScanAddressRef.current !== target) return
-    if (!silent) activeScanAddressRef.current = target
+    if (!silent) {
+      activeScanAddressRef.current = target
+      activeScanChainRef.current = selectedChain
+    }
 
     if (!silent) {
       setScanLoading(true)
@@ -257,7 +265,7 @@ export default function Home() {
 
     try {
       const persist = silent ? '0' : '1'
-      const response = await fetch(`/api/scan?address=${encodeURIComponent(target)}&persist=${persist}`, {
+      const response = await fetch(`/api/scan?address=${encodeURIComponent(target)}&chain=${encodeURIComponent(selectedChain)}&persist=${persist}`, {
         cache: 'no-store',
       })
       const data = await response.json()
@@ -265,6 +273,7 @@ export default function Home() {
       if (!response.ok || !data.success) throw new Error(data.error || 'Scan failed')
 
       setTokenAddress(target)
+      activeScanChainRef.current = data.scan?.chain?.id || selectedChain
       setScan((previous) => {
         if (silent && previous?.address === data.scan.address) {
           maybeNotifySignalChange(previous, data.scan)
@@ -297,13 +306,15 @@ export default function Home() {
           name: data.scan.token.name,
           score: data.scan.intelligence.score,
           signal: data.scan.intelligence.signal,
+          chain: data.scan?.chain?.id || selectedChain,
+          chainLabel: data.scan?.chain?.label || data.scan?.chain?.id || selectedChain,
           time: Date.now(),
         }
 
         setHistory((current) => {
           const next = [
             entry,
-            ...current.filter((item) => item.address !== entry.address),
+            ...current.filter((item) => !(item.address === entry.address && (item.chain || 'solana') === (entry.chain || 'solana'))),
           ].slice(0, 12)
 
           localStorage.setItem(HISTORY_KEY, JSON.stringify(next))
@@ -317,7 +328,7 @@ export default function Home() {
     } finally {
       if (!silent && activeScanAddressRef.current === target) setScanLoading(false)
     }
-  }, [tokenAddress, notificationsEnabled, alertScore, alertMarketCap, notificationPrefs])
+  }, [tokenAddress, scanChain, notificationsEnabled, alertScore, alertMarketCap, notificationPrefs])
 
   useEffect(() => { runScanRef.current = runScan }, [runScan])
 
@@ -329,22 +340,30 @@ export default function Home() {
   }
 
   useEffect(() => {
-    function openLinkedToken(value) {
+    function openLinkedToken(value, chainValue = 'auto') {
       const address = String(value || '').trim()
-      if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)) return false
+      const valid = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address) || /^0x[a-fA-F0-9]{40}$/.test(address)
+      if (!valid) return false
+      const nextChain = String(chainValue || 'auto').toLowerCase()
       setActiveDrawer('')
       setMenuOpen(false)
       setView('scanner')
       setTokenAddress(address)
-      window.history.replaceState(null, '', '/?token=' + encodeURIComponent(address))
+      setScanChain(nextChain)
+      const params = new URLSearchParams({ token:address })
+      if (nextChain !== 'auto') params.set('chain',nextChain)
+      window.history.replaceState(null, '', '/?' + params.toString())
       window.scrollTo({ top: 0, behavior: 'instant' })
-      runScanRef.current?.({ address })
+      runScanRef.current?.({ address, chain:nextChain })
       return true
     }
-    const fromUrl = () => openLinkedToken(new URLSearchParams(window.location.search).get('token'))
+    const fromUrl = () => {
+      const params=new URLSearchParams(window.location.search)
+      return openLinkedToken(params.get('token'),params.get('chain')||'auto')
+    }
     const onMessage = (event) => {
       if (event.data?.type !== 'RCXT_OPEN_TOKEN') return
-      if (openLinkedToken(event.data.token)) event.ports?.[0]?.postMessage({ opened: true })
+      if (openLinkedToken(event.data.token,event.data.chain||'auto')) event.ports?.[0]?.postMessage({ opened: true })
     }
     fromUrl()
     window.addEventListener('popstate', fromUrl)
@@ -373,11 +392,11 @@ export default function Home() {
     if (!autoRefresh || !scan?.address) return
 
     const timer = setInterval(() => {
-      runScan({ address: scan.address, silent: true })
+      runScan({ address: scan.address, chain:scan?.chain?.id || activeScanChainRef.current, silent: true })
     }, 15000)
 
     return () => clearInterval(timer)
-  }, [autoRefresh, scan?.address, runScan])
+  }, [autoRefresh, scan?.address, scan?.chain?.id, runScan])
 
   const loadLiveMonitor = useCallback(async (targetWallet = wallet) => {
     const address = String(targetWallet || '').trim()
@@ -748,7 +767,9 @@ export default function Home() {
 
   async function shareCurrentToken() {
     if (!scan?.address) return
-    const url = `${window.location.origin}/?token=${encodeURIComponent(scan.address)}`
+    const params = new URLSearchParams({ token:scan.address })
+    if (scan?.chain?.id) params.set('chain',scan.chain.id)
+    const url = `${window.location.origin}/?${params.toString()}`
     try {
       if (navigator.share) {
         await navigator.share({
