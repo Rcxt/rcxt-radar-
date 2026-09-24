@@ -45,8 +45,11 @@ export default function ChallengeTracker({walletAddress='',walletData=null}){
   const [error,setError]=useState('')
   const [startedAt,setStartedAt]=useState(null)
   const [autoSync,setAutoSync]=useState(false)
+  const [valuationWarning,setValuationWarning]=useState('')
+  const syncRequestRef=useRef(0)
 
   useEffect(()=>{
+    syncRequestRef.current+=1
     const saved=localStorage.getItem('rcxt-challenge-wallet-v1')||''
     const nextAddress=walletAddress||saved
     setAddress(nextAddress)
@@ -58,8 +61,13 @@ export default function ChallengeTracker({walletAddress='',walletData=null}){
   },[walletAddress])
 
   useEffect(()=>{
-    if(walletData?.portfolioTotalUsd!=null) setCurrent(Number(walletData.portfolioTotalUsd||0))
-  },[walletData?.portfolioTotalUsd])
+    if(walletData?.wallet&&walletData.wallet===address.trim()&&walletData?.portfolioTotalUsd!=null){
+      setCurrent(Number(walletData.portfolioTotalUsd||0))
+      setValuationWarning(walletData?.portfolioValuationComplete===false
+        ? `Priced equity is partial: ${walletData.unpricedTokenCount||0} token position(s) currently have no market price.`
+        : '')
+    }
+  },[walletData?.wallet,walletData?.portfolioTotalUsd,walletData?.portfolioValuationComplete,walletData?.unpricedTokenCount,address])
 
   const scopedRows=useMemo(()=>{
     if(!startedAt) return data?.rows||[]
@@ -91,6 +99,7 @@ export default function ChallengeTracker({walletAddress='',walletData=null}){
   async function sync(){
     const target=address.trim()
     if(!target) return
+    const requestId=++syncRequestRef.current
     setLoading(true)
     setError('')
     try{
@@ -105,17 +114,22 @@ export default function ChallengeTracker({walletAddress='',walletData=null}){
       const walletResponse=await fetch('/api/wallet?address='+encodeURIComponent(target),{cache:'no-store'})
       const walletJson=await walletResponse.json()
       if(!walletResponse.ok||!walletJson?.success) throw new Error(walletJson?.error||'Wallet sync failed')
+      if(requestId!==syncRequestRef.current) return
       const equity=Number(walletJson.portfolioTotalUsd??walletJson.portfolioTokenValueUsd??0)
       setCurrent(equity)
+      setValuationWarning(walletJson?.portfolioValuationComplete===false
+        ? `Priced equity is partial: ${walletJson.unpricedTokenCount||0} token position(s) currently have no market price.`
+        : '')
 
       const historyResponse=await fetch('/api/challenge?address='+encodeURIComponent(target),{cache:'no-store'})
       const historyJson=await historyResponse.json()
       if(!historyResponse.ok||!historyJson?.success) throw new Error(historyJson?.error||'Challenge history failed')
+      if(requestId!==syncRequestRef.current) return
       setData(historyJson)
     }catch(err){
-      setError(err.message)
+      if(requestId===syncRequestRef.current) setError(err.message)
     }finally{
-      setLoading(false)
+      if(requestId===syncRequestRef.current) setLoading(false)
     }
   }
 
@@ -153,7 +167,7 @@ export default function ChallengeTracker({walletAddress='',walletData=null}){
       </div>
 
       <div className="challengeSync">
-        <input value={address} onChange={e=>setAddress(e.target.value)} placeholder="Paste challenge wallet address" aria-label="Challenge wallet address"/>
+        <input value={address} onChange={e=>{syncRequestRef.current+=1;setAddress(e.target.value)}} placeholder="Paste challenge wallet address" aria-label="Challenge wallet address"/>
         <button className="primaryButton" onClick={sync} disabled={loading}>{loading?'SYNCING…':'SYNC WALLET'}</button>
         <button className={autoSync?'toolButton active':'toolButton'} onClick={toggleAutoSync}>
           {autoSync?'Auto Sync On':'Auto Sync Off'}
@@ -161,6 +175,7 @@ export default function ChallengeTracker({walletAddress='',walletData=null}){
       </div>
       <small className="challengeAutoHint">Auto sync refreshes wallet equity every 5 minutes while this page is open.</small>
       {error?<div className="v4Error">{error}</div>:null}
+      {valuationWarning?<div className="challengeRiskNotice"><strong>Partial valuation</strong><span>{valuationWarning}</span></div>:null}
 
       <div className="challengeStats">
         <div><span>Current equity</span><b>{money(stats.current)}</b></div>
