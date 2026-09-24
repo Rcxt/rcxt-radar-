@@ -50,3 +50,18 @@ test('insufficient candle history is explicitly unavailable',()=>{
   assert.equal(result.available,false)
   assert.ok(result.reason)
 })
+
+
+test('flat candles report neutral RSI instead of false overbought',()=>{
+  const result=analyzeCandles(candles({count:40,start:1,step:0}),{intervalMinutes:5})
+  assert.equal(result.available,true)
+  assert.equal(result.indicators.rsi14,50)
+})
+
+test('chart horizons stay unavailable until enough real history exists',()=>{
+  const result=analyzeCandles(candles({count:10,start:1,step:0.01}),{intervalMinutes:5})
+  assert.equal(result.available,true)
+  assert.ok(Number.isFinite(result.momentum.m15))
+  assert.equal(result.momentum.h1,null)
+  assert.equal(result.momentum.h6,null)
+})
