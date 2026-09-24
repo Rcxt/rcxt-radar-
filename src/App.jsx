@@ -1987,30 +1987,92 @@ export default function Home() {
                 <article className="panel">
                   <PanelHeader eyebrow="RISK CONTROL" title="Contract + market flags" />
                   <div className="securityRows">
-                    <SecurityRow
-                      label="Mint authority"
-                      good={scan.security?.available && !scan.security?.mintAuthority}
-                      unknown={!scan.security?.available}
-                      value={
-                        !scan.security?.available
-                          ? 'Unavailable'
-                          : scan.security?.mintAuthority
-                            ? 'Active'
-                            : 'Disabled'
-                      }
-                    />
-                    <SecurityRow
-                      label="Freeze authority"
-                      good={scan.security?.available && !scan.security?.freezeAuthority}
-                      unknown={!scan.security?.available}
-                      value={
-                        !scan.security?.available
-                          ? 'Unavailable'
-                          : scan.security?.freezeAuthority
-                            ? 'Active'
-                            : 'Disabled'
-                      }
-                    />
+                    {scan.security?.securityModel === 'evm-token' ? (
+                      <>
+                        <SecurityRow
+                          label="Contract bytecode"
+                          good={scan.security?.contractCodePresent === true}
+                          unknown={!scan.security?.available || scan.security?.contractCodePresent == null}
+                          value={
+                            !scan.security?.available
+                              ? 'RPC unavailable'
+                              : scan.security?.contractCodePresent
+                                ? 'Present'
+                                : 'Not found'
+                          }
+                        />
+                        <SecurityRow
+                          label="Open source"
+                          good={scan.security?.external?.goplus?.openSource === true}
+                          unknown={scan.security?.external?.goplus?.openSource == null}
+                          value={
+                            scan.security?.external?.goplus?.openSource === true
+                              ? 'Verified source'
+                              : scan.security?.external?.goplus?.openSource === false
+                                ? 'Closed source'
+                                : 'Unknown'
+                          }
+                        />
+                        <SecurityRow
+                          label="Honeypot"
+                          good={scan.security?.external?.goplus?.honeypot === false}
+                          unknown={scan.security?.external?.goplus?.honeypot == null}
+                          value={
+                            scan.security?.external?.goplus?.honeypot === true
+                              ? 'DETECTED'
+                              : scan.security?.external?.goplus?.honeypot === false
+                                ? 'Not detected'
+                                : 'Unknown'
+                          }
+                        />
+                        <SecurityRow
+                          label="Buy / sell tax"
+                          good={
+                            Math.max(
+                              Number(scan.security?.external?.goplus?.buyTaxPercent || 0),
+                              Number(scan.security?.external?.goplus?.sellTaxPercent || 0),
+                            ) < 10
+                          }
+                          unknown={
+                            scan.security?.external?.goplus?.buyTaxPercent == null &&
+                            scan.security?.external?.goplus?.sellTaxPercent == null
+                          }
+                          value={
+                            scan.security?.external?.goplus?.buyTaxPercent == null &&
+                            scan.security?.external?.goplus?.sellTaxPercent == null
+                              ? 'Unknown'
+                              : `${fixed(scan.security?.external?.goplus?.buyTaxPercent || 0,1,'0.0')}% / ${fixed(scan.security?.external?.goplus?.sellTaxPercent || 0,1,'0.0')}%`
+                          }
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <SecurityRow
+                          label="Mint authority"
+                          good={scan.security?.available && !scan.security?.mintAuthority}
+                          unknown={!scan.security?.available}
+                          value={
+                            !scan.security?.available
+                              ? 'Unavailable'
+                              : scan.security?.mintAuthority
+                                ? 'Active'
+                                : 'Disabled'
+                          }
+                        />
+                        <SecurityRow
+                          label="Freeze authority"
+                          good={scan.security?.available && !scan.security?.freezeAuthority}
+                          unknown={!scan.security?.available}
+                          value={
+                            !scan.security?.available
+                              ? 'Unavailable'
+                              : scan.security?.freezeAuthority
+                                ? 'Active'
+                                : 'Disabled'
+                          }
+                        />
+                      </>
+                    )}
                     <SecurityRow
                       label="Contract verification"
                       good={Boolean(scan.intelligence.contractVerified)}
@@ -2115,7 +2177,7 @@ export default function Home() {
                       unknown={Number(scan.intelligence?.securityEvidence?.market?.priceProviderCount || 0) < 2}
                       value={
                         scan.intelligence?.securityEvidence?.market?.priceConflict
-                          ? `${Number(scan.intelligence?.securityEvidence?.market?.maxDeviationPercent || 0).toFixed(1)}% source spread`
+                          ? `${fixed(scan.intelligence?.securityEvidence?.market?.maxDeviationPercent || 0,1,'0.0')}% source spread`
                           : scan.intelligence?.securityEvidence?.market?.priceAgreement
                             ? 'Strong agreement'
                             : Number(scan.intelligence?.securityEvidence?.market?.priceProviderCount || 0) >= 2
@@ -2180,7 +2242,7 @@ export default function Home() {
                       value={
                         scan.intelligence?.concentration?.top1Percent == null
                           ? 'Unavailable'
-                          : `${Number(scan.intelligence.concentration.top1Percent).toFixed(1)}%`
+                          : `${fixed(scan.intelligence.concentration.top1Percent,1)}%`
                       }
                     />
                     <SecurityRow
@@ -2198,7 +2260,7 @@ export default function Home() {
                       unknown={!scan.intelligence?.concentration?.available}
                       value={
                         scan.intelligence?.concentration?.available
-                          ? `${Number(scan.intelligence.concentration.top10Percent).toFixed(1)}%`
+                          ? `${fixed(scan.intelligence.concentration.top10Percent,1)}%`
                           : 'Unavailable'
                       }
                     />
@@ -2211,7 +2273,7 @@ export default function Home() {
                           value={
                             scan.intelligence?.concentration?.accountTop1Percent == null
                               ? 'Unavailable'
-                              : `${Number(scan.intelligence.concentration.accountTop1Percent).toFixed(1)}%`
+                              : `${fixed(scan.intelligence.concentration.accountTop1Percent,1)}%`
                           }
                         />
                         <SecurityRow
