@@ -19,11 +19,11 @@
     "x"
   ],
   "socialSearch": "official-x-api-v2",
-  "persistence": "oidc-secured-v17",
+  "persistence": "supabase-oidc-v20-null-safe-calibration",
   "region": "sfo1",
-  "release": "v6.1.0-multichain-intelligence",
+  "release": "v6.1.0-full-audit",
   "releasedAt": null,
   "productionUrl": "https://rcxt-radar.vercel.app",
-  "note": "V6.1 adds chain-aware Solana + EVM token scanning, Robinhood Chain support, multichain market/security corroboration, EVM contract/tax/honeypot checks, chain-scoped history/persistence, safer rendering, and a simple YES / WAIT / NO scan verdict.",
+  "note": "V6.1 audited multichain release: chain-aware Solana + EVM scanning, null-safe evidence, race-safe UI state, corrected chart horizons, chain-scoped plans/alerts/social intel, and hardened persistence.",
   "notificationEngine": "2.1.0"
 }
