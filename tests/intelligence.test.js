@@ -872,3 +872,43 @@ test('missing momentum fields remain unknown and suppress target scenarios',()=>
   assert.ok(result.entryGate.leanBuyMissing.some(item=>/6h momentum data is unavailable/i.test(item)))
   assert.equal(result.marketCapPlan.available,false)
 })
+
+
+test('high manipulation-risk trade tape blocks entry promotion',()=>{
+  const security=evmSecurity()
+  security.external.market.tradeQuality={
+    available:true,
+    sampleQuality:'STRONG',
+    manipulationRiskScore:82,
+    activityQualityScore:18,
+    flags:['LOW_WALLET_DIVERSITY','REPEAT_WALLET_CHURN','WALLET_ACTIVITY_CONCENTRATION'],
+    summary:{sampleSize:60,uniqueWallets:3},
+  }
+  const result=analyzePair(healthyPair(),security)
+
+  assert.equal(result.signal,'WATCH')
+  assert.ok(result.riskFlags.includes('ACTIVITY_QUALITY_HIGH_RISK'))
+  assert.ok(result.score<=58)
+  assert.ok(result.confidence<=55)
+  assert.ok(result.entryGate.leanBuyMissing.some(item=>/trade activity/i.test(item)))
+})
+
+test('clean trade sample never boosts setup or safety score',()=>{
+  const baselineSecurity=evmSecurity()
+  const baseline=analyzePair(healthyPair(),baselineSecurity)
+
+  const cleanSecurity=evmSecurity()
+  cleanSecurity.external.market.tradeQuality={
+    available:true,
+    sampleQuality:'STRONG',
+    manipulationRiskScore:0,
+    activityQualityScore:100,
+    flags:[],
+    summary:{sampleSize:60,uniqueWallets:30},
+  }
+  const clean=analyzePair(healthyPair(),cleanSecurity)
+
+  assert.equal(clean.setupScore,baseline.setupScore)
+  assert.equal(clean.safetyScore,baseline.safetyScore)
+  assert.ok(clean.dataQualityScore>=baseline.dataQualityScore)
+})
