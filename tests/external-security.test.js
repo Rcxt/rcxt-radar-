@@ -4,6 +4,7 @@ import {
   mergeSecurityEvidence,
   normalizeBirdeyeSecurity,
   normalizeGoPlusSolana,
+  normalizeGoPlusEvm,
   normalizeJupiterToken,
   normalizeRugcheckReport,
 } from '../lib/external-security.js'
@@ -290,4 +291,78 @@ test('Jupiter audit isSus false is not treated as suspicious',()=>{
 
   assert.equal(normalized.available,true)
   assert.equal(normalized.suspicious,false)
+})
+
+
+test('normalizes GoPlus EVM honeypot, taxes and holder evidence',()=>{
+  const address='0x3458e003F6ED93df0F537b8AcaC6FbE08E41247f'
+  const normalized=normalizeGoPlusEvm({
+    result:{
+      [address.toLowerCase()]:{
+        is_open_source:'1',
+        is_honeypot:'0',
+        cannot_buy:'0',
+        cannot_sell_all:'0',
+        malicious_address:'0',
+        hidden_owner:'0',
+        owner_change_balance:'0',
+        can_take_back_ownership:'0',
+        selfdestruct:'0',
+        transfer_pausable:'0',
+        is_proxy:'1',
+        is_mintable:'0',
+        buy_tax:'0.02',
+        sell_tax:'0.04',
+        holder_count:'400',
+        holders:[
+          {percent:'0.12'},{percent:'0.08'},{percent:'0.06'},{percent:'0.05'},{percent:'0.04'},
+          {percent:'0.03'},{percent:'0.03'},{percent:'0.02'},{percent:'0.02'},{percent:'0.02'},
+        ],
+      },
+    },
+  },address)
+
+  assert.equal(normalized.available,true)
+  assert.equal(normalized.model,'evm')
+  assert.equal(normalized.openSource,true)
+  assert.equal(normalized.honeypot,false)
+  assert.equal(normalized.proxy,true)
+  assert.equal(normalized.buyTaxPercent,2)
+  assert.equal(normalized.sellTaxPercent,4)
+  assert.equal(normalized.top1Percent,12)
+  assert.equal(normalized.top10Percent,47)
+})
+
+test('EVM GoPlus hard danger is preserved without Solana authority assumptions',()=>{
+  const merged=mergeSecurityEvidence({
+    available:true,
+    securityModel:'evm-token',
+    source:'evm-rpc',
+    contractCodePresent:true,
+    sources:{evmRpc:true},
+  },{
+    rugcheck:{available:false},
+    jupiter:{available:false},
+    birdeye:{available:false},
+    goplus:{
+      available:true,
+      model:'evm',
+      openSource:true,
+      honeypot:true,
+      cannotSellAll:true,
+      hiddenOwner:true,
+      blacklistActive:false,
+      transferPausable:false,
+      top1Percent:10,
+      top10Percent:45,
+    },
+  })
+
+  assert.equal(merged.external.providerCount,2)
+  assert.ok(merged.external.providers.includes('evm-rpc'))
+  assert.ok(merged.external.hardRiskFlags.includes('GOPLUS_HONEYPOT'))
+  assert.ok(merged.external.hardRiskFlags.includes('GOPLUS_CANNOT_SELL'))
+  assert.ok(merged.external.hardRiskFlags.includes('GOPLUS_HIDDEN_OWNER'))
+  assert.equal(merged.external.authority.mint.votes.length,0)
+  assert.equal(merged.external.authority.freeze.votes.length,0)
 })
