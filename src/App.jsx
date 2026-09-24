@@ -47,6 +47,9 @@ export default function Home() {
   const [view, setView] = useState('radar')
   const activeScanAddressRef = useRef('')
   const activeScanChainRef = useRef('auto')
+  const scanRequestIdRef = useRef(0)
+  const walletRequestIdRef = useRef(0)
+  const monitorRequestIdRef = useRef(0)
   const runScanRef = useRef(null)
   const [radar, setRadar] = useState([])
   const [radarLoading, setRadarLoading] = useState(true)
@@ -261,6 +264,7 @@ export default function Home() {
     if (!target) return
     const selectedChain = String(chain ?? (silent ? activeScanChainRef.current : scanChain) ?? 'auto').toLowerCase()
     if (silent && activeScanAddressRef.current !== target) return
+    const requestId=++scanRequestIdRef.current
     if (!silent) {
       activeScanAddressRef.current = target
       activeScanChainRef.current = selectedChain
@@ -280,7 +284,7 @@ export default function Home() {
         cache: 'no-store',
       })
       const data = await response.json()
-      if (activeScanAddressRef.current !== target) return
+      if (requestId!==scanRequestIdRef.current || activeScanAddressRef.current !== target) return
       if (!response.ok || !data.success) throw new Error(data.error || 'Scan failed')
 
       setTokenAddress(target)
@@ -307,9 +311,9 @@ export default function Home() {
         try {
           const historyResponse = await fetch(`/api/history?address=${encodeURIComponent(target)}&chain=${encodeURIComponent(data.scan?.chain?.id || selectedChain)}`, { cache: 'no-store' })
           const historyData = await historyResponse.json()
-          if (activeScanAddressRef.current === target && historyResponse.ok && historyData?.success) setScoreHistory(historyData.rows || [])
+          if (requestId===scanRequestIdRef.current && activeScanAddressRef.current === target && historyResponse.ok && historyData?.success) setScoreHistory(historyData.rows || [])
         } catch {
-          if (activeScanAddressRef.current === target) setScoreHistory([])
+          if (requestId===scanRequestIdRef.current && activeScanAddressRef.current === target) setScoreHistory([])
         }
 
         const entry = {
@@ -334,11 +338,11 @@ export default function Home() {
         })
       }
     } catch (error) {
-      if (activeScanAddressRef.current !== target) return
+      if (requestId!==scanRequestIdRef.current || activeScanAddressRef.current !== target) return
       setScanError(error.message)
       if (!silent) setScan(null)
     } finally {
-      if (!silent && activeScanAddressRef.current === target) setScanLoading(false)
+      if (!silent && requestId===scanRequestIdRef.current && activeScanAddressRef.current === target) setScanLoading(false)
     }
   }, [tokenAddress, scanChain, notificationsEnabled, alertScore, alertMarketCap, notificationPrefs])
 
@@ -412,6 +416,7 @@ export default function Home() {
 
   const loadLiveMonitor = useCallback(async (targetWallet = wallet) => {
     const address = String(targetWallet || '').trim()
+    const requestId=++monitorRequestIdRef.current
     if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)) {
       setLiveMonitor((current) => ({ ...current, enabled:false, loading:false, subscriptionCount:0 }))
       return null
@@ -422,6 +427,7 @@ export default function Home() {
       const response = await fetch('/api/monitor?wallet=' + encodeURIComponent(address), { cache:'no-store' })
       const data = await response.json()
       if (!response.ok || !data?.success) throw new Error(data?.error || 'Monitor status unavailable')
+      if(requestId!==monitorRequestIdRef.current) return null
       const serverPrefs=data.preferencesStored
         ? normalizeNotificationPrefs(data.preferences)
         : normalizeNotificationPrefs(notificationPrefs)
@@ -441,6 +447,7 @@ export default function Home() {
       })
       return {...data,preferences:serverPrefs}
     } catch (error) {
+      if(requestId!==monitorRequestIdRef.current) return null
       setLiveMonitor((current) => ({
         ...current,
         loading:false,
@@ -825,6 +832,7 @@ export default function Home() {
   async function loadWallet() {
     const address = wallet.trim()
     if (!address) return
+    const requestId=++walletRequestIdRef.current
 
     setWalletLoading(true)
     setWalletError('')
@@ -835,12 +843,13 @@ export default function Home() {
       })
       const data = await response.json()
       if (!response.ok || !data.success) throw new Error(data.error || 'Wallet load failed')
+      if(requestId!==walletRequestIdRef.current) return
       localStorage.setItem(WALLET_KEY, address)
       setWalletData(data)
     } catch (error) {
-      setWalletError(error.message)
+      if(requestId===walletRequestIdRef.current) setWalletError(error.message)
     } finally {
-      setWalletLoading(false)
+      if(requestId===walletRequestIdRef.current) setWalletLoading(false)
     }
   }
 
