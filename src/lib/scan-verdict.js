@@ -57,9 +57,9 @@ export function deriveScanVerdict(scan){
         state:intel.contractVerified?'pass':'warn',
       },
       {
-        label:'Price sources',
-        value:priceConflict?'CONFLICT':priceProviderCount>=2?'AGREE':'PARTIAL',
-        state:priceConflict?'fail':priceProviderCount>=2?'pass':'warn',
+        label:'Market sources',
+        value:priceConflict?'PRICE CONFLICT':liquidityConflict?'LIQ CONFLICT':priceProviderCount>=2?'AGREE':'PARTIAL',
+        state:(priceConflict||liquidityConflict)?'fail':priceProviderCount>=2?'pass':'warn',
       },
       {
         label:'Execution',
