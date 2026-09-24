@@ -103,7 +103,9 @@ test('market consensus rewards close independent prices',()=>{
   assert.equal(result.externalPriceProviderCount,3)
   assert.equal(result.priceAgreement,true)
   assert.equal(result.priceConflict,false)
-  assert.ok(result.evidenceScore>=80)
+  // Strong price agreement is useful, but incompatible liquidity scopes no longer
+  // earn a fake corroboration bonus.
+  assert.ok(result.evidenceScore>=75)
 })
 
 test('market consensus flags material price disagreement',()=>{
