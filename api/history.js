@@ -14,6 +14,12 @@ const addressPattern = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/
 const evmAddressPattern = /^0x[a-fA-F0-9]{40}$/
 const chainPattern = /^[a-z0-9_-]{2,32}$/
 
+function finiteOrNull(value){
+  if(value===null||value===undefined||value==='') return null
+  const number=Number(value)
+  return Number.isFinite(number)?number:null
+}
+
 
 function getQuery(req, name, fallback = '') {
   try {
@@ -130,21 +136,21 @@ export default async function handler(req,res){
     const rows=(data.rows||[]).map((row)=>({
       chain:row.chain_id||chain,
       chainFamily:row.chain_family||null,
-      score:Number(row.score||0),
+      score:finiteOrNull(row.score),
       scoreVersion:row.score_version||null,
       signal:row.signal||'WATCH',
       risk:row.risk||null,
-      confidence:Number(row.confidence||0),
+      confidence:finiteOrNull(row.confidence),
       setupScore:row.setup_score==null?null:Number(row.setup_score),
       executionScore:row.execution_score==null?null:Number(row.execution_score),
       safetyScore:row.safety_score==null?null:Number(row.safety_score),
       dataQualityScore:row.data_quality_score==null?null:Number(row.data_quality_score),
       marketState:row.market_state||null,
       riskFlagCount:row.risk_flag_count==null?null:Number(row.risk_flag_count),
-      priceUsd:Number(row.price_usd||0),
-      marketCap:Number(row.market_cap||0),
-      liquidityUsd:Number(row.liquidity_usd||0),
-      volume24h:Number(row.volume_24h||0),
+      priceUsd:finiteOrNull(row.price_usd),
+      marketCap:finiteOrNull(row.market_cap),
+      liquidityUsd:finiteOrNull(row.liquidity_usd),
+      volume24h:finiteOrNull(row.volume_24h),
       createdAt:row.created_at,
     }))
 
